@@ -481,6 +481,7 @@ function renderApps(rows, totalSummary) {
           <span class="footer-stat"><span>${s.agentCount}</span> agent</span>
           <span class="footer-stat"><span>${fmtNum(s.totalRecord)}</span> record</span>
           <span class="footer-stat">Rate <span>${fmtRate(s.avgRate)}</span></span>
+          <a href="agent.html?bulan=${encodeURIComponent(document.getElementById('selBulan').value)}&tahun=${document.getElementById('selTahun').value}" style="font-size:11px;color:var(--accent);text-decoration:none;font-weight:500">Cari agent →</a>
         </div>
       </div>`;
   }).join('');
