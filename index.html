@@ -197,6 +197,14 @@ select:focus { border-color: var(--accent); }
       <option value="2026">2026</option>
       <option value="2027">2027</option>
     </select>
+    <label>Aplikasi</label>
+    <select id="selAplikasi" onchange="onAplikasiChange()">
+      <option value="">Semua</option>
+    </select>
+    <label>Bucket</label>
+    <select id="selBucket" onchange="applyFilter()">
+      <option value="">Semua</option>
+    </select>
     <div class="filter-sep"></div>
     <button class="btn-refresh" id="btnRefresh" onclick="loadData(true)">↻ Refresh</button>
   </div>
@@ -345,6 +353,79 @@ function toggleTheme() {
   document.getElementById('selTahun').value = String(now.getFullYear());
 })();
 
+/* ============ FILTER DROPDOWN ============ */
+let allAplikasiList = [];
+let allBucketMap = {}; // aplikasi -> [buckets]
+let cachedRows = [];
+let cachedWeekly = null;
+
+function populateAplikasi(list) {
+  allAplikasiList = list;
+  const sel = document.getElementById('selAplikasi');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">Semua</option>' + list.map(a => `<option value="${a}">${a}</option>`).join('');
+  if (cur && list.includes(cur)) sel.value = cur;
+}
+
+function populateBucket(aplikasi) {
+  const sel = document.getElementById('selBucket');
+  const cur = sel.value;
+  let buckets = [];
+  if (aplikasi && allBucketMap[aplikasi]) {
+    buckets = allBucketMap[aplikasi];
+  } else {
+    const all = new Set();
+    Object.values(allBucketMap).forEach(b => b.forEach(x => all.add(x)));
+    buckets = [...all].sort();
+  }
+  sel.innerHTML = '<option value="">Semua</option>' + buckets.map(b => `<option value="${b}">${b}</option>`).join('');
+  if (cur && buckets.includes(cur)) sel.value = cur;
+}
+
+function onAplikasiChange() {
+  const ap = document.getElementById('selAplikasi').value;
+  populateBucket(ap);
+  applyFilter();
+}
+
+function applyFilter() {
+  const ap = document.getElementById('selAplikasi').value;
+  const bk = document.getElementById('selBucket').value;
+  const bulan = document.getElementById('selBulan').value;
+  const tahun = document.getElementById('selTahun').value;
+
+  let rows = cachedRows;
+  if (ap) rows = rows.filter(r => r.aplikasi === ap);
+  if (bk) rows = rows.filter(r => r.bucket === bk);
+
+  const summary = summarizeRows(rows);
+  summary.totalRecord = rows.length;
+  renderSummary(summary);
+  renderApps(rows, summary);
+
+  // Filter weekly juga
+  if (cachedWeekly && cachedWeekly.weekly) {
+    if (ap || bk) {
+      // Rebuild weekly dari cachedRows yang sudah difilter
+      const weeks = {};
+      rows.filter(r => r.tanggal).forEach(r => {
+        const day = parseInt((r.tanggal || '').split('-')[2] || '0');
+        const wKey = 'Minggu ' + Math.ceil(day / 7);
+        if (!weeks[wKey]) weeks[wKey] = [];
+        weeks[wKey].push(r);
+      });
+      const fakeWeekly = { success: true, weekly: {} };
+      Object.keys(weeks).sort().forEach(wk => {
+        fakeWeekly.weekly[wk] = summarizeRows(weeks[wk]);
+        fakeWeekly.weekly[wk].totalRecord = weeks[wk].length;
+      });
+      renderWeekly(fakeWeekly, bulan, tahun);
+    } else {
+      renderWeekly(cachedWeekly, bulan, tahun);
+    }
+  }
+}
+
 /* ============ LOAD DATA ============ */
 async function loadData(force) {
   const bulan = document.getElementById('selBulan').value;
@@ -369,12 +450,60 @@ async function loadData(force) {
   try {
     const [homeData_, weeklyData_] = await Promise.all([
       fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`),
-      fetchJSON(`${API_URL}?action=weekly&bulan=${bulan}&tahun=${tahun}`)
+      fetchJSON(`${API_URL}?action=weekly&bulan=${bulan}&tahun=${tahun}`),
+      fetchJSON(`${API_URL}?action=home`).then(d => {
+        if (d.aplikasiList) {
+          // Build bucketMap dari rows nanti, tapi populate aplikasi dulu
+          populateAplikasi(d.aplikasiList);
+        }
+      }).catch(() => {})
     ]);
     homeData   = homeData_;
     weeklyData = weeklyData_;
+    cachedWeekly = weeklyData_;
 
     if (!homeData.success) throw new Error(homeData.message || 'Gagal memuat data');
+
+    cachedRows = homeData.rows || [];
+
+    // Build bucketMap dari rows
+    allBucketMap = {};
+    cachedRows.forEach(r => {
+      const ap = r.aplikasi || '';
+      const bk = r.bucket || '';
+      if (ap && bk) {
+        if (!allBucketMap[ap]) allBucketMap[ap] = new Set();
+        allBucketMap[ap].add(bk);
+      }
+    });
+    Object.keys(allBucketMap).forEach(ap => {
+      allBucketMap[ap] = [...allBucketMap[ap]].sort();
+    });
+
+    // Populate aplikasi jika belum
+    if (allAplikasiList.length === 0) {
+      populateAplikasi(Object.keys(allBucketMap).sort());
+    }
+    populateBucket(document.getElementById('selAplikasi').value);
+
+    // Reset filter bucket/aplikasi saat ganti bulan/tahun
+    document.getElementById('selAplikasi').value = '';
+    document.getElementById('selBucket').value = '';
+    populateBucket('');
+
+    renderSummary(homeData.summary);
+    renderApps(homeData.rows, homeData.summary);
+    renderWeekly(weeklyData, bulan, tahun);
+
+    const now = new Date();
+    document.getElementById('lastUpdate').textContent = 'Update: ' + now.toLocaleTimeString('id-ID');
+  } catch(e) {
+    showError('Gagal memuat data. Klik Refresh untuk coba lagi. (' + e.message + ')');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '↻ Refresh';
+}
 
     renderSummary(homeData.summary);
     renderApps(homeData.rows, homeData.summary);

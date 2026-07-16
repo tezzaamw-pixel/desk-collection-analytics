@@ -170,6 +170,14 @@ select:focus{border-color:var(--accent);}
     <select id="selTahun">
       <option>2025</option><option>2026</option><option>2027</option>
     </select>
+    <label>Aplikasi</label>
+    <select id="selAplikasi" onchange="onAplikasiChange()">
+      <option value="">Semua</option>
+    </select>
+    <label>Bucket</label>
+    <select id="selBucket">
+      <option value="">Semua</option>
+    </select>
     <div class="filter-sep"></div>
     <button class="btn-load" id="btnLoad" onclick="loadData()">Tampilkan</button>
   </div>
@@ -198,6 +206,7 @@ let currentSort = 'dailyPayment';
 let chartInstance = null;
 let currentChartMetric = 'dailyPayment';
 let currentTL = null;
+let allBucketMap = {};
 
 const CHART_METRICS = [
   {key:'dailyPayment',label:'Payment',fmt:'rp'},
@@ -206,6 +215,53 @@ const CHART_METRICS = [
   {key:'ptp',label:'PTP',fmt:'num'},
   {key:'jmlDataBayar',label:'Data Bayar',fmt:'num'},
 ];
+
+function buildBucketMap(rows) {
+  allBucketMap = {};
+  rows.forEach(r => {
+    const ap = r.aplikasi || '';
+    const bk = r.bucket || '';
+    if (ap && bk) {
+      if (!allBucketMap[ap]) allBucketMap[ap] = new Set();
+      allBucketMap[ap].add(bk);
+    }
+  });
+  Object.keys(allBucketMap).forEach(ap => {
+    allBucketMap[ap] = [...allBucketMap[ap]].sort();
+  });
+}
+
+function populateAplikasi(rows) {
+  const aplikasiList = [...new Set(rows.map(r => r.aplikasi).filter(Boolean))].sort();
+  const sel = document.getElementById('selAplikasi');
+  sel.innerHTML = '<option value="">Semua</option>' + aplikasiList.map(a => `<option value="${a}">${a}</option>`).join('');
+}
+
+function populateBucket(aplikasi) {
+  const sel = document.getElementById('selBucket');
+  let buckets = [];
+  if (aplikasi && allBucketMap[aplikasi]) {
+    buckets = allBucketMap[aplikasi];
+  } else {
+    const all = new Set();
+    Object.values(allBucketMap).forEach(b => b.forEach(x => all.add(x)));
+    buckets = [...all].sort();
+  }
+  sel.innerHTML = '<option value="">Semua</option>' + buckets.map(b => `<option value="${b}">${b}</option>`).join('');
+}
+
+function onAplikasiChange() {
+  populateBucket(document.getElementById('selAplikasi').value);
+}
+
+function getFilteredRows() {
+  const ap = document.getElementById('selAplikasi').value;
+  const bk = document.getElementById('selBucket').value;
+  let rows = allRows;
+  if (ap) rows = rows.filter(r => r.aplikasi === ap);
+  if (bk) rows = rows.filter(r => r.bucket === bk);
+  return rows;
+}
 
 /* ============ THEME ============ */
 function toggleTheme(){
@@ -284,6 +340,9 @@ async function loadData(){
     if(!data.success) throw new Error(data.message);
     allRows=data.rows||[];
     currentTL=null;
+    buildBucketMap(allRows);
+    populateAplikasi(allRows);
+    populateBucket('');
     renderView();
   } catch(e){
     document.getElementById('content').innerHTML=`<div class="state-box"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
@@ -312,6 +371,7 @@ function summarizeRows(rows){
 
 /* ============ SPV VIEW ============ */
 function renderSPVList(){
+  const rows = getFilteredRows();
   const bySPV={};
   allRows.forEach(r=>{
     const spv=r.supervisor||'(Tanpa SPV)';
@@ -429,7 +489,8 @@ function showSPVDetail(spv){
 
 /* ============ TL VIEW ============ */
 function renderTLSelectWrap(){
-  const tlList=[...new Set(allRows.map(r=>r.teamLeader||'').filter(Boolean))].sort();
+  const rows = getFilteredRows();
+  const tlList=[...new Set(rows.map(r=>r.teamLeader||'').filter(Boolean))].sort();
   const bulan=document.getElementById('selBulan').value;
   const tahun=document.getElementById('selTahun').value;
 
