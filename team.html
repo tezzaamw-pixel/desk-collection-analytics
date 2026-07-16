@@ -368,14 +368,35 @@ function showSPVDetail(spv){
   const tlCount=new Set(sRows.map(r=>r.teamLeader)).size;
   const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
   const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
+
+  // Ambil setup untuk SPV ini
+  const setup=getSetup(spv);
+  const setupMetrics=setup.map(key=>ALL_METRICS.find(m=>m.key===key)).filter(Boolean);
+
+  // Group by TL
   const byTL={};sRows.forEach(r=>{const tl=r.teamLeader||'(Tanpa TL)';if(!byTL[tl])byTL[tl]=[];byTL[tl].push(r);});
-  const tlRows=Object.keys(byTL).map(tl=>{const ts=summarizeRows(byTL[tl]);return{tl,s:ts,agentCount:new Set(byTL[tl].map(r=>r.agent)).size};}).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
-  const tlTable=tlRows.map((t,i)=>`<tr>
-    <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span><a class="agent-link" href="team.html?view=tl&tl=${encodeURIComponent(t.tl)}&bulan=${bulan}&tahun=${tahun}">${t.tl}</a></td>
-    <td class="num">${t.agentCount}</td><td class="num">${fmtRp(t.s.dailyPayment)}</td>
-    <td class="num">${fmtRate(t.s.avgRate)}</td><td class="num">${fmtNum(t.s.callManual)}</td>
-    <td class="num">${fmtNum(t.s.sentuhWA)}</td><td class="num">${fmtNum(t.s.ptp)}</td><td class="num">${fmtNum(t.s.ptpBayar)}</td>
-  </tr>`).join('');
+
+  // Group by agent langsung
+  const byAgent={};sRows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
+  const agentSums=Object.keys(byAgent).map(ag=>{
+    const as=summarizeRows(byAgent[ag]);
+    const hadir=byAgent[ag].filter(r=>r.absensi==='Hadir').length;
+    const tl=byAgent[ag][0]&&byAgent[ag][0].teamLeader||'—';
+    return{ag,s:as,hadir,total:byAgent[ag].length,tl};
+  }).sort((a,b)=>(b.s[setup[0]]||b.s.dailyPayment||0)-(a.s[setup[0]]||a.s.dailyPayment||0));
+
+  // Header tabel agent dari setup
+  const agentTh='<th>Agent</th><th>TL</th><th>Hadir</th>'+setupMetrics.map(m=>`<th>${m.label}</th>`).join('');
+  const agentTbody=agentSums.map((a,i)=>{
+    const metricCells=setupMetrics.map(m=>`<td class="num">${fmtMetric(m,a.s[m.key]||0)}</td>`).join('');
+    return `<tr>
+      <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span><a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${bulan}&tahun=${tahun}">${a.ag}</a></td>
+      <td style="color:var(--text3);font-size:11px">${a.tl}</td>
+      <td><span class="absensi-pill ab-hadir">${a.hadir}/${a.total}</span></td>
+      ${metricCells}
+    </tr>`;
+  }).join('');
+
   document.getElementById('spvDetail').innerHTML=`
     <div class="team-header">
       <div class="team-avatar">${initials}</div>
@@ -391,10 +412,13 @@ function showSPVDetail(spv){
       <div class="sum-card"><div class="lbl">PTP</div><div class="val">${fmtNum(s.ptp)}</div><div class="sub">${fmtNum(s.ptpBayar)} bayar</div></div>
     </div>
     <div class="rank-section">
-      <div class="rank-header"><span class="rank-title">Per Team Leader</span></div>
+      <div class="rank-header">
+        <span class="rank-title">Detail per Agent</span>
+        <span style="font-size:11px;color:var(--text3)">Kolom sesuai setup kartu · diurutkan berdasarkan ${setupMetrics[0]?setupMetrics[0].label:'Payment'}</span>
+      </div>
       <div class="rank-body"><table class="rank-table">
-        <thead><tr><th>Team Leader</th><th>Agent</th><th>Payment</th><th>Rate</th><th>Call Manual</th><th>Sentuh WA</th><th>PTP</th><th>PTP Bayar</th></tr></thead>
-        <tbody>${tlTable}</tbody>
+        <thead><tr>${agentTh}</tr></thead>
+        <tbody>${agentTbody}</tbody>
       </table></div>
     </div>`;
   document.getElementById('spvDetail').scrollIntoView({behavior:'smooth',block:'start'});
