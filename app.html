@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Aplikasi — Desk Collection Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
+  --border:#e4e7ec;--text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --accent:#1d60c8;--accent-bg:#eef3fd;
+  --success:#059669;--success-bg:#ecfdf5;
+  --warning:#d97706;--warning-bg:#fffbeb;
+  --danger:#dc2626;--danger-bg:#fef2f2;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.07);--shadow-md:0 4px 12px rgba(0,0,0,0.1);
+  --sidebar-w:220px;
+}
+[data-theme="dark"]{
+  --navy:#0f1523;--bg:#0a0d14;--surface:#131825;--surface2:#1a2035;
+  --border:#252d42;--text:#f1f3f9;--text2:#9aa5be;--text3:#4a5568;
+  --accent:#4a8cf7;--accent-bg:#1a2540;
+  --success:#34d399;--success-bg:#0d2e22;
+  --warning:#fbbf24;--warning-bg:#2d200a;
+  --danger:#f87171;--danger-bg:#2d0f0f;
+  --shadow:0 1px 3px rgba(0,0,0,0.4);--shadow-md:0 4px 12px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+
+/* NAVBAR */
+.navbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 calc(var(--sidebar-w)+20px);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.nav-logo{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;text-decoration:none;}
+.nav-logo-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.nav-page-title{font-size:13px;color:rgba(255,255,255,0.5);border-left:1px solid rgba(255,255,255,0.15);padding-left:12px;margin-left:4px;}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.nav-timestamp{font-size:11px;color:rgba(255,255,255,0.5);}
+.nav-live{display:flex;align-items:center;gap:5px;font-size:11px;color:#34d399;}
+.nav-live-dot{width:7px;height:7px;border-radius:50%;background:#34d399;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.theme-toggle{display:flex;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-sm);overflow:hidden;}
+.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;transition:all .15s;}
+.theme-btn.active{background:rgba(255,255,255,0.2);color:#fff;}
+.btn-nav{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:5px 12px;color:rgba(255,255,255,0.85);font-size:12px;cursor:pointer;display:flex;align-items:center;gap:5px;}
+.btn-nav:hover{background:rgba(255,255,255,0.18);}
+.btn-nav:disabled{opacity:.5;cursor:not-allowed;}
+
+/* SIDEBAR */
+.sidebar{position:fixed;top:52px;left:0;width:var(--sidebar-w);height:calc(100vh - 52px);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;z-index:100;}
+.sidebar-section{padding:16px 12px 8px;}
+.sidebar-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:0 6px;margin-bottom:6px;}
+.sidebar-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;transition:all .15s;text-decoration:none;margin-bottom:2px;}
+.sidebar-item:hover{background:var(--surface2);color:var(--text);}
+.sidebar-item.active{background:var(--accent-bg);color:var(--accent);}
+.sidebar-item .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.sidebar-item .icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
+
+/* MAIN */
+.main{margin-left:var(--sidebar-w);margin-top:52px;padding:28px;min-height:calc(100vh - 52px);}
+
+/* PAGE HEADER */
+.page-header{margin-bottom:24px;}
+.page-eyebrow{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
+.page-title{font-size:26px;font-weight:700;color:var(--text);margin-bottom:4px;display:flex;align-items:center;gap:12px;}
+.app-color-bar{width:14px;height:28px;border-radius:4px;flex-shrink:0;}
+.page-desc{font-size:13px;color:var(--text2);}
+
+/* FILTER */
+.filter-bar{display:flex;align-items:center;gap:10px;margin-bottom:24px;flex-wrap:wrap;}
+.filter-bar label{font-size:12px;color:var(--text3);font-weight:500;}
+select{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;color:var(--text);font-size:13px;cursor:pointer;outline:none;box-shadow:var(--shadow);}
+select:focus{border-color:var(--accent);}
+
+/* STAT CARDS */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:28px;}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--border);}
+.stat-card.c-blue::before{background:var(--accent);}
+.stat-card.c-green::before{background:var(--success);}
+.stat-card.c-orange::before{background:var(--warning);}
+.stat-card.c-red::before{background:var(--danger);}
+.stat-label{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px;}
+.stat-value{font-size:24px;font-weight:700;color:var(--text);line-height:1;margin-bottom:5px;}
+.stat-value.c-blue{color:var(--accent);}
+.stat-value.c-green{color:var(--success);}
+.stat-value.c-orange{color:var(--warning);}
+.stat-sub{font-size:12px;color:var(--text3);}
+
+/* CHART */
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow);margin-bottom:24px;}
+.chart-card-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.chart-card-title{font-size:14px;font-weight:600;color:var(--text);}
+.chart-tabs{display:flex;background:var(--surface2);border-radius:var(--radius-sm);padding:3px;gap:2px;}
+.chart-tab{padding:5px 14px;border-radius:4px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;border:none;background:none;transition:all .15s;}
+.chart-tab.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow);}
+.chart-wrap{position:relative;height:240px;}
+
+/* ACR SECTION */
+.section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.section-title{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
+.section-big-title{font-size:20px;font-weight:700;color:var(--text);margin-bottom:4px;}
+.section-desc{font-size:12px;color:var(--text2);margin-bottom:20px;}
+
+/* ACR SUMMARY CARDS */
+.acr-summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:24px;}
+.acr-sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;box-shadow:var(--shadow);position:relative;overflow:hidden;}
+.acr-sum-card::before{content:'';position:absolute;top:0;left:0;bottom:0;width:3px;}
+.acr-sum-card.c-default::before{background:var(--border);}
+.acr-sum-card.c-green::before{background:var(--success);}
+.acr-sum-card.c-blue::before{background:var(--accent);}
+.acr-sum-card.c-orange::before{background:var(--warning);}
+.acr-sum-lbl{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+.acr-sum-val{font-size:20px;font-weight:700;color:var(--text);line-height:1;margin-bottom:3px;}
+.acr-sum-val.c-green{color:var(--success);}
+.acr-sum-val.c-blue{color:var(--accent);}
+.acr-sum-val.c-orange{color:var(--warning);}
+.acr-sum-sub{font-size:11px;color:var(--text3);}
+
+/* ACR RANK SWITCH */
+.rank-switch{display:flex;gap:6px;flex-wrap:wrap;}
+.rank-switch-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 12px;font-size:12px;color:var(--text2);cursor:pointer;transition:all .15s;}
+.rank-switch-btn.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:500;}
+
+/* ACR WEEK COLUMNS */
+.acr-weeks{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+@media(max-width:900px){.acr-weeks{grid-template-columns:repeat(2,1fr);}}
+@media(max-width:500px){.acr-weeks{grid-template-columns:1fr;}}
+.acr-week-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.acr-week-header{background:var(--navy);padding:10px 14px;text-align:center;}
+[data-theme="dark"] .acr-week-header{background:#1e2a45;}
+.acr-week-title{font-size:13px;font-weight:700;color:#fff;letter-spacing:.04em;}
+.acr-week-body{padding:8px 0;}
+.acr-week-empty{text-align:center;padding:24px 12px;font-size:12px;color:var(--text3);}
+.acr-agent-row{display:flex;align-items:center;gap:10px;padding:8px 12px;border-bottom:1px solid var(--border);transition:background .1s;}
+.acr-agent-row:last-child{border-bottom:none;}
+.acr-agent-row:hover{background:var(--surface2);}
+.acr-rank-num{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.rank-1{background:#FEF3C7;color:#92400E;}
+.rank-2{background:#F1F5F9;color:#475569;}
+.rank-3{background:#FEE2E2;color:#7F1D1D;}
+.rank-other{background:var(--surface2);color:var(--text3);}
+.acr-agent-info{flex:1;min-width:0;}
+.acr-akun-name{font-size:11px;color:var(--text3);font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.acr-agent-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.acr-agent-val{font-size:12px;font-weight:600;color:var(--success);white-space:nowrap;flex-shrink:0;}
+
+/* WEEKLY SUMMARY TABLE */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden;}
+.table-card-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.table-card-title{font-size:14px;font-weight:600;}
+.tbl-wrap{overflow-x:auto;}
+.data-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;}
+.data-table th{text-align:left;padding:10px 14px;color:var(--text3);font-weight:500;border-bottom:1px solid var(--border);background:var(--surface2);}
+.data-table td{padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text2);}
+.data-table tr:last-child td{border-bottom:none;}
+.data-table tr:hover td{background:var(--surface2);}
+.data-table td.bold{font-weight:600;color:var(--text);}
+.data-table td.num{color:var(--text);font-weight:500;}
+.data-table td.green{color:var(--success);font-weight:600;}
+.data-table tfoot td{font-weight:700;color:var(--text);border-top:2px solid var(--border);background:var(--surface2);}
+.agent-link{color:var(--accent);text-decoration:none;font-weight:600;}
+.agent-link:hover{text-decoration:underline;}
+
+/* STATE */
+.state-box{text-align:center;padding:80px 20px;color:var(--text3);}
+.state-box .icon{font-size:40px;margin-bottom:14px;}
+.state-box p{font-size:14px;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 16px;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+@media(max-width:768px){
+  :root{--sidebar-w:0px;}
+  .sidebar{display:none;}
+  .navbar{padding-left:20px;}
+  .main{margin-left:0;padding:16px;}
+}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">DC</span> DeskCollection Analytics</a>
+    <span class="nav-page-title" id="navPageTitle">Aplikasi</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-timestamp" id="navTimestamp">—</span>
+    <div class="theme-toggle">
+      <button class="theme-btn active" id="btnTerang" onclick="setTheme('light')">☀ Terang</button>
+      <button class="theme-btn" id="btnGelap" onclick="setTheme('dark')">🌙 Gelap</button>
+    </div>
+    <button class="btn-nav" id="btnRefresh" onclick="loadData()">↻ Refresh</button>
+    <div class="nav-live"><div class="nav-live-dot"></div>Live</div>
+  </div>
+</nav>
+
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Nama Aplikasi</div>
+    <div id="sidebarApps"><div style="padding:8px 10px;font-size:12px;color:var(--text3)">Memuat...</div></div>
+  </div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="team.html"><span class="icon">👥</span> Tim</a>
+    <a class="sidebar-item" href="agent.html"><span class="icon">👤</span> Agent</a>
+  </div>
+</aside>
+
+<main class="main">
+  <!-- PAGE HEADER -->
+  <div class="page-header">
+    <div class="page-eyebrow" id="pageEyebrow">APLIKASI — <span id="eyebrowDate">—</span></div>
+    <div class="page-title"><div class="app-color-bar" id="appColorBar"></div><span id="appNameTitle">—</span></div>
+    <div class="page-desc" id="pageDesc">—</div>
+  </div>
+
+  <!-- FILTER -->
+  <div class="filter-bar">
+    <label>Bulan</label>
+    <select id="selBulan" onchange="loadData()">
+      <option>Januari</option><option>Februari</option><option>Maret</option>
+      <option>April</option><option>Mei</option><option>Juni</option>
+      <option>Juli</option><option>Agustus</option><option>September</option>
+      <option>Oktober</option><option>November</option><option>Desember</option>
+    </select>
+    <label>Tahun</label>
+    <select id="selTahun" onchange="loadData()">
+      <option>2025</option><option>2026</option><option>2027</option>
+    </select>
+    <label>Bucket</label>
+    <select id="selBucket" onchange="applyBucketFilter()">
+      <option value="">Semua Bucket</option>
+    </select>
+  </div>
+
+  <!-- STAT CARDS -->
+  <div class="stat-grid" id="statGrid">
+    <div class="state-box" style="grid-column:1/-1"><div class="spinner"></div><p>Memuat data...</p></div>
+  </div>
+
+  <!-- CHART -->
+  <div class="chart-card" id="chartCard" style="display:none">
+    <div class="chart-card-header">
+      <span class="chart-card-title">Tren Harian — <span id="chartAppName">—</span></span>
+      <div class="chart-tabs">
+        <button class="chart-tab active" onclick="switchChart('payment')">Payment</button>
+        <button class="chart-tab" onclick="switchChart('call')">Call Manual</button>
+        <button class="chart-tab" onclick="switchChart('wa')">Sentuh WA</button>
+        <button class="chart-tab" onclick="switchChart('ptp')">PTP</button>
+      </div>
+    </div>
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+  </div>
+
+  <!-- ACR -->
+  <div id="acrSection" style="display:none">
+    <div class="section-title">ACR</div>
+    <div class="section-big-title">Agent Collection Report</div>
+    <div class="section-desc" id="acrDesc">—</div>
+
+    <!-- ACR SUMMARY -->
+    <div class="acr-summary" id="acrSummary"></div>
+
+    <!-- ACR RANK SWITCH -->
+    <div class="section-header">
+      <span style="font-size:13px;font-weight:600;color:var(--text)">Ranking per Minggu</span>
+      <div class="rank-switch">
+        <button class="rank-switch-btn active" onclick="switchRank('payment')">Payment</button>
+        <button class="rank-switch-btn" onclick="switchRank('rate')">Rate</button>
+        <button class="rank-switch-btn" onclick="switchRank('ptp')">PTP</button>
+        <button class="rank-switch-btn" onclick="switchRank('call')">Call Manual</button>
+      </div>
+    </div>
+
+    <!-- ACR WEEK COLUMNS -->
+    <div class="acr-weeks" id="acrWeeks"></div>
+
+    <!-- WEEKLY SUMMARY TABLE -->
+    <div class="table-card">
+      <div class="table-card-header">
+        <span class="table-card-title">Weekly Summary</span>
+        <span style="font-size:12px;color:var(--text3)" id="tableDesc">—</span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Nama Akun</th>
+              <th>Nama Agent</th>
+              <th>Total</th>
+              <th>W1</th><th>W2</th><th>W3</th><th>W4</th><th>W5</th>
+              <th>%</th>
+              <th>Rank</th>
+            </tr>
+          </thead>
+          <tbody id="weeklyTableBody"></tbody>
+          <tfoot id="weeklyTableFoot"></tfoot>
+        </table>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<script>
+const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
+const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
+function getColor(ap){return APP_COLORS[ap]||'#6366f1';}
+
+/* STATE */
+let currentAp='';
+let allRows=[];
+let filteredRows=[];
+let chartInstance=null;
+let currentChart='payment';
+let currentRank='payment';
+let weeklyByAgent={};
+let allBuckets=[];
+
+/* FORMAT */
+function fmtRp(n){if(!n||n===0)return 'Rp 0';if(n>=1e9)return 'Rp '+(n/1e9).toFixed(2)+' M';if(n>=1e6)return 'Rp '+(n/1e6).toFixed(1)+' jt';if(n>=1e3)return 'Rp '+(n/1e3).toFixed(0)+' rb';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
+function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
+function fmtRate(n){return n?(n*100).toFixed(2)+'%':'0%';}
+
+function rankVal(ag,metric){
+  const rows=weeklyByAgent[ag]||[];
+  if(metric==='payment') return rows.reduce((a,r)=>a+(r.dailyPayment||0),0);
+  if(metric==='rate'){const tb=rows.reduce((a,r)=>a+(r.jmlDataBayar||0),0);return tb>0?rows.reduce((a,r)=>a+(r.rate*r.jmlDataBayar),0)/tb:rows.reduce((a,r)=>a+(r.rate||0),0)/rows.length;}
+  if(metric==='ptp') return rows.reduce((a,r)=>a+(r.ptp||0),0);
+  if(metric==='call') return rows.reduce((a,r)=>a+(r.callManual||0),0);
+  return 0;
+}
+
+/* THEME */
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('dca_theme',t);
+  document.getElementById('btnTerang').classList.toggle('active',t==='light');
+  document.getElementById('btnGelap').classList.toggle('active',t==='dark');
+  if(chartInstance) renderTrendChart();
+}
+(function(){
+  const t=localStorage.getItem('dca_theme')||'light';
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('btnTerang').classList.toggle('active',t==='light');
+  document.getElementById('btnGelap').classList.toggle('active',t==='dark');
+})();
+
+/* FILTER INIT */
+(function(){
+  const p=new URLSearchParams(window.location.search);
+  currentAp=p.get('ap')||'';
+  const now=new Date();
+  const bl=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  document.getElementById('selBulan').value=p.get('bulan')||bl[now.getMonth()];
+  document.getElementById('selTahun').value=p.get('tahun')||String(now.getFullYear());
+  if(currentAp){
+    document.getElementById('navPageTitle').textContent=currentAp;
+    document.getElementById('appNameTitle').textContent=currentAp;
+    document.getElementById('appColorBar').style.background=getColor(currentAp);
+    document.title=currentAp+' — Desk Collection Analytics';
+    loadData();
+  } else {
+    document.getElementById('statGrid').innerHTML='<div class="state-box" style="grid-column:1/-1"><div class="icon">⚠️</div><p>Aplikasi tidak ditemukan. <a href="index.html">Kembali ke Home</a></p></div>';
+  }
+})();
+
+/* FETCH */
+async function fetchJSON(url){
+  const res=await fetch(url);const text=await res.text();
+  if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));return await(await fetch(url)).json();}
+  return JSON.parse(text);
+}
+
+/* LOAD DATA */
+async function loadData(){
+  if(!currentAp) return;
+  const bulan=document.getElementById('selBulan').value;
+  const tahun=document.getElementById('selTahun').value;
+  const btn=document.getElementById('btnRefresh');
+  btn.disabled=true;btn.textContent='⏳';
+  document.getElementById('statGrid').innerHTML='<div class="state-box" style="grid-column:1/-1"><div class="spinner"></div><p>Memuat data...</p></div>';
+  document.getElementById('chartCard').style.display='none';
+  document.getElementById('acrSection').style.display='none';
+  document.getElementById('eyebrowDate').textContent=bulan.toUpperCase()+' '+tahun;
+
+  try{
+    const data=await fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`);
+    if(!data.success) throw new Error(data.message);
+
+    allRows=(data.rows||[]).filter(r=>r.aplikasi===currentAp);
+    if(!allRows.length){
+      document.getElementById('statGrid').innerHTML='<div class="state-box" style="grid-column:1/-1"><div class="icon">📭</div><p>Tidak ada data untuk aplikasi ini pada periode tersebut.</p></div>';
+      btn.disabled=false;btn.textContent='↻ Refresh';
+      return;
+    }
+
+    // Sidebar - semua aplikasi
+    const allApps=[...new Set((data.rows||[]).map(r=>r.aplikasi).filter(Boolean))].sort();
+    renderSidebar(allApps,bulan,tahun);
+
+    // Bucket list
+    allBuckets=[...new Set(allRows.map(r=>r.bucket).filter(Boolean))].sort();
+    const selBucket=document.getElementById('selBucket');
+    const prevBucket=selBucket.value;
+    selBucket.innerHTML='<option value="">Semua Bucket</option>'+allBuckets.map(b=>`<option value="${b}">${b}</option>`).join('');
+    if(prevBucket&&allBuckets.includes(prevBucket)) selBucket.value=prevBucket;
+
+    filteredRows=getFiltered();
+    buildWeeklyByAgent();
+
+    // Meta info
+    const spvSet=new Set(allRows.map(r=>r.supervisor).filter(Boolean));
+    const spvStr=[...spvSet].join(', ')||'—';
+    document.getElementById('pageDesc').textContent='SPV: '+spvStr+' · '+[...new Set(allRows.map(r=>r.bucket).filter(Boolean))].length+' bucket aktif';
+    document.getElementById('acrDesc').textContent='Ranking agent berdasarkan payment — '+bulan+' '+tahun+' · '+currentAp;
+    document.getElementById('tableDesc').textContent=bulan+' '+tahun;
+    document.getElementById('chartAppName').textContent=currentAp;
+    document.getElementById('navTimestamp').textContent='Update: '+new Date().toLocaleTimeString('id-ID');
+
+    renderStats();
+    renderTrendChart();
+    renderACR();
+
+    document.getElementById('acrSection').style.display='block';
+  }catch(e){
+    document.getElementById('statGrid').innerHTML=`<div class="state-box" style="grid-column:1/-1"><div class="icon">⚠️</div><p>${e.message}</p><p style="font-size:12px;margin-top:6px">Klik Refresh untuk coba lagi.</p></div>`;
+  }
+  btn.disabled=false;btn.textContent='↻ Refresh';
+}
+
+function getFiltered(){
+  const bk=document.getElementById('selBucket').value;
+  return bk?allRows.filter(r=>r.bucket===bk):allRows;
+}
+
+function applyBucketFilter(){
+  filteredRows=getFiltered();
+  buildWeeklyByAgent();
+  renderStats();
+  renderTrendChart();
+  renderACR();
+}
+
+/* SIDEBAR */
+function renderSidebar(apps,bulan,tahun){
+  document.getElementById('sidebarApps').innerHTML=apps.map(ap=>`
+    <a class="sidebar-item ${ap===currentAp?'active':''}" href="app.html?ap=${encodeURIComponent(ap)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">
+      <span class="dot" style="background:${getColor(ap)}"></span>
+      ${ap.charAt(0)+ap.slice(1).toLowerCase()}
+    </a>`).join('');
+}
+
+/* SUMMARIZE */
+function summarizeRows(rows){
+  if(!rows||!rows.length) return {totalData:0,dataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,responWA:0,ptp:0,ptpBayar:0,agentCount:0,totalRecord:0};
+  const keys=['totalData','dataBaru','osDataBaru','dailyPayment','jmlDataBayar','autocall','callManual','callTerhubung','sentuhWA','sentuhGojek','responWA','responGojek','waBlokir','ptp','ptpBayar','sentuhWABA','responWABA','smsManual','responSMSManual','paymentOvertime'];
+  const r={};
+  keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
+  const tb=r.jmlDataBayar;
+  r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*x.jmlDataBayar),0)/tb:rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length;
+  r.agentCount=new Set(rows.map(x=>x.agent)).size;
+  r.totalRecord=rows.length;
+  return r;
+}
+
+/* STATS */
+function renderStats(){
+  const s=summarizeRows(filteredRows);
+  document.getElementById('statGrid').innerHTML=`
+    <div class="stat-card c-green">
+      <div class="stat-label">Total Payment</div>
+      <div class="stat-value c-green">${fmtRp(s.dailyPayment)}</div>
+      <div class="stat-sub">${fmtRp(s.paymentOvertime)} overtime</div>
+    </div>
+    <div class="stat-card c-blue">
+      <div class="stat-label">Avg Rate</div>
+      <div class="stat-value c-blue">${fmtRate(s.avgRate)}</div>
+      <div class="stat-sub">${fmtNum(s.jmlDataBayar)} data bayar</div>
+    </div>
+    <div class="stat-card c-orange">
+      <div class="stat-label">Total Akun</div>
+      <div class="stat-value c-orange">${fmtNum(s.totalData)}</div>
+      <div class="stat-sub">${fmtNum(s.dataBaru)} data baru</div>
+    </div>
+    <div class="stat-card c-blue">
+      <div class="stat-label">Agent Aktif</div>
+      <div class="stat-value">${s.agentCount}</div>
+      <div class="stat-sub">${fmtNum(s.totalRecord)} record</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Call Manual</div>
+      <div class="stat-value">${fmtNum(s.callManual)}</div>
+      <div class="stat-sub">${fmtNum(s.callTerhubung)} terhubung</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">PTP</div>
+      <div class="stat-value">${fmtNum(s.ptp)}</div>
+      <div class="stat-sub">${fmtNum(s.ptpBayar)} bayar</div>
+    </div>`;
+}
+
+/* TREND CHART */
+function switchChart(type){
+  currentChart=type;
+  document.querySelectorAll('.chart-tab').forEach(t=>{
+    const labels={payment:'Payment',call:'Call Manual',wa:'Sentuh WA',ptp:'PTP'};
+    t.classList.toggle('active',t.textContent.trim()===labels[type]);
+  });
+  renderTrendChart();
+}
+
+function renderTrendChart(){
+  const sorted=[...filteredRows].filter(r=>r.tanggal).sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+  if(!sorted.length) return;
+  document.getElementById('chartCard').style.display='block';
+
+  // Group by date, sum metric
+  const byDate={};
+  sorted.forEach(r=>{
+    const d=r.tanggal;
+    if(!byDate[d]) byDate[d]={payment:0,call:0,wa:0,ptp:0,count:0};
+    byDate[d].payment+=r.dailyPayment||0;
+    byDate[d].call+=r.callManual||0;
+    byDate[d].wa+=r.sentuhWA||0;
+    byDate[d].ptp+=r.ptp||0;
+    byDate[d].count++;
+  });
+
+  const dates=Object.keys(byDate).sort();
+  const labels=dates.map(d=>d.split('-')[2]+'/'+d.split('-')[1]);
+  const values=dates.map(d=>byDate[d][currentChart]||0);
+
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const gc=isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)';
+  const tc=isDark?'#4a5568':'#9ca3af';
+  const color=getColor(currentAp);
+
+  if(chartInstance){chartInstance.destroy();chartInstance=null;}
+  const ctx=document.getElementById('trendChart');
+  if(!ctx) return;
+
+  chartInstance=new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets:[{
+      data:values,
+      borderColor:color,
+      backgroundColor:color+'18',
+      borderWidth:2,pointRadius:3,pointHoverRadius:5,
+      fill:true,tension:0.3
+    }]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{
+        if(currentChart==='payment') return fmtRp(ctx.parsed.y);
+        return fmtNum(ctx.parsed.y);
+      }}}},
+      scales:{
+        x:{grid:{color:gc},ticks:{color:tc,font:{size:11},maxTicksLimit:12}},
+        y:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>currentChart==='payment'?fmtRp(v):fmtNum(v)}}
+      }
+    }
+  });
+}
+
+/* BUILD WEEKLY BY AGENT */
+function buildWeeklyByAgent(){
+  weeklyByAgent={};
+  filteredRows.forEach(r=>{
+    const ag=r.agent||'(?)';
+    if(!weeklyByAgent[ag]) weeklyByAgent[ag]=[];
+    weeklyByAgent[ag].push(r);
+  });
+}
+
+function getWeekNum(tanggal){
+  if(!tanggal) return 0;
+  const day=parseInt(tanggal.split('-')[2]||'0');
+  return Math.ceil(day/7);
+}
+
+/* ACR */
+function renderACR(){
+  const agents=Object.keys(weeklyByAgent);
+  const s=summarizeRows(filteredRows);
+  const totalPayment=s.dailyPayment;
+
+  // ACR SUMMARY
+  const bestAgent=agents.reduce((best,ag)=>rankVal(ag,currentRank)>rankVal(best,currentRank)?ag:best,agents[0]||'—');
+  const avgPerAgent=agents.length>0?totalPayment/agents.length:0;
+  document.getElementById('acrSummary').innerHTML=`
+    <div class="acr-sum-card c-default"><div class="acr-sum-lbl">Total Agent</div><div class="acr-sum-val">${agents.length}</div><div class="acr-sum-sub">agent aktif</div></div>
+    <div class="acr-sum-card c-green"><div class="acr-sum-lbl">Total Payment</div><div class="acr-sum-val c-green">${fmtRp(totalPayment)}</div><div class="acr-sum-sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
+    <div class="acr-sum-card c-orange"><div class="acr-sum-lbl">Best Agent</div><div class="acr-sum-val c-orange" style="font-size:15px">${bestAgent}</div><div class="acr-sum-sub">${fmtRp(rankVal(bestAgent,'payment'))}</div></div>
+    <div class="acr-sum-card c-blue"><div class="acr-sum-lbl">Rata-rata/Agent</div><div class="acr-sum-val c-blue">${fmtRp(avgPerAgent)}</div><div class="acr-sum-sub">per agent</div></div>`;
+
+  // WEEK COLUMNS
+  const bulan=document.getElementById('selBulan').value;
+  const tahun=document.getElementById('selTahun').value;
+  const weekCols=[1,2,3,4].map(wk=>{
+    const weekRows=filteredRows.filter(r=>getWeekNum(r.tanggal)===wk);
+    const weekByAgent={};
+    weekRows.forEach(r=>{
+      const ag=r.agent||'(?)';
+      if(!weekByAgent[ag]) weekByAgent[ag]=[];
+      weekByAgent[ag].push(r);
+    });
+    // sort by currentRank
+    const sortedRanked=Object.keys(weekByAgent).map(ag=>{
+      const rows=weekByAgent[ag];
+      const payment=rows.reduce((a,r)=>a+(r.dailyPayment||0),0);
+      const rate=rows.reduce((a,r)=>a+(r.jmlDataBayar||0),0)>0?rows.reduce((a,r)=>a+(r.rate*(r.jmlDataBayar||0)),0)/rows.reduce((a,r)=>a+(r.jmlDataBayar||0),0):0;
+      const ptp=rows.reduce((a,r)=>a+(r.ptp||0),0);
+      const call=rows.reduce((a,r)=>a+(r.callManual||0),0);
+      const namaAkun=rows[0]&&rows[0].namaAkun?rows[0].namaAkun:'—';
+      return{ag,payment,rate,ptp,call,namaAkun};
+    }).sort((a,b)=>{
+      if(currentRank==='rate') return b.rate-a.rate;
+      if(currentRank==='ptp') return b.ptp-a.ptp;
+      if(currentRank==='call') return b.call-a.call;
+      return b.payment-a.payment;
+    });
+
+    const rankClass=(i)=>i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+    const valStr=(a)=>{
+      if(currentRank==='rate') return fmtRate(a.rate);
+      if(currentRank==='ptp') return fmtNum(a.ptp);
+      if(currentRank==='call') return fmtNum(a.call);
+      return fmtRp(a.payment);
+    };
+
+    const rows=sortedRanked.length?sortedRanked.map((a,i)=>`
+      <div class="acr-agent-row">
+        <div class="acr-rank-num ${rankClass(i)}">${i+1}</div>
+        <div class="acr-agent-info">
+          <div class="acr-akun-name">${a.namaAkun}</div>
+          <div class="acr-agent-name"><a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">${a.ag}</a></div>
+        </div>
+        <div class="acr-agent-val">${valStr(a)}</div>
+      </div>`).join(''):'<div class="acr-week-empty">Belum ada data</div>';
+
+    return`<div class="acr-week-card">
+      <div class="acr-week-header"><div class="acr-week-title">WEEK ${wk}</div></div>
+      <div class="acr-week-body">${rows}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('acrWeeks').innerHTML=weekCols;
+
+  // WEEKLY SUMMARY TABLE
+  renderWeeklySummaryTable(agents,totalPayment,bulan,tahun);
+}
+
+function switchRank(type){
+  currentRank=type;
+  document.querySelectorAll('.rank-switch-btn').forEach(b=>{
+    const labels={payment:'Payment',rate:'Rate',ptp:'PTP',call:'Call Manual'};
+    b.classList.toggle('active',b.textContent.trim()===labels[type]);
+  });
+  renderACR();
+}
+
+function renderWeeklySummaryTable(agents,totalPayment,bulan,tahun){
+  const agentData=agents.map(ag=>{
+    const rows=weeklyByAgent[ag];
+    const namaAkun=rows[0]&&rows[0].namaAkun?rows[0].namaAkun:'—';
+    const wkPayment=[1,2,3,4,5].map(wk=>rows.filter(r=>getWeekNum(r.tanggal)===wk).reduce((a,r)=>a+(r.dailyPayment||0),0));
+    const total=wkPayment.reduce((a,v)=>a+v,0);
+    return{ag,namaAkun,wkPayment,total};
+  }).sort((a,b)=>b.total-a.total);
+
+  const grandTotal=agentData.reduce((a,x)=>a+x.total,0);
+  const wkTotals=[0,1,2,3,4].map(i=>agentData.reduce((a,x)=>a+x.wkPayment[i],0));
+
+  const rankClass=(i)=>i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
+
+  document.getElementById('weeklyTableBody').innerHTML=agentData.map((a,i)=>`
+    <tr>
+      <td class="bold">${a.namaAkun}</td>
+      <td><a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">${a.ag}</a></td>
+      <td class="green">${fmtRp(a.total)}</td>
+      ${a.wkPayment.map(v=>`<td class="num">${v>0?fmtRp(v):'Rp 0'}</td>`).join('')}
+      <td class="num">${grandTotal>0?(a.total/grandTotal*100).toFixed(1)+'%':'0%'}</td>
+      <td><span class="acr-rank-num ${rankClass(i)}" style="display:inline-flex">${i+1}</span></td>
+    </tr>`).join('');
+
+  document.getElementById('weeklyTableFoot').innerHTML=`
+    <tr>
+      <td colspan="2">TOTAL</td>
+      <td>${fmtRp(grandTotal)}</td>
+      ${wkTotals.map(v=>`<td>${v>0?fmtRp(v):'Rp 0'}</td>`).join('')}
+      <td>100%</td>
+      <td>—</td>
+    </tr>`;
+}
+</script>
+</body>
+</html>

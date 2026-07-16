@@ -291,7 +291,7 @@ function setTheme(t){
 async function fetchJSON(url){
   const res=await fetch(url);
   const text=await res.text();
-  if(text.trim().startsWith('<')){
+  if(text.trim().charCodeAt(0)===60){
     await new Promise(r=>setTimeout(r,2000));
     return await (await fetch(url)).json();
   }
