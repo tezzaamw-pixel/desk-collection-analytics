@@ -28,16 +28,14 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
-/* NAVBAR */
 .navbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 calc(var(--sidebar-w)+20px);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
 .nav-logo{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;text-decoration:none;}
 .nav-logo-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;}
 .nav-page-title{font-size:13px;color:rgba(255,255,255,0.5);border-left:1px solid rgba(255,255,255,0.15);padding-left:12px;margin-left:4px;}
 .nav-right{display:flex;align-items:center;gap:10px;}
 .theme-toggle{display:flex;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-sm);overflow:hidden;}
-.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;transition:all .15s;}
+.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;}
 .theme-btn.active{background:rgba(255,255,255,0.2);color:#fff;}
-/* SIDEBAR */
 .sidebar{position:fixed;top:52px;left:0;width:var(--sidebar-w);height:calc(100vh - 52px);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;z-index:100;}
 .sidebar-section{padding:16px 12px 8px;}
 .sidebar-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:0 6px;margin-bottom:6px;}
@@ -47,30 +45,24 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 .sidebar-item .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
 .sidebar-item .icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
 .sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
-/* MAIN */
 .main{margin-left:var(--sidebar-w);margin-top:52px;padding:28px;min-height:calc(100vh - 52px);}
 .section-title{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
-/* FILTER */
-.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;box-shadow:var(--shadow);}
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;box-shadow:var(--shadow);}
 .filter-bar label{font-size:12px;color:var(--text3);font-weight:500;}
 select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;cursor:pointer;outline:none;}
 select:focus{border-color:var(--accent);}
 .filter-sep{flex:1;}
 .btn-load{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
-.btn-load:hover{opacity:.88;}
 .btn-load:disabled{opacity:.5;cursor:not-allowed;}
-/* VIEW TOGGLE */
 .view-toggle{display:flex;gap:8px;margin-bottom:20px;}
 .view-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 18px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;}
 .view-btn.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);}
-/* TEAM HEADER */
 .team-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;margin-bottom:20px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
 .team-avatar{width:48px;height:48px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--accent);flex-shrink:0;}
 .team-name{font-size:17px;font-weight:700;margin-bottom:4px;}
 .team-meta{font-size:12px;color:var(--text2);display:flex;gap:14px;flex-wrap:wrap;}
 .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;}
 .pill-blue{background:var(--accent-bg);color:var(--accent);}
-/* SUMMARY */
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
 .sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
 .sum-card .lbl{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
@@ -78,6 +70,28 @@ select:focus{border-color:var(--accent);}
 .sum-card .sub{font-size:11px;color:var(--text3);}
 .sum-card.accent{border-color:var(--accent);background:var(--accent-bg);}
 .sum-card.accent .val{color:var(--accent);}
+/* SPV CARD */
+.spv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px;}
+.spv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:border-color .15s;}
+.spv-card:hover{border-color:var(--accent);}
+.spv-card-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.spv-card-left{display:flex;align-items:center;gap:10px;}
+.spv-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0;}
+.spv-name{font-size:14px;font-weight:600;}
+.spv-meta{font-size:11px;color:var(--text3);}
+.btn-setup-spv{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;}
+.btn-setup-spv:hover{background:var(--surface2);}
+.spv-body{padding:12px 16px;}
+.spv-metrics{display:grid;gap:6px;}
+.spv-metric-row{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:var(--surface2);border-radius:var(--radius-sm);}
+.spv-metric-label{font-size:12px;color:var(--text2);}
+.spv-metric-val{font-size:13px;font-weight:600;color:var(--text);}
+/* TL */
+.tl-select-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;box-shadow:var(--shadow);}
+.tl-select-wrap label{font-size:13px;font-weight:500;margin-bottom:8px;display:block;}
+.tl-select-row{display:flex;gap:10px;flex-wrap:wrap;}
+.tl-select-row select{flex:1;min-width:200px;}
+.btn-view{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
 /* RANK TABLE */
 .rank-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden;}
 .rank-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
@@ -93,7 +107,7 @@ select:focus{border-color:var(--accent);}
 .rank-table tr:hover td{background:var(--surface2);}
 .rank-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;margin-right:6px;}
 .rank-1{background:#FEF3C7;color:#92400E;}
-.rank-2{background:#F3F4F6;color:#374151;}
+.rank-2{background:#F1F5F9;color:#475569;}
 .rank-3{background:#FEE2E2;color:#7F1D1D;}
 .rank-n{background:var(--surface2);color:var(--text3);}
 .agent-link{color:var(--accent);text-decoration:none;font-weight:500;}
@@ -109,41 +123,31 @@ select:focus{border-color:var(--accent);}
 .chart-tabs{display:flex;gap:6px;flex-wrap:wrap;}
 .chart-tab{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;}
 .chart-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:500;}
-/* SPV CARDS */
-.spv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px;}
-.spv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:border-color .15s;}
-.spv-card:hover{border-color:var(--accent);}
-.spv-card-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
-.spv-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0;}
-.spv-name{font-size:14px;font-weight:600;}
-.spv-meta{font-size:11px;color:var(--text3);}
-.spv-body{padding:12px 16px;}
-.spv-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
-.spv-stat{text-align:center;}
-.spv-stat-val{font-size:15px;font-weight:700;color:var(--text);}
-.spv-stat-lbl{font-size:10px;color:var(--text3);margin-top:2px;}
-/* TL SELECT */
-.tl-select-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;box-shadow:var(--shadow);}
-.tl-select-wrap label{font-size:13px;font-weight:500;margin-bottom:8px;display:block;}
-.tl-select-row{display:flex;gap:10px;flex-wrap:wrap;}
-.tl-select-row select{flex:1;min-width:200px;}
-.btn-view{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
+/* SETUP MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:var(--radius);width:100%;max-width:420px;box-shadow:var(--shadow-md);}
+.modal-header{padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:15px;font-weight:600;}
+.modal-close{background:none;border:none;cursor:pointer;color:var(--text3);font-size:20px;padding:2px 6px;border-radius:4px;}
+.modal-close:hover{background:var(--surface2);}
+.modal-body{padding:16px 18px;max-height:55vh;overflow-y:auto;}
+.metric-toggle{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;cursor:pointer;transition:background .1s;}
+.metric-toggle:hover{background:var(--surface2);}
+.metric-toggle input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;}
+.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.btn-save{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
+.btn-cancel{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;font-size:13px;color:var(--text2);cursor:pointer;}
 /* STATE */
 .state-box{text-align:center;padding:60px 20px;color:var(--text3);}
 .state-box .icon{font-size:36px;margin-bottom:12px;}
 .state-box p{font-size:14px;}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-@media(max-width:768px){
-  :root{--sidebar-w:0px;}
-  .sidebar{display:none;}
-  .navbar{padding-left:20px;}
-  .main{margin-left:0;}
-}
+@media(max-width:768px){:root{--sidebar-w:0px;}.sidebar{display:none;}.navbar{padding-left:20px;}.main{margin-left:0;}}
 </style>
 </head>
 <body>
-
 <nav class="navbar">
   <div style="display:flex;align-items:center;gap:12px;">
     <a class="nav-logo" href="index.html"><span class="nav-logo-badge">DC</span> DeskCollection Analytics</a>
@@ -156,7 +160,6 @@ select:focus{border-color:var(--accent);}
     </div>
   </div>
 </nav>
-
 <aside class="sidebar">
   <div class="sidebar-section">
     <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
@@ -171,6 +174,21 @@ select:focus{border-color:var(--accent);}
     <a class="sidebar-item" href="agent.html"><span class="icon">👤</span> Agent</a>
   </div>
 </aside>
+
+<!-- SETUP MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title" id="modalTitle">Setup tampilan</span>
+      <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+    <div class="modal-footer">
+      <button class="btn-cancel" onclick="closeModal()">Batal</button>
+      <button class="btn-save" onclick="saveSetup()">Simpan</button>
+    </div>
+  </div>
+</div>
 
 <main class="main">
   <div class="filter-bar">
@@ -190,12 +208,10 @@ select:focus{border-color:var(--accent);}
     <div class="filter-sep"></div>
     <button class="btn-load" id="btnLoad" onclick="loadData()">Tampilkan</button>
   </div>
-
   <div class="view-toggle">
     <button class="view-btn active" id="btnSPV" onclick="switchView('spv')">👤 Per Supervisor</button>
     <button class="view-btn" id="btnTL" onclick="switchView('tl')">👥 Per Team Leader</button>
   </div>
-
   <div id="content">
     <div class="state-box"><div class="icon">👥</div><p>Pilih bulan dan tahun, lalu klik Tampilkan.</p></div>
   </div>
@@ -206,36 +222,45 @@ const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYCl
 const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
 function getColor(ap){return APP_COLORS[ap]||'#6366f1';}
 
-let allRows=[];
-let currentView='spv';
-let currentSort='dailyPayment';
-let chartInstance=null;
-let currentChartMetric='dailyPayment';
-let currentTL=null;
-let allBucketMap={};
-
-const CHART_METRICS=[
-  {key:'dailyPayment',label:'Payment',fmt:'rp'},
-  {key:'callManual',label:'Call Manual',fmt:'num'},
-  {key:'sentuhWA',label:'Sentuh WA',fmt:'num'},
-  {key:'ptp',label:'PTP',fmt:'num'},
+const ALL_METRICS=[
+  {key:'dailyPayment',label:'Daily Payment',fmt:'rp'},
+  {key:'avgRate',label:'Rate (%)',fmt:'rate'},
   {key:'jmlDataBayar',label:'Data Bayar',fmt:'num'},
+  {key:'callManual',label:'Call Manual',fmt:'num'},
+  {key:'callTerhubung',label:'Call Terhubung',fmt:'num'},
+  {key:'sentuhWA',label:'Sentuh WA',fmt:'num'},
+  {key:'responWA',label:'Respon WA',fmt:'num'},
+  {key:'sentuhGojek',label:'Sentuh Gojek',fmt:'num'},
+  {key:'responGojek',label:'Respon Gojek',fmt:'num'},
+  {key:'sentuhWABA',label:'Sentuh WABA',fmt:'num'},
+  {key:'responWABA',label:'Respon WABA',fmt:'num'},
+  {key:'smsManual',label:'SMS Manual',fmt:'num'},
+  {key:'autocall',label:'Autocall',fmt:'num'},
+  {key:'waBlokir',label:'WA Blokir',fmt:'num'},
+  {key:'ptp',label:'PTP',fmt:'num'},
+  {key:'ptpBayar',label:'PTP Bayar',fmt:'num'},
+  {key:'paymentOvertime',label:'Payment Overtime',fmt:'rp'},
+  {key:'totalData',label:'Total Data',fmt:'num'},
+  {key:'dataBaru',label:'Data Baru',fmt:'num'},
 ];
+const DEFAULT_METRICS=['dailyPayment','avgRate','callManual','sentuhWA','ptp'];
 
-/* FORMAT */
+function getSetup(key){try{const r=localStorage.getItem('dca_spv_'+key);if(r)return JSON.parse(r);}catch(e){}return DEFAULT_METRICS.slice();}
+function saveSetupKey(key,metrics){localStorage.setItem('dca_spv_'+key,JSON.stringify(metrics));}
+
+let allRows=[],currentView='spv',currentSort='dailyPayment',chartInstance=null,currentChartMetric='dailyPayment',currentTL=null,allBucketMap={},currentSetupKey=null;
+const CHART_METRICS=[{key:'dailyPayment',label:'Payment',fmt:'rp'},{key:'callManual',label:'Call Manual',fmt:'num'},{key:'sentuhWA',label:'Sentuh WA',fmt:'num'},{key:'ptp',label:'PTP',fmt:'num'},{key:'jmlDataBayar',label:'Data Bayar',fmt:'num'}];
+
 function fmtRp(n){if(!n||n===0)return 'Rp 0';if(n>=1e9)return 'Rp '+(n/1e9).toFixed(2)+' M';if(n>=1e6)return 'Rp '+(n/1e6).toFixed(1)+' jt';if(n>=1e3)return 'Rp '+(n/1e3).toFixed(0)+' rb';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
 function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
 function fmtRate(n){return n?(n*100).toFixed(2)+'%':'0%';}
 function fmtByKey(key,val){const m=CHART_METRICS.find(x=>x.key===key);if(!m)return val;if(m.fmt==='rp')return fmtRp(val);return fmtNum(val);}
+function fmtMetric(m,val){if(m.fmt==='rp')return fmtRp(val);if(m.fmt==='rate')return fmtRate(val);return fmtNum(val);}
 
-/* THEME */
 function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('dca_theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');if(chartInstance&&currentTL)renderTLDetail(currentTL);}
 (function(){const t=localStorage.getItem('dca_theme')||'light';document.documentElement.setAttribute('data-theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');})();
-
-/* FILTER INIT */
 (function(){
-  const now=new Date();
-  const bl=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const now=new Date();const bl=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   document.getElementById('selBulan').value=bl[now.getMonth()];
   document.getElementById('selTahun').value=String(now.getFullYear());
   const p=new URLSearchParams(window.location.search);
@@ -245,115 +270,92 @@ function setTheme(t){document.documentElement.setAttribute('data-theme',t);local
   if(p.get('tl')||p.get('spv'))setTimeout(loadData,100);
 })();
 
-/* BUCKET MAP */
-function buildBucketMap(rows){
-  allBucketMap={};
-  rows.forEach(r=>{const ap=r.aplikasi||'';const bk=r.bucket||'';if(ap&&bk){if(!allBucketMap[ap])allBucketMap[ap]=new Set();allBucketMap[ap].add(bk);}});
-  Object.keys(allBucketMap).forEach(ap=>{allBucketMap[ap]=[...allBucketMap[ap]].sort();});
-}
-function populateAplikasi(rows){
-  const list=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].sort();
-  document.getElementById('selAplikasi').innerHTML='<option value="">Semua</option>'+list.map(a=>`<option value="${a}">${a}</option>`).join('');
-}
-function populateBucket(ap){
-  let buckets=[];
-  if(ap&&allBucketMap[ap]){buckets=allBucketMap[ap];}
-  else{const all=new Set();Object.values(allBucketMap).forEach(b=>b.forEach(x=>all.add(x)));buckets=[...all].sort();}
-  document.getElementById('selBucket').innerHTML='<option value="">Semua</option>'+buckets.map(b=>`<option value="${b}">${b}</option>`).join('');
-}
+function buildBucketMap(rows){allBucketMap={};rows.forEach(r=>{const ap=r.aplikasi||'';const bk=r.bucket||'';if(ap&&bk){if(!allBucketMap[ap])allBucketMap[ap]=new Set();allBucketMap[ap].add(bk);}});Object.keys(allBucketMap).forEach(ap=>{allBucketMap[ap]=[...allBucketMap[ap]].sort();});}
+function populateAplikasi(rows){const list=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].sort();document.getElementById('selAplikasi').innerHTML='<option value="">Semua</option>'+list.map(a=>`<option value="${a}">${a}</option>`).join('');}
+function populateBucket(ap){let b=[];if(ap&&allBucketMap[ap]){b=allBucketMap[ap];}else{const all=new Set();Object.values(allBucketMap).forEach(x=>x.forEach(v=>all.add(v)));b=[...all].sort();}document.getElementById('selBucket').innerHTML='<option value="">Semua</option>'+b.map(x=>`<option value="${x}">${x}</option>`).join('');}
 function onAplikasiChange(){populateBucket(document.getElementById('selAplikasi').value);}
+function getFilteredRows(){const ap=document.getElementById('selAplikasi').value;const bk=document.getElementById('selBucket').value;let rows=allRows;if(ap)rows=rows.filter(r=>r.aplikasi===ap);if(bk)rows=rows.filter(r=>r.bucket===bk);return rows;}
 
-function getFilteredRows(){
-  const ap=document.getElementById('selAplikasi').value;
-  const bk=document.getElementById('selBucket').value;
-  let rows=allRows;
-  if(ap)rows=rows.filter(r=>r.aplikasi===ap);
-  if(bk)rows=rows.filter(r=>r.bucket===bk);
-  return rows;
-}
+async function fetchJSON(url){const res=await fetch(url);const text=await res.text();if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));return await(await fetch(url)).json();}return JSON.parse(text);}
 
-/* FETCH */
-async function fetchJSON(url){
-  const res=await fetch(url);const text=await res.text();
-  if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));return await(await fetch(url)).json();}
-  return JSON.parse(text);
-}
-
-/* LOAD */
 async function loadData(){
-  const bulan=document.getElementById('selBulan').value;
-  const tahun=document.getElementById('selTahun').value;
-  const btn=document.getElementById('btnLoad');
-  btn.disabled=true;btn.textContent='⏳ Memuat...';
+  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
+  const btn=document.getElementById('btnLoad');btn.disabled=true;btn.textContent='⏳ Memuat...';
   document.getElementById('content').innerHTML='<div class="state-box"><div class="spinner"></div><p>Memuat data...</p></div>';
   try{
-    const data=await fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`);
+    const data=await fetchJSON(API_URL+'?action=agentdata&bulan='+bulan+'&tahun='+tahun);
     if(!data.success)throw new Error(data.message);
-    allRows=data.rows||[];
-    currentTL=null;
-    buildBucketMap(allRows);
-    populateAplikasi(allRows);
-    populateBucket('');
+    allRows=data.rows||[];currentTL=null;
+    buildBucketMap(allRows);populateAplikasi(allRows);populateBucket('');
     renderSidebar(allRows,bulan,tahun);
     switchView(currentView);
-  }catch(e){
-    document.getElementById('content').innerHTML=`<div class="state-box"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
-  }
+  }catch(e){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">⚠️</div><p>'+e.message+'</p></div>';}
   btn.disabled=false;btn.textContent='Tampilkan';
 }
 
 function renderSidebar(rows,bulan,tahun){
   const apps=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].sort();
-  document.getElementById('sidebarApps').innerHTML=apps.map(ap=>`
-    <a class="sidebar-item" href="app.html?ap=${encodeURIComponent(ap)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">
-      <span class="dot" style="background:${getColor(ap)}"></span>
-      ${ap.charAt(0)+ap.slice(1).toLowerCase()}
-    </a>`).join('');
+  document.getElementById('sidebarApps').innerHTML=apps.map(ap=>`<a class="sidebar-item" href="app.html?ap=${encodeURIComponent(ap)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}"><span class="dot" style="background:${getColor(ap)}"></span>${ap.charAt(0)+ap.slice(1).toLowerCase()}</a>`).join('');
 }
 
-function switchView(v){
-  currentView=v;
-  document.getElementById('btnSPV').classList.toggle('active',v==='spv');
-  document.getElementById('btnTL').classList.toggle('active',v==='tl');
-  if(allRows.length)v==='spv'?renderSPVList():renderTLSelectWrap();
-}
+function switchView(v){currentView=v;document.getElementById('btnSPV').classList.toggle('active',v==='spv');document.getElementById('btnTL').classList.toggle('active',v==='tl');if(allRows.length)v==='spv'?renderSPVList():renderTLSelectWrap();}
 
-/* SUMMARIZE */
 function summarizeRows(rows){
-  if(!rows||!rows.length)return {totalData:0,dataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,responWA:0,ptp:0,ptpBayar:0};
+  if(!rows||!rows.length)return{totalData:0,dataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,sentuhGojek:0,responWA:0,responGojek:0,waBlokir:0,ptp:0,ptpBayar:0,sentuhWABA:0,responWABA:0,smsManual:0,responSMSManual:0,autocall:0};
   const keys=['totalData','dataBaru','osDataBaru','dailyPayment','jmlDataBayar','autocall','callManual','callTerhubung','sentuhWA','sentuhGojek','responWA','responGojek','waBlokir','ptp','ptpBayar','sentuhWABA','responWABA','smsManual','responSMSManual','paymentOvertime'];
-  const r={};
-  keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
-  const tb=r.jmlDataBayar;
-  r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*x.jmlDataBayar),0)/tb:rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length;
+  const r={};keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
+  const tb=r.jmlDataBayar;r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*x.jmlDataBayar),0)/tb:rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length;
   return r;
 }
+
+/* SETUP MODAL */
+function openSetup(key){
+  currentSetupKey=key;
+  const setup=getSetup(key);
+  document.getElementById('modalTitle').textContent='Setup tampilan — '+key;
+  document.getElementById('modalBody').innerHTML=ALL_METRICS.map(m=>`<label class="metric-toggle"><span>${m.label}</span><input type="checkbox" value="${m.key}" ${setup.includes(m.key)?'checked':''}></label>`).join('');
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');currentSetupKey=null;}
+function saveSetup(){
+  const keys=Array.from(document.querySelectorAll('#modalBody input[type=checkbox]:checked')).map(c=>c.value);
+  if(!keys.length){alert('Pilih minimal 1 metrik.');return;}
+  saveSetupKey(currentSetupKey,keys);closeModal();
+  if(allRows.length)renderSPVList();
+}
+document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
 /* SPV LIST */
 function renderSPVList(){
   const filteredRows=getFilteredRows();
-  const bySPV={};
-  filteredRows.forEach(r=>{const spv=r.supervisor||'(Tanpa SPV)';if(!bySPV[spv])bySPV[spv]=[];bySPV[spv].push(r);});
-  const bulan=document.getElementById('selBulan').value;
-  const tahun=document.getElementById('selTahun').value;
+  const bySPV={};filteredRows.forEach(r=>{const spv=r.supervisor||'(Tanpa SPV)';if(!bySPV[spv])bySPV[spv]=[];bySPV[spv].push(r);});
+  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
   if(!Object.keys(bySPV).length){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
+
   const cards=Object.keys(bySPV).sort().map(spv=>{
-    const sRows=bySPV[spv];
-    const s=summarizeRows(sRows);
+    const sRows=bySPV[spv];const s=summarizeRows(sRows);
     const agentCount=new Set(sRows.map(r=>r.agent)).size;
     const tlCount=new Set(sRows.map(r=>r.teamLeader)).size;
     const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
     const appList=[...new Set(sRows.map(r=>r.aplikasi))].join(', ');
-    return `<div class="spv-card" onclick="showSPVDetail('${spv.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
+    const setup=getSetup(spv);
+    const metricsHtml=setup.map(key=>{
+      const m=ALL_METRICS.find(x=>x.key===key);if(!m)return '';
+      const val=s[key]||0;
+      return `<div class="spv-metric-row"><span class="spv-metric-label">${m.label}</span><span class="spv-metric-val">${fmtMetric(m,val)}</span></div>`;
+    }).join('');
+    const escapedSpv=spv.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="spv-card">
       <div class="spv-card-header">
-        <div class="spv-avatar">${initials}</div>
-        <div><div class="spv-name">${spv}</div><div class="spv-meta">${appList} · ${tlCount} TL · ${agentCount} agent</div></div>
+        <div class="spv-card-left">
+          <div class="spv-avatar">${initials}</div>
+          <div><div class="spv-name">${spv}</div><div class="spv-meta">${appList} · ${tlCount} TL · ${agentCount} agent</div></div>
+        </div>
+        <button class="btn-setup-spv" onclick="openSetup('${escapedSpv}')">⚙ Setup</button>
       </div>
-      <div class="spv-body"><div class="spv-stats">
-        <div class="spv-stat"><div class="spv-stat-val">${fmtRp(s.dailyPayment)}</div><div class="spv-stat-lbl">Payment</div></div>
-        <div class="spv-stat"><div class="spv-stat-val">${fmtRate(s.avgRate)}</div><div class="spv-stat-lbl">Rate</div></div>
-        <div class="spv-stat"><div class="spv-stat-val">${fmtNum(s.ptp)}</div><div class="spv-stat-lbl">PTP</div></div>
-      </div></div>
+      <div class="spv-body" onclick="showSPVDetail('${escapedSpv}')">
+        <div class="spv-metrics">${metricsHtml}</div>
+      </div>
     </div>`;
   }).join('');
   document.getElementById('content').innerHTML=`<p class="section-title">Semua Supervisor — ${bulan} ${tahun}</p><div class="spv-grid">${cards}</div><div id="spvDetail"></div>`;
@@ -365,10 +367,8 @@ function showSPVDetail(spv){
   const agentCount=new Set(sRows.map(r=>r.agent)).size;
   const tlCount=new Set(sRows.map(r=>r.teamLeader)).size;
   const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-  const bulan=document.getElementById('selBulan').value;
-  const tahun=document.getElementById('selTahun').value;
-  const byTL={};
-  sRows.forEach(r=>{const tl=r.teamLeader||'(Tanpa TL)';if(!byTL[tl])byTL[tl]=[];byTL[tl].push(r);});
+  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
+  const byTL={};sRows.forEach(r=>{const tl=r.teamLeader||'(Tanpa TL)';if(!byTL[tl])byTL[tl]=[];byTL[tl].push(r);});
   const tlRows=Object.keys(byTL).map(tl=>{const ts=summarizeRows(byTL[tl]);return{tl,s:ts,agentCount:new Set(byTL[tl].map(r=>r.agent)).size};}).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
   const tlTable=tlRows.map((t,i)=>`<tr>
     <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span><a class="agent-link" href="team.html?view=tl&tl=${encodeURIComponent(t.tl)}&bulan=${bulan}&tahun=${tahun}">${t.tl}</a></td>
@@ -406,8 +406,7 @@ function renderTLSelectWrap(){
   const tlList=[...new Set(filteredRows.map(r=>r.teamLeader||'').filter(Boolean))].sort();
   const preselect=new URLSearchParams(window.location.search).get('tl')||'';
   document.getElementById('content').innerHTML=`
-    <div class="tl-select-wrap">
-      <label>Pilih Team Leader</label>
+    <div class="tl-select-wrap"><label>Pilih Team Leader</label>
       <div class="tl-select-row">
         <select id="selTL"><option value="">-- Pilih TL --</option>${tlList.map(tl=>`<option value="${tl}" ${tl===preselect?'selected':''}>${tl}</option>`).join('')}</select>
         <button class="btn-view" onclick="viewTL()">Lihat</button>
@@ -417,26 +416,16 @@ function renderTLSelectWrap(){
   if(preselect){document.getElementById('selTL').value=preselect;viewTL();}
 }
 
-function viewTL(){
-  const tl=document.getElementById('selTL').value;
-  if(!tl){alert('Pilih Team Leader dulu.');return;}
-  currentTL=tl;renderTLDetail(tl);
-}
+function viewTL(){const tl=document.getElementById('selTL').value;if(!tl){alert('Pilih Team Leader dulu.');return;}currentTL=tl;renderTLDetail(tl);}
 
 function renderTLDetail(tl){
   const rows=allRows.filter(r=>r.teamLeader===tl);
   if(!rows.length){document.getElementById('tlDetail').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
-  const s=summarizeRows(rows);
-  const first=rows[0];
-  const bulan=document.getElementById('selBulan').value;
-  const tahun=document.getElementById('selTahun').value;
+  const s=summarizeRows(rows);const first=rows[0];
+  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
   const initials=tl.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-  const byAgent={};
-  rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
-  const agentSums=Object.keys(byAgent).map(ag=>{
-    const as=summarizeRows(byAgent[ag]);
-    return{ag,s:as,hadir:byAgent[ag].filter(r=>r.absensi==='Hadir').length,total:byAgent[ag].length};
-  }).sort((a,b)=>(b.s[currentSort]||0)-(a.s[currentSort]||0));
+  const byAgent={};rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
+  const agentSums=Object.keys(byAgent).map(ag=>{const as=summarizeRows(byAgent[ag]);return{ag,s:as,hadir:byAgent[ag].filter(r=>r.absensi==='Hadir').length,total:byAgent[ag].length};}).sort((a,b)=>(b.s[currentSort]||0)-(a.s[currentSort]||0));
   const sortTabs=['dailyPayment','callManual','sentuhWA','ptp','jmlDataBayar'];
   const sortLabels={dailyPayment:'Payment',callManual:'Call Manual',sentuhWA:'Sentuh WA',ptp:'PTP',jmlDataBayar:'Data Bayar'};
   const agentRows=agentSums.map((a,i)=>`<tr>
@@ -449,8 +438,7 @@ function renderTLDetail(tl){
   document.getElementById('tlDetail').innerHTML=`
     <div class="team-header">
       <div class="team-avatar">${initials}</div>
-      <div style="flex:1">
-        <div class="team-name">${tl}</div>
+      <div style="flex:1"><div class="team-name">${tl}</div>
         <div class="team-meta"><span>📱 ${first.aplikasi||'—'}</span><span>🪣 ${first.bucket||'—'}</span><span>👤 SPV: ${first.supervisor||'—'}</span><span>👥 ${agentSums.length} agent</span></div>
       </div>
       <span class="pill pill-blue">${bulan} ${tahun}</span>
@@ -465,15 +453,13 @@ function renderTLDetail(tl){
     </div>
     <p class="section-title">Perbandingan Agent</p>
     <div class="chart-section">
-      <div class="chart-header">
-        <span class="chart-title">Performa per Agent</span>
+      <div class="chart-header"><span class="chart-title">Performa per Agent</span>
         <div class="chart-tabs">${CHART_METRICS.map(m=>`<button class="chart-tab ${m.key===currentChartMetric?'active':''}" onclick="switchChartMetric('${m.key}')">${m.label}</button>`).join('')}</div>
       </div>
       <div class="chart-wrap"><canvas id="barChart"></canvas></div>
     </div>
     <div class="rank-section">
-      <div class="rank-header">
-        <span class="rank-title">Detail per Agent</span>
+      <div class="rank-header"><span class="rank-title">Detail per Agent</span>
         <div class="sort-tabs">${sortTabs.map(k=>`<button class="sort-tab ${k===currentSort?'active':''}" onclick="resortAgents('${k}')">${sortLabels[k]}</button>`).join('')}</div>
       </div>
       <div class="rank-body"><table class="rank-table">
@@ -489,11 +475,9 @@ function resortAgents(key){currentSort=key;if(currentTL)renderTLDetail(currentTL
 
 function renderBarChart(labels,values){
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-  const gc=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';
-  const tc=isDark?'#9AA5BE':'#9CA3AF';
+  const gc=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';const tc=isDark?'#9AA5BE':'#9CA3AF';
   if(chartInstance){chartInstance.destroy();chartInstance=null;}
-  const ctx=document.getElementById('barChart');
-  if(!ctx)return;
+  const ctx=document.getElementById('barChart');if(!ctx)return;
   chartInstance=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'rgba(29,96,200,0.75)',borderColor:'rgba(29,96,200,1)',borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtByKey(currentChartMetric,ctx.parsed.y)}}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>fmtByKey(currentChartMetric,v)}}}}});
 }
 </script>
