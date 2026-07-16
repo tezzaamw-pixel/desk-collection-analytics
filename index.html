@@ -355,13 +355,24 @@ async function loadData(force) {
 
   showLoading();
 
+  async function fetchJSON(url) {
+    const res = await fetch(url);
+    const text = await res.text();
+    if (text.trim().startsWith('<')) {
+      await new Promise(r => setTimeout(r, 2000));
+      const res2 = await fetch(url);
+      return await res2.json();
+    }
+    return JSON.parse(text);
+  }
+
   try {
-    const [homeRes, weeklyRes] = await Promise.all([
-      fetch(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`),
-      fetch(`${API_URL}?action=weekly&bulan=${bulan}&tahun=${tahun}`)
+    const [homeData_, weeklyData_] = await Promise.all([
+      fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`),
+      fetchJSON(`${API_URL}?action=weekly&bulan=${bulan}&tahun=${tahun}`)
     ]);
-    homeData   = await homeRes.json();
-    weeklyData = await weeklyRes.json();
+    homeData   = homeData_;
+    weeklyData = weeklyData_;
 
     if (!homeData.success) throw new Error(homeData.message || 'Gagal memuat data');
 
@@ -386,7 +397,7 @@ function showLoading() {
 }
 
 function showError(msg) {
-  document.getElementById('summaryGrid').innerHTML = `<div class="state-box"><div class="icon">⚠️</div><p>${msg}</p></div>`;
+  document.getElementById('summaryGrid').innerHTML = `<div class="state-box"><div class="icon">⚠️</div><p>${msg}</p><p class="hint" style="margin-top:8px;font-size:12px">Klik <strong>↻ Refresh</strong> untuk coba lagi.</p></div>`;
 }
 
 /* ============ RENDER SUMMARY ============ */

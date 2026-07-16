@@ -270,8 +270,17 @@ async function loadData(){
   document.getElementById('content').innerHTML='<div class="state-box"><div class="spinner"></div><p>Memuat data...</p></div>';
 
   try {
-    const res=await fetch(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`);
-    const data=await res.json();
+    async function fetchJSON(url) {
+      const res = await fetch(url);
+      const text = await res.text();
+      if (text.trim().startsWith('<')) {
+        await new Promise(r => setTimeout(r, 2000));
+        const res2 = await fetch(url);
+        return await res2.json();
+      }
+      return JSON.parse(text);
+    }
+    const data = await fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`);
     if(!data.success) throw new Error(data.message);
     allRows=data.rows||[];
     currentTL=null;

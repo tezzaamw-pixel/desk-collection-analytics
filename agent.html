@@ -265,12 +265,21 @@ async function doSearch() {
   document.getElementById('result').innerHTML = '<div class="state-box"><div class="spinner"></div><p>Memuat data agent...</p></div>';
 
   try {
-    const [agentRes, teamRes] = await Promise.all([
-      fetch(`${API_URL}?action=agentdata&agent=${encodeURIComponent(agentName)}&bulan=${bulan}&tahun=${tahun}`),
-      fetch(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`)
+    async function fetchJSON(url) {
+      const res = await fetch(url);
+      const text = await res.text();
+      if (text.trim().startsWith('<')) {
+        await new Promise(r => setTimeout(r, 2000));
+        const res2 = await fetch(url);
+        return await res2.json();
+      }
+      return JSON.parse(text);
+    }
+
+    const [agentData, teamData] = await Promise.all([
+      fetchJSON(`${API_URL}?action=agentdata&agent=${encodeURIComponent(agentName)}&bulan=${bulan}&tahun=${tahun}`),
+      fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`)
     ]);
-    const agentData = await agentRes.json();
-    const teamData  = await teamRes.json();
 
     if (!agentData.success) throw new Error(agentData.message);
     if (agentData.totalRows === 0) {
