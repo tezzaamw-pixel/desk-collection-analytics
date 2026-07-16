@@ -6,67 +6,71 @@
 <title>Tim — Desk Collection Analytics</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-:root {
-  --bg:#F7F8FA;--surface:#FFFFFF;--surface2:#F0F2F5;
-  --border:#E4E7EC;--text:#111827;--text2:#4B5563;--text3:#9CA3AF;
-  --accent:#1D60C8;--accent-bg:#EEF3FD;
-  --success:#059669;--success-bg:#ECFDF5;
-  --warning:#D97706;--warning-bg:#FFFBEB;
-  --danger:#DC2626;--danger-bg:#FEF2F2;
+:root{
+  --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
+  --border:#e4e7ec;--text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --accent:#1d60c8;--accent-bg:#eef3fd;
+  --success:#059669;--success-bg:#ecfdf5;
+  --warning:#d97706;--warning-bg:#fffbeb;
+  --danger:#dc2626;--danger-bg:#fef2f2;
   --radius:10px;--radius-sm:6px;
-  --shadow:0 1px 3px rgba(0,0,0,0.07);--shadow-md:0 4px 12px rgba(0,0,0,0.08);
+  --shadow:0 1px 3px rgba(0,0,0,0.07);--shadow-md:0 4px 12px rgba(0,0,0,0.1);
+  --sidebar-w:220px;
 }
 [data-theme="dark"]{
-  --bg:#0F1117;--surface:#1A1D27;--surface2:#232635;
-  --border:#2E3347;--text:#F1F3F9;--text2:#9AA5BE;--text3:#5C6680;
-  --accent:#4A8CF7;--accent-bg:#1A2540;
-  --success:#34D399;--success-bg:#0D2E22;
-  --warning:#FBBF24;--warning-bg:#2D200A;
-  --danger:#F87171;--danger-bg:#2D0F0F;
-  --shadow:0 1px 3px rgba(0,0,0,0.3);--shadow-md:0 4px 12px rgba(0,0,0,0.4);
+  --navy:#0f1523;--bg:#0a0d14;--surface:#131825;--surface2:#1a2035;
+  --border:#252d42;--text:#f1f3f9;--text2:#9aa5be;--text3:#4a5568;
+  --accent:#4a8cf7;--accent-bg:#1a2540;
+  --success:#34d399;--success-bg:#0d2e22;
+  --warning:#fbbf24;--warning-bg:#2d200a;
+  --danger:#f87171;--danger-bg:#2d0f0f;
+  --shadow:0 1px 3px rgba(0,0,0,0.4);--shadow-md:0 4px 12px rgba(0,0,0,0.5);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
-
-/* NAV */
-.navbar{background:var(--surface);border-bottom:1px solid var(--border);padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:56px;position:sticky;top:0;z-index:100;box-shadow:var(--shadow);}
-.nav-brand{font-size:15px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:8px;text-decoration:none;}
-.nav-brand span{color:var(--accent);}
+/* NAVBAR */
+.navbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 calc(var(--sidebar-w)+20px);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.nav-logo{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;text-decoration:none;}
+.nav-logo-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.nav-page-title{font-size:13px;color:rgba(255,255,255,0.5);border-left:1px solid rgba(255,255,255,0.15);padding-left:12px;margin-left:4px;}
 .nav-right{display:flex;align-items:center;gap:10px;}
-.btn-back{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 12px;cursor:pointer;color:var(--text2);font-size:13px;text-decoration:none;transition:all .15s;}
-.btn-back:hover{background:var(--surface2);}
-.btn-icon{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;cursor:pointer;color:var(--text2);font-size:13px;transition:all .15s;}
-.btn-icon:hover{background:var(--surface2);}
-
-/* LAYOUT */
-.container{max-width:1100px;margin:0 auto;padding:24px;}
-.section-title{font-size:13px;font-weight:600;color:var(--text3);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;}
-
-/* FILTER BAR */
+.theme-toggle{display:flex;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-sm);overflow:hidden;}
+.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;transition:all .15s;}
+.theme-btn.active{background:rgba(255,255,255,0.2);color:#fff;}
+/* SIDEBAR */
+.sidebar{position:fixed;top:52px;left:0;width:var(--sidebar-w);height:calc(100vh - 52px);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;z-index:100;}
+.sidebar-section{padding:16px 12px 8px;}
+.sidebar-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:0 6px;margin-bottom:6px;}
+.sidebar-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;transition:all .15s;text-decoration:none;margin-bottom:2px;}
+.sidebar-item:hover{background:var(--surface2);color:var(--text);}
+.sidebar-item.active{background:var(--accent-bg);color:var(--accent);}
+.sidebar-item .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.sidebar-item .icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
+/* MAIN */
+.main{margin-left:var(--sidebar-w);margin-top:52px;padding:28px;min-height:calc(100vh - 52px);}
+.section-title{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
+/* FILTER */
 .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:24px;flex-wrap:wrap;box-shadow:var(--shadow);}
 .filter-bar label{font-size:12px;color:var(--text3);font-weight:500;}
 select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;cursor:pointer;outline:none;}
 select:focus{border-color:var(--accent);}
 .filter-sep{flex:1;}
-.btn-load{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;transition:opacity .15s;}
+.btn-load{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
 .btn-load:hover{opacity:.88;}
 .btn-load:disabled{opacity:.5;cursor:not-allowed;}
-
 /* VIEW TOGGLE */
 .view-toggle{display:flex;gap:8px;margin-bottom:20px;}
 .view-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 18px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;}
 .view-btn.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);}
-
-/* TEAM HEADER CARD */
+/* TEAM HEADER */
 .team-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;margin-bottom:20px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
 .team-avatar{width:48px;height:48px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--accent);flex-shrink:0;}
 .team-name{font-size:17px;font-weight:700;margin-bottom:4px;}
 .team-meta{font-size:12px;color:var(--text2);display:flex;gap:14px;flex-wrap:wrap;}
 .pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;}
 .pill-blue{background:var(--accent-bg);color:var(--accent);}
-.pill-green{background:var(--success-bg);color:var(--success);}
-
-/* SUMMARY GRID */
+/* SUMMARY */
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
 .sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
 .sum-card .lbl{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
@@ -74,12 +78,11 @@ select:focus{border-color:var(--accent);}
 .sum-card .sub{font-size:11px;color:var(--text3);}
 .sum-card.accent{border-color:var(--accent);background:var(--accent-bg);}
 .sum-card.accent .val{color:var(--accent);}
-
-/* AGENT RANK TABLE */
+/* RANK TABLE */
 .rank-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden;}
 .rank-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
 .rank-title{font-size:14px;font-weight:600;}
-.sort-tabs{display:flex;gap:6px;}
+.sort-tabs{display:flex;gap:6px;flex-wrap:wrap;}
 .sort-tab{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;}
 .sort-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:500;}
 .rank-body{overflow-x:auto;}
@@ -88,7 +91,6 @@ select:focus{border-color:var(--accent);}
 .rank-table td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text2);}
 .rank-table tr:last-child td{border-bottom:none;}
 .rank-table tr:hover td{background:var(--surface2);}
-.rank-table td:first-child{font-weight:500;color:var(--text);}
 .rank-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;margin-right:6px;}
 .rank-1{background:#FEF3C7;color:#92400E;}
 .rank-2{background:#F3F4F6;color:#374151;}
@@ -99,7 +101,6 @@ select:focus{border-color:var(--accent);}
 .num{color:var(--text);font-weight:500;}
 .absensi-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
 .ab-hadir{background:var(--success-bg);color:var(--success);}
-
 /* CHART */
 .chart-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow);}
 .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
@@ -108,9 +109,8 @@ select:focus{border-color:var(--accent);}
 .chart-tabs{display:flex;gap:6px;flex-wrap:wrap;}
 .chart-tab{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;}
 .chart-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:500;}
-
-/* SPV LIST */
-.spv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-bottom:24px;}
+/* SPV CARDS */
+.spv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px;}
 .spv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:border-color .15s;}
 .spv-card:hover{border-color:var(--accent);}
 .spv-card-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;}
@@ -122,42 +122,57 @@ select:focus{border-color:var(--accent);}
 .spv-stat{text-align:center;}
 .spv-stat-val{font-size:15px;font-weight:700;color:var(--text);}
 .spv-stat-lbl{font-size:10px;color:var(--text3);margin-top:2px;}
-
-/* TL LIST (dropdown select) */
+/* TL SELECT */
 .tl-select-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;box-shadow:var(--shadow);}
 .tl-select-wrap label{font-size:13px;font-weight:500;margin-bottom:8px;display:block;}
 .tl-select-row{display:flex;gap:10px;flex-wrap:wrap;}
 .tl-select-row select{flex:1;min-width:200px;}
 .btn-view{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
-
 /* STATE */
 .state-box{text-align:center;padding:60px 20px;color:var(--text3);}
 .state-box .icon{font-size:36px;margin-bottom:12px;}
 .state-box p{font-size:14px;}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-
-@media(max-width:600px){
-  .container{padding:14px;}
-  .navbar{padding:0 14px;}
-  .sort-tabs{flex-wrap:wrap;}
-  .spv-grid{grid-template-columns:1fr;}
+@media(max-width:768px){
+  :root{--sidebar-w:0px;}
+  .sidebar{display:none;}
+  .navbar{padding-left:20px;}
+  .main{margin-left:0;}
 }
 </style>
 </head>
 <body>
 
 <nav class="navbar">
-  <a class="nav-brand" href="index.html">📊 <span>Desk</span>Collection Analytics</a>
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">DC</span> DeskCollection Analytics</a>
+    <span class="nav-page-title">Tim</span>
+  </div>
   <div class="nav-right">
-    <a class="btn-back" href="index.html">← Kembali</a>
-    <button class="btn-icon" onclick="toggleTheme()" id="themeBtn">🌙 Gelap</button>
+    <div class="theme-toggle">
+      <button class="theme-btn active" id="btnTerang" onclick="setTheme('light')">☀ Terang</button>
+      <button class="theme-btn" id="btnGelap" onclick="setTheme('dark')">🌙 Gelap</button>
+    </div>
   </div>
 </nav>
 
-<div class="container">
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
+  </div>
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">Nama Aplikasi</div>
+    <div id="sidebarApps"><div style="padding:8px 10px;font-size:12px;color:var(--text3)">—</div></div>
+  </div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section">
+    <a class="sidebar-item active" href="team.html"><span class="icon">👥</span> Tim</a>
+    <a class="sidebar-item" href="agent.html"><span class="icon">👤</span> Agent</a>
+  </div>
+</aside>
 
-  <!-- FILTER -->
+<main class="main">
   <div class="filter-bar">
     <label>Bulan</label>
     <select id="selBulan">
@@ -167,48 +182,39 @@ select:focus{border-color:var(--accent);}
       <option>Oktober</option><option>November</option><option>Desember</option>
     </select>
     <label>Tahun</label>
-    <select id="selTahun">
-      <option>2025</option><option>2026</option><option>2027</option>
-    </select>
+    <select id="selTahun"><option>2025</option><option>2026</option><option>2027</option></select>
     <label>Aplikasi</label>
-    <select id="selAplikasi" onchange="onAplikasiChange()">
-      <option value="">Semua</option>
-    </select>
+    <select id="selAplikasi" onchange="onAplikasiChange()"><option value="">Semua</option></select>
     <label>Bucket</label>
-    <select id="selBucket">
-      <option value="">Semua</option>
-    </select>
+    <select id="selBucket"><option value="">Semua</option></select>
     <div class="filter-sep"></div>
     <button class="btn-load" id="btnLoad" onclick="loadData()">Tampilkan</button>
   </div>
 
-  <!-- VIEW TOGGLE -->
   <div class="view-toggle">
     <button class="view-btn active" id="btnSPV" onclick="switchView('spv')">👤 Per Supervisor</button>
     <button class="view-btn" id="btnTL" onclick="switchView('tl')">👥 Per Team Leader</button>
   </div>
 
-  <!-- CONTENT -->
   <div id="content">
-    <div class="state-box">
-      <div class="icon">👥</div>
-      <p>Pilih bulan dan tahun, lalu klik Tampilkan.</p>
-    </div>
+    <div class="state-box"><div class="icon">👥</div><p>Pilih bulan dan tahun, lalu klik Tampilkan.</p></div>
   </div>
-
-</div>
+</main>
 
 <script>
-const API_URL = 'https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
-let allRows = [];
-let currentView = 'spv';
-let currentSort = 'dailyPayment';
-let chartInstance = null;
-let currentChartMetric = 'dailyPayment';
-let currentTL = null;
-let allBucketMap = {};
+const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
+const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
+function getColor(ap){return APP_COLORS[ap]||'#6366f1';}
 
-const CHART_METRICS = [
+let allRows=[];
+let currentView='spv';
+let currentSort='dailyPayment';
+let chartInstance=null;
+let currentChartMetric='dailyPayment';
+let currentTL=null;
+let allBucketMap={};
+
+const CHART_METRICS=[
   {key:'dailyPayment',label:'Payment',fmt:'rp'},
   {key:'callManual',label:'Call Manual',fmt:'num'},
   {key:'sentuhWA',label:'Sentuh WA',fmt:'num'},
@@ -216,255 +222,166 @@ const CHART_METRICS = [
   {key:'jmlDataBayar',label:'Data Bayar',fmt:'num'},
 ];
 
-function buildBucketMap(rows) {
-  allBucketMap = {};
-  rows.forEach(r => {
-    const ap = r.aplikasi || '';
-    const bk = r.bucket || '';
-    if (ap && bk) {
-      if (!allBucketMap[ap]) allBucketMap[ap] = new Set();
-      allBucketMap[ap].add(bk);
-    }
-  });
-  Object.keys(allBucketMap).forEach(ap => {
-    allBucketMap[ap] = [...allBucketMap[ap]].sort();
-  });
-}
+/* FORMAT */
+function fmtRp(n){if(!n||n===0)return 'Rp 0';if(n>=1e9)return 'Rp '+(n/1e9).toFixed(2)+' M';if(n>=1e6)return 'Rp '+(n/1e6).toFixed(1)+' jt';if(n>=1e3)return 'Rp '+(n/1e3).toFixed(0)+' rb';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
+function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
+function fmtRate(n){return n?(n*100).toFixed(2)+'%':'0%';}
+function fmtByKey(key,val){const m=CHART_METRICS.find(x=>x.key===key);if(!m)return val;if(m.fmt==='rp')return fmtRp(val);return fmtNum(val);}
 
-function populateAplikasi(rows) {
-  const aplikasiList = [...new Set(rows.map(r => r.aplikasi).filter(Boolean))].sort();
-  const sel = document.getElementById('selAplikasi');
-  sel.innerHTML = '<option value="">Semua</option>' + aplikasiList.map(a => `<option value="${a}">${a}</option>`).join('');
-}
+/* THEME */
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('dca_theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');if(chartInstance&&currentTL)renderTLDetail(currentTL);}
+(function(){const t=localStorage.getItem('dca_theme')||'light';document.documentElement.setAttribute('data-theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');})();
 
-function populateBucket(aplikasi) {
-  const sel = document.getElementById('selBucket');
-  let buckets = [];
-  if (aplikasi && allBucketMap[aplikasi]) {
-    buckets = allBucketMap[aplikasi];
-  } else {
-    const all = new Set();
-    Object.values(allBucketMap).forEach(b => b.forEach(x => all.add(x)));
-    buckets = [...all].sort();
-  }
-  sel.innerHTML = '<option value="">Semua</option>' + buckets.map(b => `<option value="${b}">${b}</option>`).join('');
-}
-
-function onAplikasiChange() {
-  populateBucket(document.getElementById('selAplikasi').value);
-}
-
-function getFilteredRows() {
-  const ap = document.getElementById('selAplikasi').value;
-  const bk = document.getElementById('selBucket').value;
-  let rows = allRows;
-  if (ap) rows = rows.filter(r => r.aplikasi === ap);
-  if (bk) rows = rows.filter(r => r.bucket === bk);
-  return rows;
-}
-
-/* ============ THEME ============ */
-function toggleTheme(){
-  const html=document.documentElement;
-  const isDark=html.getAttribute('data-theme')==='dark';
-  html.setAttribute('data-theme',isDark?'light':'dark');
-  document.getElementById('themeBtn').textContent=isDark?'🌙 Gelap':'☀️ Terang';
-  localStorage.setItem('dca_theme',isDark?'light':'dark');
-  if(currentTL) renderTLDetail(currentTL);
-}
-(function initTheme(){
-  const t=localStorage.getItem('dca_theme')||'light';
-  document.documentElement.setAttribute('data-theme',t);
-  const btn=document.getElementById('themeBtn');
-  if(btn) btn.textContent=t==='dark'?'☀️ Terang':'🌙 Gelap';
-})();
-
-/* ============ FILTER INIT ============ */
-(function initFilter(){
+/* FILTER INIT */
+(function(){
   const now=new Date();
   const bl=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   document.getElementById('selBulan').value=bl[now.getMonth()];
   document.getElementById('selTahun').value=String(now.getFullYear());
   const p=new URLSearchParams(window.location.search);
-  if(p.get('bulan')) document.getElementById('selBulan').value=p.get('bulan');
-  if(p.get('tahun')) document.getElementById('selTahun').value=p.get('tahun');
-  if(p.get('view')) currentView=p.get('view');
-  if(p.get('tl')||p.get('spv')) loadData();
+  if(p.get('bulan'))document.getElementById('selBulan').value=p.get('bulan');
+  if(p.get('tahun'))document.getElementById('selTahun').value=p.get('tahun');
+  if(p.get('view'))currentView=p.get('view');
+  if(p.get('tl')||p.get('spv'))setTimeout(loadData,100);
 })();
 
-/* ============ FORMAT ============ */
-function fmtRp(n){
-  if(!n||n===0) return 'Rp 0';
-  if(n>=1e9) return 'Rp '+(n/1e9).toFixed(2)+' M';
-  if(n>=1e6) return 'Rp '+(n/1e6).toFixed(1)+' jt';
-  if(n>=1e3) return 'Rp '+(n/1e3).toFixed(0)+' rb';
-  return 'Rp '+Math.round(n).toLocaleString('id-ID');
+/* BUCKET MAP */
+function buildBucketMap(rows){
+  allBucketMap={};
+  rows.forEach(r=>{const ap=r.aplikasi||'';const bk=r.bucket||'';if(ap&&bk){if(!allBucketMap[ap])allBucketMap[ap]=new Set();allBucketMap[ap].add(bk);}});
+  Object.keys(allBucketMap).forEach(ap=>{allBucketMap[ap]=[...allBucketMap[ap]].sort();});
 }
-function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
-function fmtRate(n){return n?(n*100).toFixed(2)+'%':'0%';}
-function fmtByKey(key,val){
-  const m=CHART_METRICS.find(x=>x.key===key);
-  if(!m) return val;
-  if(m.fmt==='rp') return fmtRp(val);
-  return fmtNum(val);
+function populateAplikasi(rows){
+  const list=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].sort();
+  document.getElementById('selAplikasi').innerHTML='<option value="">Semua</option>'+list.map(a=>`<option value="${a}">${a}</option>`).join('');
+}
+function populateBucket(ap){
+  let buckets=[];
+  if(ap&&allBucketMap[ap]){buckets=allBucketMap[ap];}
+  else{const all=new Set();Object.values(allBucketMap).forEach(b=>b.forEach(x=>all.add(x)));buckets=[...all].sort();}
+  document.getElementById('selBucket').innerHTML='<option value="">Semua</option>'+buckets.map(b=>`<option value="${b}">${b}</option>`).join('');
+}
+function onAplikasiChange(){populateBucket(document.getElementById('selAplikasi').value);}
+
+function getFilteredRows(){
+  const ap=document.getElementById('selAplikasi').value;
+  const bk=document.getElementById('selBucket').value;
+  let rows=allRows;
+  if(ap)rows=rows.filter(r=>r.aplikasi===ap);
+  if(bk)rows=rows.filter(r=>r.bucket===bk);
+  return rows;
 }
 
-/* ============ SWITCH VIEW ============ */
-function switchView(v){
-  currentView=v;
-  document.getElementById('btnSPV').classList.toggle('active',v==='spv');
-  document.getElementById('btnTL').classList.toggle('active',v==='tl');
-  if(allRows.length) renderView();
+/* FETCH */
+async function fetchJSON(url){
+  const res=await fetch(url);const text=await res.text();
+  if(text.trim().startsWith('<')){await new Promise(r=>setTimeout(r,2000));return await(await fetch(url)).json();}
+  return JSON.parse(text);
 }
 
-/* ============ LOAD DATA ============ */
+/* LOAD */
 async function loadData(){
   const bulan=document.getElementById('selBulan').value;
   const tahun=document.getElementById('selTahun').value;
   const btn=document.getElementById('btnLoad');
-  btn.disabled=true; btn.textContent='⏳ Memuat...';
+  btn.disabled=true;btn.textContent='⏳ Memuat...';
   document.getElementById('content').innerHTML='<div class="state-box"><div class="spinner"></div><p>Memuat data...</p></div>';
-
-  try {
-    async function fetchJSON(url) {
-      const res = await fetch(url);
-      const text = await res.text();
-      if (text.trim().startsWith('<')) {
-        await new Promise(r => setTimeout(r, 2000));
-        const res2 = await fetch(url);
-        return await res2.json();
-      }
-      return JSON.parse(text);
-    }
-    const data = await fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`);
-    if(!data.success) throw new Error(data.message);
+  try{
+    const data=await fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`);
+    if(!data.success)throw new Error(data.message);
     allRows=data.rows||[];
     currentTL=null;
     buildBucketMap(allRows);
     populateAplikasi(allRows);
     populateBucket('');
-    renderView();
-  } catch(e){
+    renderSidebar(allRows,bulan,tahun);
+    switchView(currentView);
+  }catch(e){
     document.getElementById('content').innerHTML=`<div class="state-box"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
   }
-  btn.disabled=false; btn.textContent='Tampilkan';
+  btn.disabled=false;btn.textContent='Tampilkan';
 }
 
-function renderView(){
-  if(currentView==='spv') renderSPVList();
-  else renderTLSelectWrap();
+function renderSidebar(rows,bulan,tahun){
+  const apps=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].sort();
+  document.getElementById('sidebarApps').innerHTML=apps.map(ap=>`
+    <a class="sidebar-item" href="app.html?ap=${encodeURIComponent(ap)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">
+      <span class="dot" style="background:${getColor(ap)}"></span>
+      ${ap.charAt(0)+ap.slice(1).toLowerCase()}
+    </a>`).join('');
 }
 
-/* ============ SUMMARIZE ============ */
+function switchView(v){
+  currentView=v;
+  document.getElementById('btnSPV').classList.toggle('active',v==='spv');
+  document.getElementById('btnTL').classList.toggle('active',v==='tl');
+  if(allRows.length)v==='spv'?renderSPVList():renderTLSelectWrap();
+}
+
+/* SUMMARIZE */
 function summarizeRows(rows){
-  if(!rows.length) return {};
-  const numKeys=['totalData','dataBaru','osDataBaru','dailyPayment','jmlDataBayar',
-    'autocall','callManual','callTerhubung','sentuhWA','sentuhGojek','responWA','responGojek',
-    'waBlokir','ptp','ptpBayar','sentuhWABA','responWABA','smsManual','responSMSManual','paymentOvertime'];
+  if(!rows||!rows.length)return {totalData:0,dataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,responWA:0,ptp:0,ptpBayar:0};
+  const keys=['totalData','dataBaru','osDataBaru','dailyPayment','jmlDataBayar','autocall','callManual','callTerhubung','sentuhWA','sentuhGojek','responWA','responGojek','waBlokir','ptp','ptpBayar','sentuhWABA','responWABA','smsManual','responSMSManual','paymentOvertime'];
   const r={};
-  numKeys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
+  keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
   const tb=r.jmlDataBayar;
-  r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*x.jmlDataBayar),0)/tb
-    :rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length;
+  r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*x.jmlDataBayar),0)/tb:rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length;
   return r;
 }
 
-/* ============ SPV VIEW ============ */
+/* SPV LIST */
 function renderSPVList(){
-  const rows = getFilteredRows();
+  const filteredRows=getFilteredRows();
   const bySPV={};
-  allRows.forEach(r=>{
-    const spv=r.supervisor||'(Tanpa SPV)';
-    if(!bySPV[spv]) bySPV[spv]=[];
-    bySPV[spv].push(r);
-  });
-
+  filteredRows.forEach(r=>{const spv=r.supervisor||'(Tanpa SPV)';if(!bySPV[spv])bySPV[spv]=[];bySPV[spv].push(r);});
   const bulan=document.getElementById('selBulan').value;
   const tahun=document.getElementById('selTahun').value;
-
+  if(!Object.keys(bySPV).length){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
   const cards=Object.keys(bySPV).sort().map(spv=>{
-    const rows=bySPV[spv];
-    const s=summarizeRows(rows);
-    const agentCount=new Set(rows.map(r=>r.agent)).size;
-    const tlCount=new Set(rows.map(r=>r.teamLeader)).size;
+    const sRows=bySPV[spv];
+    const s=summarizeRows(sRows);
+    const agentCount=new Set(sRows.map(r=>r.agent)).size;
+    const tlCount=new Set(sRows.map(r=>r.teamLeader)).size;
     const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-    const aplikasiList=[...new Set(rows.map(r=>r.aplikasi))].join(', ');
-
-    return `
-      <div class="spv-card" onclick="showSPVDetail('${spv.replace(/'/g,"\\'")}')">
-        <div class="spv-card-header">
-          <div class="spv-avatar">${initials}</div>
-          <div>
-            <div class="spv-name">${spv}</div>
-            <div class="spv-meta">${aplikasiList} · ${tlCount} TL · ${agentCount} agent</div>
-          </div>
-        </div>
-        <div class="spv-body">
-          <div class="spv-stats">
-            <div class="spv-stat"><div class="spv-stat-val">${fmtRp(s.dailyPayment)}</div><div class="spv-stat-lbl">Payment</div></div>
-            <div class="spv-stat"><div class="spv-stat-val">${fmtRate(s.avgRate)}</div><div class="spv-stat-lbl">Avg Rate</div></div>
-            <div class="spv-stat"><div class="spv-stat-val">${fmtNum(s.ptp)}</div><div class="spv-stat-lbl">PTP</div></div>
-          </div>
-        </div>
-      </div>`;
+    const appList=[...new Set(sRows.map(r=>r.aplikasi))].join(', ');
+    return `<div class="spv-card" onclick="showSPVDetail('${spv.replace(/\\/g,'\\\\').replace(/'/g,"\\'")}')">
+      <div class="spv-card-header">
+        <div class="spv-avatar">${initials}</div>
+        <div><div class="spv-name">${spv}</div><div class="spv-meta">${appList} · ${tlCount} TL · ${agentCount} agent</div></div>
+      </div>
+      <div class="spv-body"><div class="spv-stats">
+        <div class="spv-stat"><div class="spv-stat-val">${fmtRp(s.dailyPayment)}</div><div class="spv-stat-lbl">Payment</div></div>
+        <div class="spv-stat"><div class="spv-stat-val">${fmtRate(s.avgRate)}</div><div class="spv-stat-lbl">Rate</div></div>
+        <div class="spv-stat"><div class="spv-stat-val">${fmtNum(s.ptp)}</div><div class="spv-stat-lbl">PTP</div></div>
+      </div></div>
+    </div>`;
   }).join('');
-
-  document.getElementById('content').innerHTML=`
-    <p class="section-title">Semua Supervisor — ${bulan} ${tahun}</p>
-    <div class="spv-grid">${cards}</div>
-    <div id="spvDetail"></div>`;
+  document.getElementById('content').innerHTML=`<p class="section-title">Semua Supervisor — ${bulan} ${tahun}</p><div class="spv-grid">${cards}</div><div id="spvDetail"></div>`;
 }
 
 function showSPVDetail(spv){
-  const rows=allRows.filter(r=>(r.supervisor||'(Tanpa SPV)')===spv);
-  const s=summarizeRows(rows);
-  const agentCount=new Set(rows.map(r=>r.agent)).size;
-  const tlCount=new Set(rows.map(r=>r.teamLeader)).size;
+  const sRows=getFilteredRows().filter(r=>(r.supervisor||'(Tanpa SPV)')===spv);
+  const s=summarizeRows(sRows);
+  const agentCount=new Set(sRows.map(r=>r.agent)).size;
+  const tlCount=new Set(sRows.map(r=>r.teamLeader)).size;
   const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
   const bulan=document.getElementById('selBulan').value;
   const tahun=document.getElementById('selTahun').value;
-
-  // Group by TL
   const byTL={};
-  rows.forEach(r=>{
-    const tl=r.teamLeader||'(Tanpa TL)';
-    if(!byTL[tl]) byTL[tl]=[];
-    byTL[tl].push(r);
-  });
-
-  const tlRows=Object.keys(byTL).map(tl=>{
-    const ts=summarizeRows(byTL[tl]);
-    const ac=new Set(byTL[tl].map(r=>r.agent)).size;
-    return {tl,s:ts,agentCount:ac,rows:byTL[tl]};
-  }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
-
-  const tlTable=tlRows.map((t,i)=>`
-    <tr>
-      <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span>
-        <a class="agent-link" href="team.html?view=tl&tl=${encodeURIComponent(t.tl)}&bulan=${bulan}&tahun=${tahun}">${t.tl}</a>
-      </td>
-      <td class="num">${t.agentCount}</td>
-      <td class="num">${fmtRp(t.s.dailyPayment)}</td>
-      <td class="num">${fmtRate(t.s.avgRate)}</td>
-      <td class="num">${fmtNum(t.s.callManual)}</td>
-      <td class="num">${fmtNum(t.s.sentuhWA)}</td>
-      <td class="num">${fmtNum(t.s.ptp)}</td>
-      <td class="num">${fmtNum(t.s.ptpBayar)}</td>
-    </tr>`).join('');
-
+  sRows.forEach(r=>{const tl=r.teamLeader||'(Tanpa TL)';if(!byTL[tl])byTL[tl]=[];byTL[tl].push(r);});
+  const tlRows=Object.keys(byTL).map(tl=>{const ts=summarizeRows(byTL[tl]);return{tl,s:ts,agentCount:new Set(byTL[tl].map(r=>r.agent)).size};}).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
+  const tlTable=tlRows.map((t,i)=>`<tr>
+    <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span><a class="agent-link" href="team.html?view=tl&tl=${encodeURIComponent(t.tl)}&bulan=${bulan}&tahun=${tahun}">${t.tl}</a></td>
+    <td class="num">${t.agentCount}</td><td class="num">${fmtRp(t.s.dailyPayment)}</td>
+    <td class="num">${fmtRate(t.s.avgRate)}</td><td class="num">${fmtNum(t.s.callManual)}</td>
+    <td class="num">${fmtNum(t.s.sentuhWA)}</td><td class="num">${fmtNum(t.s.ptp)}</td><td class="num">${fmtNum(t.s.ptpBayar)}</td>
+  </tr>`).join('');
   document.getElementById('spvDetail').innerHTML=`
     <div class="team-header">
       <div class="team-avatar">${initials}</div>
-      <div style="flex:1">
-        <div class="team-name">${spv}</div>
-        <div class="team-meta">
-          <span>👥 ${tlCount} Team Leader</span>
-          <span>👤 ${agentCount} Agent</span>
-        </div>
-      </div>
+      <div style="flex:1"><div class="team-name">${spv}</div><div class="team-meta"><span>👥 ${tlCount} TL</span><span>👤 ${agentCount} Agent</span></div></div>
       <span class="pill pill-blue">${bulan} ${tahun}</span>
     </div>
-
     <p class="section-title">Ringkasan Tim</p>
     <div class="summary-grid">
       <div class="sum-card accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(s.dailyPayment)}</div><div class="sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
@@ -473,127 +390,71 @@ function showSPVDetail(spv){
       <div class="sum-card"><div class="lbl">Sentuh WA</div><div class="val">${fmtNum(s.sentuhWA)}</div><div class="sub">${fmtNum(s.responWA)} respon</div></div>
       <div class="sum-card"><div class="lbl">PTP</div><div class="val">${fmtNum(s.ptp)}</div><div class="sub">${fmtNum(s.ptpBayar)} bayar</div></div>
     </div>
-
     <div class="rank-section">
-      <div class="rank-header"><span class="rank-title">Performa per Team Leader</span></div>
-      <div class="rank-body">
-        <table class="rank-table">
-          <thead><tr><th>Team Leader</th><th>Agent</th><th>Payment</th><th>Rate</th><th>Call Manual</th><th>Sentuh WA</th><th>PTP</th><th>PTP Bayar</th></tr></thead>
-          <tbody>${tlTable}</tbody>
-        </table>
-      </div>
+      <div class="rank-header"><span class="rank-title">Per Team Leader</span></div>
+      <div class="rank-body"><table class="rank-table">
+        <thead><tr><th>Team Leader</th><th>Agent</th><th>Payment</th><th>Rate</th><th>Call Manual</th><th>Sentuh WA</th><th>PTP</th><th>PTP Bayar</th></tr></thead>
+        <tbody>${tlTable}</tbody>
+      </table></div>
     </div>`;
-
   document.getElementById('spvDetail').scrollIntoView({behavior:'smooth',block:'start'});
 }
 
-/* ============ TL VIEW ============ */
+/* TL VIEW */
 function renderTLSelectWrap(){
-  const rows = getFilteredRows();
-  const tlList=[...new Set(rows.map(r=>r.teamLeader||'').filter(Boolean))].sort();
-  const bulan=document.getElementById('selBulan').value;
-  const tahun=document.getElementById('selTahun').value;
-
-  const params=new URLSearchParams(window.location.search);
-  const preselect=params.get('tl')||'';
-
+  const filteredRows=getFilteredRows();
+  const tlList=[...new Set(filteredRows.map(r=>r.teamLeader||'').filter(Boolean))].sort();
+  const preselect=new URLSearchParams(window.location.search).get('tl')||'';
   document.getElementById('content').innerHTML=`
     <div class="tl-select-wrap">
       <label>Pilih Team Leader</label>
       <div class="tl-select-row">
-        <select id="selTL">
-          <option value="">-- Pilih TL --</option>
-          ${tlList.map(tl=>`<option value="${tl}" ${tl===preselect?'selected':''}>${tl}</option>`).join('')}
-        </select>
+        <select id="selTL"><option value="">-- Pilih TL --</option>${tlList.map(tl=>`<option value="${tl}" ${tl===preselect?'selected':''}>${tl}</option>`).join('')}</select>
         <button class="btn-view" onclick="viewTL()">Lihat</button>
       </div>
     </div>
-    <div id="tlDetail">
-      <div class="state-box"><div class="icon">👥</div><p>Pilih Team Leader untuk melihat detail tim.</p></div>
-    </div>`;
-
-  if(preselect){
-    document.getElementById('selTL').value=preselect;
-    viewTL();
-  }
+    <div id="tlDetail"><div class="state-box"><div class="icon">👥</div><p>Pilih Team Leader untuk melihat detail tim.</p></div></div>`;
+  if(preselect){document.getElementById('selTL').value=preselect;viewTL();}
 }
 
 function viewTL(){
   const tl=document.getElementById('selTL').value;
   if(!tl){alert('Pilih Team Leader dulu.');return;}
-  currentTL=tl;
-  renderTLDetail(tl);
+  currentTL=tl;renderTLDetail(tl);
 }
 
 function renderTLDetail(tl){
   const rows=allRows.filter(r=>r.teamLeader===tl);
-  if(!rows.length){
-    document.getElementById('tlDetail').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data untuk TL ini.</p></div>';
-    return;
-  }
-
+  if(!rows.length){document.getElementById('tlDetail').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
   const s=summarizeRows(rows);
-  const agentList=[...new Set(rows.map(r=>r.agent))].filter(Boolean).sort();
   const first=rows[0];
-  const aplikasi=first.aplikasi||'—';
-  const bucket=first.bucket||'—';
-  const spv=first.supervisor||'—';
   const bulan=document.getElementById('selBulan').value;
   const tahun=document.getElementById('selTahun').value;
   const initials=tl.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-
-  // Summarize per agent
   const byAgent={};
-  rows.forEach(r=>{
-    const ag=r.agent||'(?)';
-    if(!byAgent[ag]) byAgent[ag]=[];
-    byAgent[ag].push(r);
-  });
-
-  const agentSummaries=Object.keys(byAgent).map(ag=>{
+  rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
+  const agentSums=Object.keys(byAgent).map(ag=>{
     const as=summarizeRows(byAgent[ag]);
-    const hadir=byAgent[ag].filter(r=>r.absensi==='Hadir').length;
-    return {ag,s:as,hadir,total:byAgent[ag].length};
-  });
-
-  // Sort by current metric
-  agentSummaries.sort((a,b)=>(b.s[currentSort]||0)-(a.s[currentSort]||0));
-
-  // Chart data — payment per agent (bar)
-  const chartLabels=agentSummaries.map(a=>a.ag.split(' ')[0]);
-  const chartVals=agentSummaries.map(a=>a.s[currentChartMetric]||0);
-
+    return{ag,s:as,hadir:byAgent[ag].filter(r=>r.absensi==='Hadir').length,total:byAgent[ag].length};
+  }).sort((a,b)=>(b.s[currentSort]||0)-(a.s[currentSort]||0));
   const sortTabs=['dailyPayment','callManual','sentuhWA','ptp','jmlDataBayar'];
   const sortLabels={dailyPayment:'Payment',callManual:'Call Manual',sentuhWA:'Sentuh WA',ptp:'PTP',jmlDataBayar:'Data Bayar'};
-
-  const agentRows=agentSummaries.map((a,i)=>`
-    <tr>
-      <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span>
-        <a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${bulan}&tahun=${tahun}">${a.ag}</a>
-      </td>
-      <td><span class="absensi-pill ab-hadir">${a.hadir}/${a.total}</span></td>
-      <td class="num">${fmtRp(a.s.dailyPayment)}</td>
-      <td class="num">${fmtRate(a.s.avgRate)}</td>
-      <td class="num">${fmtNum(a.s.callManual)}</td>
-      <td class="num">${fmtNum(a.s.sentuhWA)}</td>
-      <td class="num">${fmtNum(a.s.responWA)}</td>
-      <td class="num">${fmtNum(a.s.ptp)}</td>
-      <td class="num">${fmtNum(a.s.ptpBayar)}</td>
-    </tr>`).join('');
-
+  const agentRows=agentSums.map((a,i)=>`<tr>
+    <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span><a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${bulan}&tahun=${tahun}">${a.ag}</a></td>
+    <td><span class="absensi-pill ab-hadir">${a.hadir}/${a.total}</span></td>
+    <td class="num">${fmtRp(a.s.dailyPayment)}</td><td class="num">${fmtRate(a.s.avgRate)}</td>
+    <td class="num">${fmtNum(a.s.callManual)}</td><td class="num">${fmtNum(a.s.sentuhWA)}</td>
+    <td class="num">${fmtNum(a.s.responWA)}</td><td class="num">${fmtNum(a.s.ptp)}</td><td class="num">${fmtNum(a.s.ptpBayar)}</td>
+  </tr>`).join('');
   document.getElementById('tlDetail').innerHTML=`
     <div class="team-header">
       <div class="team-avatar">${initials}</div>
       <div style="flex:1">
         <div class="team-name">${tl}</div>
-        <div class="team-meta">
-          <span>📱 ${aplikasi}</span><span>🪣 ${bucket}</span>
-          <span>👤 SPV: ${spv}</span><span>👥 ${agentList.length} agent</span>
-        </div>
+        <div class="team-meta"><span>📱 ${first.aplikasi||'—'}</span><span>🪣 ${first.bucket||'—'}</span><span>👤 SPV: ${first.supervisor||'—'}</span><span>👥 ${agentSums.length} agent</span></div>
       </div>
       <span class="pill pill-blue">${bulan} ${tahun}</span>
     </div>
-
     <p class="section-title">Ringkasan Tim</p>
     <div class="summary-grid">
       <div class="sum-card accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(s.dailyPayment)}</div><div class="sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
@@ -602,82 +463,38 @@ function renderTLDetail(tl){
       <div class="sum-card"><div class="lbl">Sentuh WA</div><div class="val">${fmtNum(s.sentuhWA)}</div><div class="sub">${fmtNum(s.responWA)} respon</div></div>
       <div class="sum-card"><div class="lbl">PTP</div><div class="val">${fmtNum(s.ptp)}</div><div class="sub">${fmtNum(s.ptpBayar)} bayar</div></div>
     </div>
-
     <p class="section-title">Perbandingan Agent</p>
     <div class="chart-section">
       <div class="chart-header">
         <span class="chart-title">Performa per Agent</span>
-        <div class="chart-tabs">
-          ${CHART_METRICS.map(m=>`<button class="chart-tab ${m.key===currentChartMetric?'active':''}" onclick="switchChartMetric('${m.key}')">${m.label}</button>`).join('')}
-        </div>
+        <div class="chart-tabs">${CHART_METRICS.map(m=>`<button class="chart-tab ${m.key===currentChartMetric?'active':''}" onclick="switchChartMetric('${m.key}')">${m.label}</button>`).join('')}</div>
       </div>
       <div class="chart-wrap"><canvas id="barChart"></canvas></div>
     </div>
-
     <div class="rank-section">
       <div class="rank-header">
         <span class="rank-title">Detail per Agent</span>
-        <div class="sort-tabs">
-          ${sortTabs.map(k=>`<button class="sort-tab ${k===currentSort?'active':''}" onclick="resortAgents('${k}')">${sortLabels[k]}</button>`).join('')}
-        </div>
+        <div class="sort-tabs">${sortTabs.map(k=>`<button class="sort-tab ${k===currentSort?'active':''}" onclick="resortAgents('${k}')">${sortLabels[k]}</button>`).join('')}</div>
       </div>
-      <div class="rank-body">
-        <table class="rank-table">
-          <thead><tr><th>Agent</th><th>Hadir</th><th>Payment</th><th>Rate</th><th>Call Manual</th><th>Sentuh WA</th><th>Respon WA</th><th>PTP</th><th>PTP Bayar</th></tr></thead>
-          <tbody id="agentTableBody">${agentRows}</tbody>
-        </table>
-      </div>
+      <div class="rank-body"><table class="rank-table">
+        <thead><tr><th>Agent</th><th>Hadir</th><th>Payment</th><th>Rate</th><th>Call Manual</th><th>Sentuh WA</th><th>Respon WA</th><th>PTP</th><th>PTP Bayar</th></tr></thead>
+        <tbody>${agentRows}</tbody>
+      </table></div>
     </div>`;
-
-  // Render bar chart
-  renderBarChart(chartLabels, chartVals);
+  renderBarChart(agentSums.map(a=>a.ag.split(' ')[0]),agentSums.map(a=>a.s[currentChartMetric]||0));
 }
 
-function switchChartMetric(key){
-  currentChartMetric=key;
-  if(currentTL) renderTLDetail(currentTL);
-}
+function switchChartMetric(key){currentChartMetric=key;if(currentTL)renderTLDetail(currentTL);}
+function resortAgents(key){currentSort=key;if(currentTL)renderTLDetail(currentTL);}
 
-function resortAgents(key){
-  currentSort=key;
-  if(currentTL) renderTLDetail(currentTL);
-}
-
-function renderBarChart(labels, values){
+function renderBarChart(labels,values){
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-  const gridColor=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';
-  const textColor=isDark?'#9AA5BE':'#9CA3AF';
-
+  const gc=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';
+  const tc=isDark?'#9AA5BE':'#9CA3AF';
   if(chartInstance){chartInstance.destroy();chartInstance=null;}
   const ctx=document.getElementById('barChart');
-  if(!ctx) return;
-
-  chartInstance=new Chart(ctx,{
-    type:'bar',
-    data:{
-      labels,
-      datasets:[{
-        label:'',
-        data:values,
-        backgroundColor:'rgba(29,96,200,0.75)',
-        borderColor:'rgba(29,96,200,1)',
-        borderWidth:1,
-        borderRadius:4,
-      }]
-    },
-    options:{
-      responsive:true,
-      maintainAspectRatio:false,
-      plugins:{
-        legend:{display:false},
-        tooltip:{callbacks:{label:ctx=>fmtByKey(currentChartMetric,ctx.parsed.y)}}
-      },
-      scales:{
-        x:{grid:{color:gridColor},ticks:{color:textColor,font:{size:11}}},
-        y:{grid:{color:gridColor},ticks:{color:textColor,font:{size:11},callback:v=>fmtByKey(currentChartMetric,v)}}
-      }
-    }
-  });
+  if(!ctx)return;
+  chartInstance=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'rgba(29,96,200,0.75)',borderColor:'rgba(29,96,200,1)',borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtByKey(currentChartMetric,ctx.parsed.y)}}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>fmtByKey(currentChartMetric,v)}}}}});
 }
 </script>
 </body>
