@@ -46,7 +46,9 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 .sidebar-item .icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
 .sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
 .main{margin-left:var(--sidebar-w);margin-top:52px;padding:28px;min-height:calc(100vh - 52px);}
-.section-title{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
+.section-lbl{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
+
+/* FILTER */
 .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;box-shadow:var(--shadow);}
 .filter-bar label{font-size:12px;color:var(--text3);font-weight:500;}
 select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;cursor:pointer;outline:none;}
@@ -54,90 +56,94 @@ select:focus{border-color:var(--accent);}
 .filter-sep{flex:1;}
 .btn-load{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
 .btn-load:disabled{opacity:.5;cursor:not-allowed;}
-.view-toggle{display:flex;gap:8px;margin-bottom:20px;}
-.view-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 18px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;}
-.view-btn.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);}
-.team-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 22px;margin-bottom:20px;box-shadow:var(--shadow);display:flex;align-items:center;gap:16px;flex-wrap:wrap;}
-.team-avatar{width:48px;height:48px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:18px;font-weight:700;color:var(--accent);flex-shrink:0;}
-.team-name{font-size:17px;font-weight:700;margin-bottom:4px;}
-.team-meta{font-size:12px;color:var(--text2);display:flex;gap:14px;flex-wrap:wrap;}
-.pill{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:500;}
-.pill-blue{background:var(--accent-bg);color:var(--accent);}
-.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
-.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
-.sum-card .lbl{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:5px;}
-.sum-card .val{font-size:20px;font-weight:700;color:var(--text);line-height:1;margin-bottom:3px;}
-.sum-card .sub{font-size:11px;color:var(--text3);}
-.sum-card.accent{border-color:var(--accent);background:var(--accent-bg);}
-.sum-card.accent .val{color:var(--accent);}
-/* SPV CARD */
-.spv-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;margin-bottom:24px;}
-.spv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;cursor:pointer;transition:border-color .15s;}
-.spv-card:hover{border-color:var(--accent);}
-.spv-card-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;}
-.spv-card-left{display:flex;align-items:center;gap:10px;}
-.spv-avatar{width:36px;height:36px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--accent);flex-shrink:0;}
-.spv-name{font-size:14px;font-weight:600;}
+
+/* SPV CARDS */
+.spv-list{display:flex;flex-direction:column;gap:20px;}
+.spv-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.spv-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
+.spv-header-left{display:flex;align-items:center;gap:12px;}
+.spv-avatar{width:42px;height:42px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--accent);flex-shrink:0;}
+.spv-name{font-size:16px;font-weight:700;color:var(--text);margin-bottom:3px;}
 .spv-meta{font-size:11px;color:var(--text3);}
-.btn-setup-spv{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text2);cursor:pointer;white-space:nowrap;transition:all .15s;}
-.btn-setup-spv:hover{background:var(--surface2);}
-.spv-body{padding:12px 16px;}
-.spv-metrics{display:grid;gap:6px;}
-.spv-metric-row{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:var(--surface2);border-radius:var(--radius-sm);}
-.spv-metric-label{font-size:12px;color:var(--text2);}
-.spv-metric-val{font-size:13px;font-weight:600;color:var(--text);}
-/* TL */
-.tl-select-wrap{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;margin-bottom:20px;box-shadow:var(--shadow);}
-.tl-select-wrap label{font-size:13px;font-weight:500;margin-bottom:8px;display:block;}
-.tl-select-row{display:flex;gap:10px;flex-wrap:wrap;}
-.tl-select-row select{flex:1;min-width:200px;}
-.btn-view{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
-/* RANK TABLE */
-.rank-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden;}
-.rank-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;}
-.rank-title{font-size:14px;font-weight:600;}
-.sort-tabs{display:flex;gap:6px;flex-wrap:wrap;}
-.sort-tab{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;}
-.sort-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:500;}
-.rank-body{overflow-x:auto;}
-.rank-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;}
-.rank-table th{text-align:left;padding:9px 14px;color:var(--text3);font-weight:500;border-bottom:1px solid var(--border);background:var(--surface2);}
-.rank-table td{padding:9px 14px;border-bottom:1px solid var(--border);color:var(--text2);}
-.rank-table tr:last-child td{border-bottom:none;}
-.rank-table tr:hover td{background:var(--surface2);}
-.rank-num{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:11px;font-weight:700;margin-right:6px;}
-.rank-1{background:#FEF3C7;color:#92400E;}
-.rank-2{background:#F1F5F9;color:#475569;}
-.rank-3{background:#FEE2E2;color:#7F1D1D;}
-.rank-n{background:var(--surface2);color:var(--text3);}
+.spv-header-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pill-blue{background:var(--accent-bg);color:var(--accent);font-size:11px;padding:3px 10px;border-radius:20px;font-weight:500;}
+
+/* SETUP SWITCH BAR */
+.setup-bar{padding:10px 18px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.setup-tab{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;}
+.setup-tab:hover{border-color:var(--accent);color:var(--accent);}
+.setup-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);}
+.setup-tab-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;}
+.setup-tab-del:hover{color:var(--danger);}
+.btn-add-setup{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius-sm);border:1px dashed var(--border);background:none;font-size:12px;color:var(--text3);cursor:pointer;transition:all .15s;}
+.btn-add-setup:hover{border-color:var(--accent);color:var(--accent);}
+
+/* METRIC ROWS - fixed cols */
+.spv-metrics-grid{padding:14px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;border-bottom:1px solid var(--border);}
+.metric-box{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;}
+.metric-box .lbl{font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
+.metric-box .val{font-size:16px;font-weight:700;color:var(--text);}
+.metric-box .sub{font-size:10px;color:var(--text3);margin-top:2px;}
+.metric-box.accent{border:1px solid var(--accent);}
+.metric-box.accent .val{color:var(--accent);}
+
+/* TL LIST */
+.tl-list{padding:0;}
+.tl-row{border-bottom:1px solid var(--border);}
+.tl-row:last-child{border-bottom:none;}
+.tl-header{display:flex;align-items:center;gap:10px;padding:11px 18px;cursor:pointer;transition:background .1s;}
+.tl-header:hover{background:var(--surface2);}
+.tl-rank{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.r1{background:#FEF3C7;color:#92400E;}
+.r2{background:#F1F5F9;color:#475569;}
+.r3{background:#FEE2E2;color:#7F1D1D;}
+.rn{background:var(--surface2);color:var(--text3);}
+.tl-name{font-size:13px;font-weight:600;color:var(--accent);flex:1;}
+.tl-stats{display:flex;gap:20px;flex-shrink:0;}
+.tl-stat{font-size:12px;color:var(--text2);text-align:right;}
+.tl-stat .sv{font-weight:600;color:var(--text);}
+.tl-toggle{font-size:14px;color:var(--text3);transition:transform .2s;flex-shrink:0;}
+.tl-toggle.open{transform:rotate(180deg);}
+
+/* AGENT DETAIL (expand) */
+.agent-detail{display:none;border-top:1px solid var(--border);background:var(--surface2);}
+.agent-detail.open{display:block;}
+.agent-detail-inner{overflow-x:auto;}
+.agent-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;}
+.agent-table th{text-align:left;padding:8px 14px;color:var(--text3);font-weight:500;border-bottom:1px solid var(--border);background:var(--surface);}
+.agent-table td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--text2);}
+.agent-table tr:last-child td{border-bottom:none;}
+.agent-table tr:hover td{background:var(--surface);}
+.absensi-pill{display:inline-block;padding:2px 7px;border-radius:20px;font-size:11px;font-weight:500;}
+.ab-hadir{background:var(--success-bg);color:var(--success);}
+.ab-off{background:var(--surface2);color:var(--text3);}
 .agent-link{color:var(--accent);text-decoration:none;font-weight:500;}
 .agent-link:hover{text-decoration:underline;}
 .num{color:var(--text);font-weight:500;}
-.absensi-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
-.ab-hadir{background:var(--success-bg);color:var(--success);}
-/* CHART */
-.chart-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow);}
-.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
-.chart-title{font-size:14px;font-weight:600;}
-.chart-wrap{position:relative;height:240px;}
-.chart-tabs{display:flex;gap:6px;flex-wrap:wrap;}
-.chart-tab{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;}
-.chart-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:500;}
+
 /* SETUP MODAL */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.45);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:300;display:none;align-items:center;justify-content:center;padding:20px;}
 .modal-overlay.open{display:flex;}
-.modal{background:var(--surface);border-radius:var(--radius);width:100%;max-width:420px;box-shadow:var(--shadow-md);}
-.modal-header{padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal{background:var(--surface);border-radius:var(--radius);width:100%;max-width:460px;box-shadow:var(--shadow-md);max-height:90vh;display:flex;flex-direction:column;}
+.modal-header{padding:16px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
 .modal-title{font-size:15px;font-weight:600;}
 .modal-close{background:none;border:none;cursor:pointer;color:var(--text3);font-size:20px;padding:2px 6px;border-radius:4px;}
 .modal-close:hover{background:var(--surface2);}
-.modal-body{padding:16px 18px;max-height:55vh;overflow-y:auto;}
+.modal-name-row{padding:12px 18px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.modal-name-row label{font-size:12px;color:var(--text3);font-weight:500;display:block;margin-bottom:6px;}
+.modal-name-input{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:8px 12px;color:var(--text);font-size:14px;outline:none;}
+.modal-name-input:focus{border-color:var(--accent);}
+.modal-body{padding:14px 18px;overflow-y:auto;flex:1;}
 .metric-toggle{display:flex;align-items:center;justify-content:space-between;padding:9px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:6px;cursor:pointer;transition:background .1s;}
 .metric-toggle:hover{background:var(--surface2);}
 .metric-toggle input[type=checkbox]{accent-color:var(--accent);width:15px;height:15px;cursor:pointer;}
-.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;}
+.modal-footer{padding:12px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:8px;flex-shrink:0;}
 .btn-save{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
 .btn-cancel{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;font-size:13px;color:var(--text2);cursor:pointer;}
+
+/* CHART */
+.chart-wrap-sm{position:relative;height:200px;}
+
 /* STATE */
 .state-box{text-align:center;padding:60px 20px;color:var(--text3);}
 .state-box .icon{font-size:36px;margin-bottom:12px;}
@@ -160,6 +166,7 @@ select:focus{border-color:var(--accent);}
     </div>
   </div>
 </nav>
+
 <aside class="sidebar">
   <div class="sidebar-section">
     <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
@@ -179,8 +186,12 @@ select:focus{border-color:var(--accent);}
 <div class="modal-overlay" id="modalOverlay">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title" id="modalTitle">Setup tampilan</span>
+      <span class="modal-title" id="modalTitle">Setup tampilan baru</span>
       <button class="modal-close" onclick="closeModal()">×</button>
+    </div>
+    <div class="modal-name-row">
+      <label>Nama setup</label>
+      <input class="modal-name-input" id="modalSetupName" placeholder="contoh: Pergerakan Data, Aktivitas WA...">
     </div>
     <div class="modal-body" id="modalBody"></div>
     <div class="modal-footer">
@@ -207,10 +218,6 @@ select:focus{border-color:var(--accent);}
     <select id="selBucket"><option value="">Semua</option></select>
     <div class="filter-sep"></div>
     <button class="btn-load" id="btnLoad" onclick="loadData()">Tampilkan</button>
-  </div>
-  <div class="view-toggle">
-    <button class="view-btn active" id="btnSPV" onclick="switchView('spv')">👤 Per Supervisor</button>
-    <button class="view-btn" id="btnTL" onclick="switchView('tl')">👥 Per Team Leader</button>
   </div>
   <div id="content">
     <div class="state-box"><div class="icon">👥</div><p>Pilih bulan dan tahun, lalu klik Tampilkan.</p></div>
@@ -242,54 +249,91 @@ const ALL_METRICS=[
   {key:'paymentOvertime',label:'Payment Overtime',fmt:'rp'},
   {key:'totalData',label:'Total Data',fmt:'num'},
   {key:'dataBaru',label:'Data Baru',fmt:'num'},
+  {key:'osDataBaru',label:'OS Data Baru',fmt:'rp'},
 ];
-const DEFAULT_METRICS=['dailyPayment','avgRate','callManual','sentuhWA','ptp'];
 
-function getSetup(key){try{const r=localStorage.getItem('dca_spv_'+key);if(r)return JSON.parse(r);}catch(e){}return DEFAULT_METRICS.slice();}
-function saveSetupKey(key,metrics){localStorage.setItem('dca_spv_'+key,JSON.stringify(metrics));}
+// Setup storage: key = 'dca_setups_'+spv → [{name, metrics:[key,...]}, ...]
+function getSetups(spv){
+  try{const r=localStorage.getItem('dca_setups_'+spv);if(r)return JSON.parse(r);}catch(e){}
+  return [];
+}
+function saveSetups(spv,setups){localStorage.setItem('dca_setups_'+spv,JSON.stringify(setups));}
+function getActiveSetupIdx(spv){
+  try{const r=localStorage.getItem('dca_active_'+spv);if(r!==null)return parseInt(r);}catch(e){}
+  return 0;
+}
+function setActiveSetupIdx(spv,idx){localStorage.setItem('dca_active_'+spv,String(idx));}
 
-let allRows=[],currentView='spv',currentSort='dailyPayment',chartInstance=null,currentChartMetric='dailyPayment',currentTL=null,allBucketMap={},currentSetupKey=null;
-const CHART_METRICS=[{key:'dailyPayment',label:'Payment',fmt:'rp'},{key:'callManual',label:'Call Manual',fmt:'num'},{key:'sentuhWA',label:'Sentuh WA',fmt:'num'},{key:'ptp',label:'PTP',fmt:'num'},{key:'jmlDataBayar',label:'Data Bayar',fmt:'num'}];
+let allRows=[],allBucketMap={};
+let currentModalSpv=null,currentModalEditIdx=null;
 
 function fmtRp(n){if(!n||n===0)return 'Rp 0';if(n>=1e9)return 'Rp '+(n/1e9).toFixed(2)+' M';if(n>=1e6)return 'Rp '+(n/1e6).toFixed(1)+' jt';if(n>=1e3)return 'Rp '+(n/1e3).toFixed(0)+' rb';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
 function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
 function fmtRate(n){return n?(n*100).toFixed(2)+'%':'0%';}
-function fmtByKey(key,val){const m=CHART_METRICS.find(x=>x.key===key);if(!m)return val;if(m.fmt==='rp')return fmtRp(val);return fmtNum(val);}
-function fmtMetric(m,val){if(m.fmt==='rp')return fmtRp(val);if(m.fmt==='rate')return fmtRate(val);return fmtNum(val);}
+function fmtMetric(m,val){if(!m)return val;if(m.fmt==='rp')return fmtRp(val);if(m.fmt==='rate')return fmtRate(val);return fmtNum(val);}
 
-function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('dca_theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');if(chartInstance&&currentTL)renderTLDetail(currentTL);}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('dca_theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');}
 (function(){const t=localStorage.getItem('dca_theme')||'light';document.documentElement.setAttribute('data-theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');})();
+
 (function(){
-  const now=new Date();const bl=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const now=new Date();
+  const bl=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   document.getElementById('selBulan').value=bl[now.getMonth()];
   document.getElementById('selTahun').value=String(now.getFullYear());
   const p=new URLSearchParams(window.location.search);
   if(p.get('bulan'))document.getElementById('selBulan').value=p.get('bulan');
   if(p.get('tahun'))document.getElementById('selTahun').value=p.get('tahun');
-  if(p.get('view'))currentView=p.get('view');
-  if(p.get('tl')||p.get('spv'))setTimeout(loadData,100);
 })();
 
-function buildBucketMap(rows){allBucketMap={};rows.forEach(r=>{const ap=r.aplikasi||'';const bk=r.bucket||'';if(ap&&bk){if(!allBucketMap[ap])allBucketMap[ap]=new Set();allBucketMap[ap].add(bk);}});Object.keys(allBucketMap).forEach(ap=>{allBucketMap[ap]=[...allBucketMap[ap]].sort();});}
-function populateAplikasi(rows){const list=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].sort();document.getElementById('selAplikasi').innerHTML='<option value="">Semua</option>'+list.map(a=>`<option value="${a}">${a}</option>`).join('');}
-function populateBucket(ap){let b=[];if(ap&&allBucketMap[ap]){b=allBucketMap[ap];}else{const all=new Set();Object.values(allBucketMap).forEach(x=>x.forEach(v=>all.add(v)));b=[...all].sort();}document.getElementById('selBucket').innerHTML='<option value="">Semua</option>'+b.map(x=>`<option value="${x}">${x}</option>`).join('');}
+function buildBucketMap(rows){
+  allBucketMap={};
+  rows.forEach(r=>{const ap=r.aplikasi||'';const bk=r.bucket||'';if(ap&&bk){if(!allBucketMap[ap])allBucketMap[ap]=new Set();allBucketMap[ap].add(bk);}});
+  Object.keys(allBucketMap).forEach(ap=>{allBucketMap[ap]=[...allBucketMap[ap]].sort();});
+}
+function populateAplikasi(rows){
+  const list=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].sort();
+  document.getElementById('selAplikasi').innerHTML='<option value="">Semua</option>'+list.map(a=>`<option value="${a}">${a}</option>`).join('');
+}
+function populateBucket(ap){
+  let b=[];
+  if(ap&&allBucketMap[ap]){b=allBucketMap[ap];}
+  else{const all=new Set();Object.values(allBucketMap).forEach(x=>x.forEach(v=>all.add(v)));b=[...all].sort();}
+  document.getElementById('selBucket').innerHTML='<option value="">Semua</option>'+b.map(x=>`<option value="${x}">${x}</option>`).join('');
+}
 function onAplikasiChange(){populateBucket(document.getElementById('selAplikasi').value);}
-function getFilteredRows(){const ap=document.getElementById('selAplikasi').value;const bk=document.getElementById('selBucket').value;let rows=allRows;if(ap)rows=rows.filter(r=>r.aplikasi===ap);if(bk)rows=rows.filter(r=>r.bucket===bk);return rows;}
+function getFilteredRows(){
+  const ap=document.getElementById('selAplikasi').value;
+  const bk=document.getElementById('selBucket').value;
+  let rows=allRows;
+  if(ap)rows=rows.filter(r=>r.aplikasi===ap);
+  if(bk)rows=rows.filter(r=>r.bucket===bk);
+  return rows;
+}
 
-async function fetchJSON(url){const res=await fetch(url);const text=await res.text();if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));return await(await fetch(url)).json();}return JSON.parse(text);}
+async function fetchJSON(url){
+  const res=await fetch(url);const text=await res.text();
+  if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));return await(await fetch(url)).json();}
+  return JSON.parse(text);
+}
 
 async function loadData(){
-  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
-  const btn=document.getElementById('btnLoad');btn.disabled=true;btn.textContent='⏳ Memuat...';
+  const bulan=document.getElementById('selBulan').value;
+  const tahun=document.getElementById('selTahun').value;
+  const btn=document.getElementById('btnLoad');
+  btn.disabled=true;btn.textContent='⏳ Memuat...';
   document.getElementById('content').innerHTML='<div class="state-box"><div class="spinner"></div><p>Memuat data...</p></div>';
   try{
     const data=await fetchJSON(API_URL+'?action=agentdata&bulan='+bulan+'&tahun='+tahun);
     if(!data.success)throw new Error(data.message);
-    allRows=data.rows||[];currentTL=null;
-    buildBucketMap(allRows);populateAplikasi(allRows);populateBucket('');
+    allRows=data.rows||[];
+    buildBucketMap(allRows);
+    populateAplikasi(allRows);
+    populateBucket('');
     renderSidebar(allRows,bulan,tahun);
-    switchView(currentView);
-  }catch(e){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">⚠️</div><p>'+e.message+'</p></div>';}
+    renderAll();
+  }catch(e){
+    document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">⚠️</div><p>'+e.message+'</p></div>';
+  }
   btn.disabled=false;btn.textContent='Tampilkan';
 }
 
@@ -298,212 +342,222 @@ function renderSidebar(rows,bulan,tahun){
   document.getElementById('sidebarApps').innerHTML=apps.map(ap=>`<a class="sidebar-item" href="app.html?ap=${encodeURIComponent(ap)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}"><span class="dot" style="background:${getColor(ap)}"></span>${ap.charAt(0)+ap.slice(1).toLowerCase()}</a>`).join('');
 }
 
-function switchView(v){currentView=v;document.getElementById('btnSPV').classList.toggle('active',v==='spv');document.getElementById('btnTL').classList.toggle('active',v==='tl');if(allRows.length)v==='spv'?renderSPVList():renderTLSelectWrap();}
-
 function summarizeRows(rows){
-  if(!rows||!rows.length)return{totalData:0,dataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,sentuhGojek:0,responWA:0,responGojek:0,waBlokir:0,ptp:0,ptpBayar:0,sentuhWABA:0,responWABA:0,smsManual:0,responSMSManual:0,autocall:0};
+  if(!rows||!rows.length)return{totalData:0,dataBaru:0,osDataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,sentuhGojek:0,responWA:0,responGojek:0,waBlokir:0,ptp:0,ptpBayar:0,sentuhWABA:0,responWABA:0,smsManual:0,responSMSManual:0,autocall:0};
   const keys=['totalData','dataBaru','osDataBaru','dailyPayment','jmlDataBayar','autocall','callManual','callTerhubung','sentuhWA','sentuhGojek','responWA','responGojek','waBlokir','ptp','ptpBayar','sentuhWABA','responWABA','smsManual','responSMSManual','paymentOvertime'];
   const r={};keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
   const tb=r.jmlDataBayar;r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*x.jmlDataBayar),0)/tb:rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length;
   return r;
 }
 
+function renderAll(){
+  const filtered=getFilteredRows();
+  const bySPV={};
+  filtered.forEach(r=>{const spv=r.supervisor||'(Tanpa SPV)';if(!bySPV[spv])bySPV[spv]=[];bySPV[spv].push(r);});
+  const bulan=document.getElementById('selBulan').value;
+  const tahun=document.getElementById('selTahun').value;
+  if(!Object.keys(bySPV).length){
+    document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';
+    return;
+  }
+  const blocks=Object.keys(bySPV).sort().map(spv=>buildSPVBlock(spv,bySPV[spv],bulan,tahun)).join('');
+  document.getElementById('content').innerHTML=`<div class="spv-list">${blocks}</div>`;
+}
+
+function buildSPVBlock(spv,rows,bulan,tahun){
+  const s=summarizeRows(rows);
+  const agentCount=new Set(rows.map(r=>r.agent)).size;
+  const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+  const appList=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].join(', ');
+  const setups=getSetups(spv);
+  const activeIdx=Math.min(getActiveSetupIdx(spv),setups.length-1);
+  const safeSpv=escAttr(spv);
+
+  // Setup switch bar
+  const setupTabs=setups.map((st,i)=>`
+    <div class="setup-tab ${i===activeIdx?'active':''}" onclick="switchSetup('${safeSpv}',${i})">
+      ${escHtml(st.name)}
+      <button class="setup-tab-del" onclick="event.stopPropagation();deleteSetup('${safeSpv}',${i})" title="Hapus">×</button>
+    </div>`).join('');
+
+  // Metric boxes dari setup aktif
+  const activeSetup=setups[activeIdx];
+  const metricBoxes=activeSetup?activeSetup.metrics.map(key=>{
+    const m=ALL_METRICS.find(x=>x.key===key);if(!m)return '';
+    return `<div class="metric-box"><div class="lbl">${m.label}</div><div class="val">${fmtMetric(m,s[key]||0)}</div></div>`;
+  }).join(''):'<div style="color:var(--text3);font-size:12px;padding:8px 0">Belum ada setup. Klik "+ Setup baru" untuk menambahkan.</div>';
+
+  // TL list
+  const byTL={};
+  rows.forEach(r=>{const tl=r.teamLeader||'(Tanpa TL)';if(!byTL[tl])byTL[tl]=[];byTL[tl].push(r);});
+  const tlList=Object.keys(byTL).map(tl=>{
+    const ts=summarizeRows(byTL[tl]);
+    const ac=new Set(byTL[tl].map(r=>r.agent)).size;
+    return{tl,s:ts,agentCount:ac,rows:byTL[tl]};
+  }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
+
+  const tlBlocks=tlList.map((t,i)=>buildTLRow(t,i,spv,bulan,tahun,activeSetup)).join('');
+
+  return `<div class="spv-block" id="spv-${safeSpv}">
+    <div class="spv-header">
+      <div class="spv-header-left">
+        <div class="spv-avatar">${initials}</div>
+        <div>
+          <div class="spv-name">${escHtml(spv)}</div>
+          <div class="spv-meta">${escHtml(appList)} · ${Object.keys(byTL).length} TL · ${agentCount} agent</div>
+        </div>
+      </div>
+      <div class="spv-header-right">
+        <span class="pill-blue">${bulan} ${tahun}</span>
+        <button class="btn-add-setup" onclick="openSetupModal('${safeSpv}',null)">+ Setup baru</button>
+      </div>
+    </div>
+    <div class="setup-bar">
+      ${setupTabs}
+    </div>
+    <div class="spv-metrics-grid">
+      <div class="metric-box accent">
+        <div class="lbl">Total Payment</div>
+        <div class="val">${fmtRp(s.dailyPayment)}</div>
+        <div class="sub">${fmtRp(s.paymentOvertime)} overtime</div>
+      </div>
+      <div class="metric-box">
+        <div class="lbl">Avg Rate</div>
+        <div class="val">${fmtRate(s.avgRate)}</div>
+        <div class="sub">${fmtNum(s.jmlDataBayar)} data bayar</div>
+      </div>
+      <div class="metric-box">
+        <div class="lbl">PTP</div>
+        <div class="val">${fmtNum(s.ptp)}</div>
+        <div class="sub">${fmtNum(s.ptpBayar)} bayar</div>
+      </div>
+      ${metricBoxes}
+    </div>
+    <div class="tl-list">${tlBlocks}</div>
+  </div>`;
+}
+
+function buildTLRow(t,i,spv,bulan,tahun,activeSetup){
+  const safeSpv=escAttr(spv);
+  const safeTL=escAttr(t.tl);
+  const rankClass=i===0?'r1':i===1?'r2':i===2?'r3':'rn';
+
+  // Kolom ringkasan TL: Payment + metrik pertama dari setup (jika ada)
+  const firstMetric=activeSetup&&activeSetup.metrics.length?ALL_METRICS.find(m=>m.key===activeSetup.metrics[0]):null;
+  const extraStat=firstMetric?`<div class="tl-stat"><div style="font-size:10px;color:var(--text3)">${firstMetric.label}</div><div class="sv">${fmtMetric(firstMetric,t.s[firstMetric.key]||0)}</div></div>`:'';
+
+  // Agent rows - kolom: Absensi, Daily Payment, lalu setup metrics
+  const setupCols=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
+  const agentsByPay=[...t.rows.reduce((map,r)=>{
+    const ag=r.agent||'(?)';
+    if(!map.has(ag))map.set(ag,[]);
+    map.get(ag).push(r);return map;
+  },new Map()).entries()].map(([ag,rows])=>{
+    const as=summarizeRows(rows);
+    const hadir=rows.filter(r=>r.absensi==='Hadir').length;
+    return{ag,s:as,hadir,total:rows.length};
+  }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
+
+  const agentTh=`<th>Agent</th><th>Hadir</th><th>Daily Payment</th>${setupCols.map(m=>`<th>${m.label}</th>`).join('')}`;
+  const agentRows=agentsByPay.map((a,j)=>`<tr>
+    <td><span style="display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:10px;font-weight:700;margin-right:6px;background:var(--surface2);color:var(--text3)">${j+1}</span>
+      <a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">${escHtml(a.ag)}</a>
+    </td>
+    <td><span class="absensi-pill ${a.hadir>0?'ab-hadir':'ab-off'}">${a.hadir}/${a.total}</span></td>
+    <td class="num">${fmtRp(a.s.dailyPayment)}</td>
+    ${setupCols.map(m=>`<td class="num">${fmtMetric(m,a.s[m.key]||0)}</td>`).join('')}
+  </tr>`).join('');
+
+  const tlId='tl-'+safeSpv+'-'+i;
+  return `<div class="tl-row">
+    <div class="tl-header" onclick="toggleTL('${tlId}')">
+      <div class="tl-rank ${rankClass}">${i+1}</div>
+      <div class="tl-name">${escHtml(t.tl)}</div>
+      <div class="tl-stats">
+        <div class="tl-stat"><div style="font-size:10px;color:var(--text3)">Agent</div><div class="sv">${t.agentCount}</div></div>
+        <div class="tl-stat"><div style="font-size:10px;color:var(--text3)">Payment</div><div class="sv">${fmtRp(t.s.dailyPayment)}</div></div>
+        <div class="tl-stat"><div style="font-size:10px;color:var(--text3)">Rate</div><div class="sv">${fmtRate(t.s.avgRate)}</div></div>
+        ${extraStat}
+      </div>
+      <div class="tl-toggle" id="${tlId}-icon">▾</div>
+    </div>
+    <div class="agent-detail" id="${tlId}">
+      <div class="agent-detail-inner">
+        <table class="agent-table">
+          <thead><tr>${agentTh}</tr></thead>
+          <tbody>${agentRows}</tbody>
+        </table>
+      </div>
+    </div>
+  </div>`;
+}
+
+function toggleTL(id){
+  const el=document.getElementById(id);
+  const icon=document.getElementById(id+'-icon');
+  if(!el)return;
+  const isOpen=el.classList.contains('open');
+  el.classList.toggle('open',!isOpen);
+  if(icon)icon.classList.toggle('open',!isOpen);
+}
+
 /* SETUP MODAL */
-function openSetup(key){
-  currentSetupKey=key;
-  const setup=getSetup(key);
-  document.getElementById('modalTitle').textContent='Setup tampilan — '+key;
-  document.getElementById('modalBody').innerHTML=ALL_METRICS.map(m=>`<label class="metric-toggle"><span>${m.label}</span><input type="checkbox" value="${m.key}" ${setup.includes(m.key)?'checked':''}></label>`).join('');
+function openSetupModal(spv,editIdx){
+  currentModalSpv=spv;
+  currentModalEditIdx=editIdx;
+  const setups=getSetups(spv);
+  const editing=editIdx!==null&&setups[editIdx];
+  document.getElementById('modalTitle').textContent=editing?'Edit setup — '+escHtml(spv):'Setup baru — '+escHtml(spv);
+  document.getElementById('modalSetupName').value=editing?editing.name:'';
+  const currentMetrics=editing?editing.metrics:[];
+  document.getElementById('modalBody').innerHTML=ALL_METRICS.map(m=>`
+    <label class="metric-toggle">
+      <span>${m.label}</span>
+      <input type="checkbox" value="${m.key}" ${currentMetrics.includes(m.key)?'checked':''}>
+    </label>`).join('');
   document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(()=>document.getElementById('modalSetupName').focus(),100);
 }
-function closeModal(){document.getElementById('modalOverlay').classList.remove('open');currentSetupKey=null;}
+
+function closeModal(){
+  document.getElementById('modalOverlay').classList.remove('open');
+  currentModalSpv=null;currentModalEditIdx=null;
+}
+
 function saveSetup(){
-  const keys=Array.from(document.querySelectorAll('#modalBody input[type=checkbox]:checked')).map(c=>c.value);
-  if(!keys.length){alert('Pilih minimal 1 metrik.');return;}
-  saveSetupKey(currentSetupKey,keys);closeModal();
-  if(allRows.length)renderSPVList();
+  const name=document.getElementById('modalSetupName').value.trim();
+  if(!name){alert('Masukkan nama setup dulu.');return;}
+  const metrics=Array.from(document.querySelectorAll('#modalBody input[type=checkbox]:checked')).map(c=>c.value);
+  if(!metrics.length){alert('Pilih minimal 1 metrik.');return;}
+  const spv=currentModalSpv;
+  const setups=getSetups(spv);
+  if(currentModalEditIdx!==null){setups[currentModalEditIdx]={name,metrics};}
+  else{setups.push({name,metrics});}
+  saveSetups(spv,setups);
+  closeModal();
+  renderAll();
 }
+
+function switchSetup(spv,idx){
+  setActiveSetupIdx(spv,idx);
+  renderAll();
+}
+
+function deleteSetup(spv,idx){
+  if(!confirm('Hapus setup ini?'))return;
+  const setups=getSetups(spv);
+  setups.splice(idx,1);
+  saveSetups(spv,setups);
+  const active=getActiveSetupIdx(spv);
+  if(active>=setups.length)setActiveSetupIdx(spv,Math.max(0,setups.length-1));
+  renderAll();
+}
+
 document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
 
-/* SPV LIST */
-function renderSPVList(){
-  const filteredRows=getFilteredRows();
-  const bySPV={};filteredRows.forEach(r=>{const spv=r.supervisor||'(Tanpa SPV)';if(!bySPV[spv])bySPV[spv]=[];bySPV[spv].push(r);});
-  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
-  if(!Object.keys(bySPV).length){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
-
-  const cards=Object.keys(bySPV).sort().map(spv=>{
-    const sRows=bySPV[spv];const s=summarizeRows(sRows);
-    const agentCount=new Set(sRows.map(r=>r.agent)).size;
-    const tlCount=new Set(sRows.map(r=>r.teamLeader)).size;
-    const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-    const appList=[...new Set(sRows.map(r=>r.aplikasi))].join(', ');
-    const setup=getSetup(spv);
-    const metricsHtml=setup.map(key=>{
-      const m=ALL_METRICS.find(x=>x.key===key);if(!m)return '';
-      const val=s[key]||0;
-      return `<div class="spv-metric-row"><span class="spv-metric-label">${m.label}</span><span class="spv-metric-val">${fmtMetric(m,val)}</span></div>`;
-    }).join('');
-    const escapedSpv=spv.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
-    return `<div class="spv-card">
-      <div class="spv-card-header">
-        <div class="spv-card-left">
-          <div class="spv-avatar">${initials}</div>
-          <div><div class="spv-name">${spv}</div><div class="spv-meta">${appList} · ${tlCount} TL · ${agentCount} agent</div></div>
-        </div>
-        <button class="btn-setup-spv" onclick="openSetup('${escapedSpv}')">⚙ Setup</button>
-      </div>
-      <div class="spv-body" onclick="showSPVDetail('${escapedSpv}')">
-        <div class="spv-metrics">${metricsHtml}</div>
-      </div>
-    </div>`;
-  }).join('');
-  document.getElementById('content').innerHTML=`<p class="section-title">Semua Supervisor — ${bulan} ${tahun}</p><div class="spv-grid">${cards}</div><div id="spvDetail"></div>`;
-}
-
-function showSPVDetail(spv){
-  const sRows=getFilteredRows().filter(r=>(r.supervisor||'(Tanpa SPV)')===spv);
-  const s=summarizeRows(sRows);
-  const agentCount=new Set(sRows.map(r=>r.agent)).size;
-  const tlCount=new Set(sRows.map(r=>r.teamLeader)).size;
-  const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
-
-  // Ambil setup untuk SPV ini
-  const setup=getSetup(spv);
-  const setupMetrics=setup.map(key=>ALL_METRICS.find(m=>m.key===key)).filter(Boolean);
-
-  // Group by TL
-  const byTL={};sRows.forEach(r=>{const tl=r.teamLeader||'(Tanpa TL)';if(!byTL[tl])byTL[tl]=[];byTL[tl].push(r);});
-
-  // Group by agent langsung
-  const byAgent={};sRows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
-  const agentSums=Object.keys(byAgent).map(ag=>{
-    const as=summarizeRows(byAgent[ag]);
-    const hadir=byAgent[ag].filter(r=>r.absensi==='Hadir').length;
-    const tl=byAgent[ag][0]&&byAgent[ag][0].teamLeader||'—';
-    return{ag,s:as,hadir,total:byAgent[ag].length,tl};
-  }).sort((a,b)=>(b.s[setup[0]]||b.s.dailyPayment||0)-(a.s[setup[0]]||a.s.dailyPayment||0));
-
-  // Header tabel agent dari setup
-  const agentTh='<th>Agent</th><th>TL</th><th>Hadir</th>'+setupMetrics.map(m=>`<th>${m.label}</th>`).join('');
-  const agentTbody=agentSums.map((a,i)=>{
-    const metricCells=setupMetrics.map(m=>`<td class="num">${fmtMetric(m,a.s[m.key]||0)}</td>`).join('');
-    return `<tr>
-      <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span><a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${bulan}&tahun=${tahun}">${a.ag}</a></td>
-      <td style="color:var(--text3);font-size:11px">${a.tl}</td>
-      <td><span class="absensi-pill ab-hadir">${a.hadir}/${a.total}</span></td>
-      ${metricCells}
-    </tr>`;
-  }).join('');
-
-  document.getElementById('spvDetail').innerHTML=`
-    <div class="team-header">
-      <div class="team-avatar">${initials}</div>
-      <div style="flex:1"><div class="team-name">${spv}</div><div class="team-meta"><span>👥 ${tlCount} TL</span><span>👤 ${agentCount} Agent</span></div></div>
-      <span class="pill pill-blue">${bulan} ${tahun}</span>
-    </div>
-    <p class="section-title">Ringkasan Tim</p>
-    <div class="summary-grid">
-      <div class="sum-card accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(s.dailyPayment)}</div><div class="sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
-      <div class="sum-card"><div class="lbl">Avg Rate</div><div class="val">${fmtRate(s.avgRate)}</div><div class="sub">${fmtNum(s.jmlDataBayar)} data bayar</div></div>
-      <div class="sum-card"><div class="lbl">Call Manual</div><div class="val">${fmtNum(s.callManual)}</div><div class="sub">${fmtNum(s.callTerhubung)} terhubung</div></div>
-      <div class="sum-card"><div class="lbl">Sentuh WA</div><div class="val">${fmtNum(s.sentuhWA)}</div><div class="sub">${fmtNum(s.responWA)} respon</div></div>
-      <div class="sum-card"><div class="lbl">PTP</div><div class="val">${fmtNum(s.ptp)}</div><div class="sub">${fmtNum(s.ptpBayar)} bayar</div></div>
-    </div>
-    <div class="rank-section">
-      <div class="rank-header">
-        <span class="rank-title">Detail per Agent</span>
-        <span style="font-size:11px;color:var(--text3)">Kolom sesuai setup kartu · diurutkan berdasarkan ${setupMetrics[0]?setupMetrics[0].label:'Payment'}</span>
-      </div>
-      <div class="rank-body"><table class="rank-table">
-        <thead><tr>${agentTh}</tr></thead>
-        <tbody>${agentTbody}</tbody>
-      </table></div>
-    </div>`;
-  document.getElementById('spvDetail').scrollIntoView({behavior:'smooth',block:'start'});
-}
-
-/* TL VIEW */
-function renderTLSelectWrap(){
-  const filteredRows=getFilteredRows();
-  const tlList=[...new Set(filteredRows.map(r=>r.teamLeader||'').filter(Boolean))].sort();
-  const preselect=new URLSearchParams(window.location.search).get('tl')||'';
-  document.getElementById('content').innerHTML=`
-    <div class="tl-select-wrap"><label>Pilih Team Leader</label>
-      <div class="tl-select-row">
-        <select id="selTL"><option value="">-- Pilih TL --</option>${tlList.map(tl=>`<option value="${tl}" ${tl===preselect?'selected':''}>${tl}</option>`).join('')}</select>
-        <button class="btn-view" onclick="viewTL()">Lihat</button>
-      </div>
-    </div>
-    <div id="tlDetail"><div class="state-box"><div class="icon">👥</div><p>Pilih Team Leader untuk melihat detail tim.</p></div></div>`;
-  if(preselect){document.getElementById('selTL').value=preselect;viewTL();}
-}
-
-function viewTL(){const tl=document.getElementById('selTL').value;if(!tl){alert('Pilih Team Leader dulu.');return;}currentTL=tl;renderTLDetail(tl);}
-
-function renderTLDetail(tl){
-  const rows=allRows.filter(r=>r.teamLeader===tl);
-  if(!rows.length){document.getElementById('tlDetail').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
-  const s=summarizeRows(rows);const first=rows[0];
-  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
-  const initials=tl.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-  const byAgent={};rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
-  const agentSums=Object.keys(byAgent).map(ag=>{const as=summarizeRows(byAgent[ag]);return{ag,s:as,hadir:byAgent[ag].filter(r=>r.absensi==='Hadir').length,total:byAgent[ag].length};}).sort((a,b)=>(b.s[currentSort]||0)-(a.s[currentSort]||0));
-  const sortTabs=['dailyPayment','callManual','sentuhWA','ptp','jmlDataBayar'];
-  const sortLabels={dailyPayment:'Payment',callManual:'Call Manual',sentuhWA:'Sentuh WA',ptp:'PTP',jmlDataBayar:'Data Bayar'};
-  const agentRows=agentSums.map((a,i)=>`<tr>
-    <td><span class="rank-num ${i<3?'rank-'+(i+1):'rank-n'}">${i+1}</span><a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${bulan}&tahun=${tahun}">${a.ag}</a></td>
-    <td><span class="absensi-pill ab-hadir">${a.hadir}/${a.total}</span></td>
-    <td class="num">${fmtRp(a.s.dailyPayment)}</td><td class="num">${fmtRate(a.s.avgRate)}</td>
-    <td class="num">${fmtNum(a.s.callManual)}</td><td class="num">${fmtNum(a.s.sentuhWA)}</td>
-    <td class="num">${fmtNum(a.s.responWA)}</td><td class="num">${fmtNum(a.s.ptp)}</td><td class="num">${fmtNum(a.s.ptpBayar)}</td>
-  </tr>`).join('');
-  document.getElementById('tlDetail').innerHTML=`
-    <div class="team-header">
-      <div class="team-avatar">${initials}</div>
-      <div style="flex:1"><div class="team-name">${tl}</div>
-        <div class="team-meta"><span>📱 ${first.aplikasi||'—'}</span><span>🪣 ${first.bucket||'—'}</span><span>👤 SPV: ${first.supervisor||'—'}</span><span>👥 ${agentSums.length} agent</span></div>
-      </div>
-      <span class="pill pill-blue">${bulan} ${tahun}</span>
-    </div>
-    <p class="section-title">Ringkasan Tim</p>
-    <div class="summary-grid">
-      <div class="sum-card accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(s.dailyPayment)}</div><div class="sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
-      <div class="sum-card"><div class="lbl">Avg Rate</div><div class="val">${fmtRate(s.avgRate)}</div><div class="sub">${fmtNum(s.jmlDataBayar)} data bayar</div></div>
-      <div class="sum-card"><div class="lbl">Call Manual</div><div class="val">${fmtNum(s.callManual)}</div><div class="sub">${fmtNum(s.callTerhubung)} terhubung</div></div>
-      <div class="sum-card"><div class="lbl">Sentuh WA</div><div class="val">${fmtNum(s.sentuhWA)}</div><div class="sub">${fmtNum(s.responWA)} respon</div></div>
-      <div class="sum-card"><div class="lbl">PTP</div><div class="val">${fmtNum(s.ptp)}</div><div class="sub">${fmtNum(s.ptpBayar)} bayar</div></div>
-    </div>
-    <p class="section-title">Perbandingan Agent</p>
-    <div class="chart-section">
-      <div class="chart-header"><span class="chart-title">Performa per Agent</span>
-        <div class="chart-tabs">${CHART_METRICS.map(m=>`<button class="chart-tab ${m.key===currentChartMetric?'active':''}" onclick="switchChartMetric('${m.key}')">${m.label}</button>`).join('')}</div>
-      </div>
-      <div class="chart-wrap"><canvas id="barChart"></canvas></div>
-    </div>
-    <div class="rank-section">
-      <div class="rank-header"><span class="rank-title">Detail per Agent</span>
-        <div class="sort-tabs">${sortTabs.map(k=>`<button class="sort-tab ${k===currentSort?'active':''}" onclick="resortAgents('${k}')">${sortLabels[k]}</button>`).join('')}</div>
-      </div>
-      <div class="rank-body"><table class="rank-table">
-        <thead><tr><th>Agent</th><th>Hadir</th><th>Payment</th><th>Rate</th><th>Call Manual</th><th>Sentuh WA</th><th>Respon WA</th><th>PTP</th><th>PTP Bayar</th></tr></thead>
-        <tbody>${agentRows}</tbody>
-      </table></div>
-    </div>`;
-  renderBarChart(agentSums.map(a=>a.ag.split(' ')[0]),agentSums.map(a=>a.s[currentChartMetric]||0));
-}
-
-function switchChartMetric(key){currentChartMetric=key;if(currentTL)renderTLDetail(currentTL);}
-function resortAgents(key){currentSort=key;if(currentTL)renderTLDetail(currentTL);}
-
-function renderBarChart(labels,values){
-  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
-  const gc=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';const tc=isDark?'#9AA5BE':'#9CA3AF';
-  if(chartInstance){chartInstance.destroy();chartInstance=null;}
-  const ctx=document.getElementById('barChart');if(!ctx)return;
-  chartInstance=new Chart(ctx,{type:'bar',data:{labels,datasets:[{data:values,backgroundColor:'rgba(29,96,200,0.75)',borderColor:'rgba(29,96,200,1)',borderWidth:1,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtByKey(currentChartMetric,ctx.parsed.y)}}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11}}},y:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>fmtByKey(currentChartMetric,v)}}}}});
-}
+/* UTIL */
+function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function escAttr(s){return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");}
 </script>
 </body>
 </html>
