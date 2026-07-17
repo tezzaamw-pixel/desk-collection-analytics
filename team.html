@@ -109,6 +109,10 @@ select:focus{border-color:var(--accent);}
 .tl-stat .sk{font-size:10px;color:var(--text3);}
 .tl-toggle{font-size:13px;color:var(--text3);transition:transform .2s;flex-shrink:0;}
 .tl-toggle.open{transform:rotate(180deg);}
+.tl-setup-tabs{display:flex;gap:4px;flex-shrink:0;flex-wrap:nowrap;}
+.tl-setup-tab{padding:3px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface);font-size:11px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.tl-setup-tab:hover{border-color:var(--accent);color:var(--accent);}
+.tl-setup-active{background:var(--accent-bg)!important;border-color:var(--accent)!important;color:var(--accent)!important;}
 
 /* AGENT TABLE */
 .agent-detail{display:none;border-top:1px solid var(--border);}
@@ -499,10 +503,14 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
     </tr>`;
   }).join('');
 
+  // Setup switch tabs untuk TL ini (mini versi)
+  const tlSetupTabs=setups.length?setups.map((st,i)=>`<button class="tl-setup-tab ${i===activeIdx?'tl-setup-active':''}" onclick="event.stopPropagation();switchSetup('${safeSpv}',${i})" title="${escH(st.name)}">${escH(st.name)}</button>`).join(''):'';
+
   return `<div class="tl-row">
     <div class="tl-header" onclick="toggleTL('${tlId}')">
       <div class="tl-rank ${rankClass}">${rank+1}</div>
       <div class="tl-name">${escH(t.tl)}</div>
+      ${tlSetupTabs?`<div class="tl-setup-tabs" onclick="event.stopPropagation()">${tlSetupTabs}</div>`:''}
       <div class="tl-stats">
         <div class="tl-stat"><span class="sk">Agent</span><span class="sv">${t.agentCount}</span></div>
         <div class="tl-stat"><span class="sk">Payment</span><span class="sv">${fmtRp(t.s.dailyPayment)}</span></div>

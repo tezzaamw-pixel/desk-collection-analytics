@@ -233,8 +233,12 @@ select:focus{border-color:var(--accent);}
       <option>2025</option><option>2026</option><option>2027</option>
     </select>
     <label>Bucket</label>
-    <select id="selBucket" onchange="applyBucketFilter()">
+    <select id="selBucket" onchange="onBucketChange()">
       <option value="">Semua Bucket</option>
+    </select>
+    <label>Team Leader</label>
+    <select id="selTL" onchange="applyFilter()">
+      <option value="">Semua TL</option>
     </select>
   </div>
 
@@ -410,6 +414,7 @@ async function loadData(){
     const prevBucket=selBucket.value;
     selBucket.innerHTML='<option value="">Semua Bucket</option>'+allBuckets.map(b=>`<option value="${b}">${b}</option>`).join('');
     if(prevBucket&&allBuckets.includes(prevBucket)) selBucket.value=prevBucket;
+    populateTL(selBucket.value);
 
     filteredRows=getFiltered();
     buildWeeklyByAgent();
@@ -436,10 +441,29 @@ async function loadData(){
 
 function getFiltered(){
   const bk=document.getElementById('selBucket').value;
-  return bk?allRows.filter(r=>r.bucket===bk):allRows;
+  const tl=document.getElementById('selTL').value;
+  let rows=allRows;
+  if(bk) rows=rows.filter(r=>r.bucket===bk);
+  if(tl) rows=rows.filter(r=>r.teamLeader===tl);
+  return rows;
 }
 
-function applyBucketFilter(){
+function populateTL(bucketFilter){
+  const sel=document.getElementById('selTL');
+  const prev=sel.value;
+  let rows=allRows;
+  if(bucketFilter) rows=rows.filter(r=>r.bucket===bucketFilter);
+  const tls=[...new Set(rows.map(r=>r.teamLeader).filter(Boolean))].sort();
+  sel.innerHTML='<option value="">Semua TL</option>'+tls.map(t=>`<option value="${t}">${t}</option>`).join('');
+  if(prev&&tls.includes(prev)) sel.value=prev;
+}
+
+function onBucketChange(){
+  populateTL(document.getElementById('selBucket').value);
+  applyFilter();
+}
+
+function applyFilter(){
   filteredRows=getFiltered();
   buildWeeklyByAgent();
   renderStats();
