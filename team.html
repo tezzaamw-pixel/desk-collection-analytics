@@ -503,8 +503,10 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
     </tr>`;
   }).join('');
 
-  // Setup switch tabs untuk TL ini (mini versi)
-  const tlSetupTabs=setups.length?setups.map((st,i)=>`<button class="tl-setup-tab ${i===activeIdx?'tl-setup-active':''}" onclick="event.stopPropagation();switchSetup('${safeSpv}',${i})" title="${escH(st.name)}">${escH(st.name)}</button>`).join(''):'';
+  // Setup switch tabs untuk TL ini (mini versi) - ambil langsung dari storage
+  const tlSetups=getSetups(spv);
+  const tlActiveIdx=Math.max(0,Math.min(getActiveIdx(spv),tlSetups.length-1));
+  const tlSetupTabs=tlSetups.length?tlSetups.map((st,i)=>`<button class="tl-setup-tab ${i===tlActiveIdx?'tl-setup-active':''}" onclick="event.stopPropagation();switchSetup('${safeSpv}',${i})" title="${escH(st.name)}">${escH(st.name)}</button>`).join(''):'';
 
   return `<div class="tl-row">
     <div class="tl-header" onclick="toggleTL('${tlId}')">

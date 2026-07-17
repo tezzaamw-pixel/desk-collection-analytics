@@ -333,6 +333,7 @@ function renderChart(){
 
   if(chartInstance){chartInstance.destroy();chartInstance=null;}
   const ctx=document.getElementById('trendChart');
+  if(!ctx) return;
   chartInstance=new Chart(ctx,{
     type:'line',
     data:{labels,datasets},
