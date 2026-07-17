@@ -78,7 +78,7 @@ select:focus{border-color:var(--accent);}
 
 /* FIXED METRIC BOXES */
 .spv-metrics-grid{padding:14px 18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;border-bottom:1px solid var(--border);}
-.metric-box{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;}
+.metric-box{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;transition:opacity .15s;}
 .metric-box .lbl{font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:4px;}
 .metric-box .val{font-size:15px;font-weight:700;color:var(--text);}
 .metric-box .sub{font-size:10px;color:var(--text3);margin-top:2px;}
@@ -179,6 +179,14 @@ select:focus{border-color:var(--accent);}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 @media(max-width:768px){:root{--sidebar-w:0px;}.sidebar{display:none;}.navbar{padding-left:20px;}.main{margin-left:0;}}
+
+/* Smooth transitions */
+.spv-block,.project-card,.sum-card,.stat-card,.acr-week-card{transition:box-shadow .15s,border-color .15s;}
+.agent-detail{transition:none;}
+.tl-header{transition:background .1s;}
+.setup-tab,.tl-setup-tab,.sort-tab,.chart-tab,.rank-switch-btn{transition:all .15s;}
+.metric-box{transition:opacity .12s;}
+.sidebar-item{transition:background .12s,color .12s;}
 </style>
 </head>
 <body>
@@ -244,7 +252,7 @@ select:focus{border-color:var(--accent);}
     <label>Bucket</label>
     <select id="selBucket"><option value="">Semua</option></select>
     <div class="filter-sep"></div>
-    <button class="btn-load" id="btnLoad" onclick="loadData()">Tampilkan</button>
+    <button class="btn-load" id="btnLoad" onclick="clearCache();loadData()">Tampilkan</button>
   </div>
   <div id="content">
     <div class="state-box"><div class="icon">👥</div><p>Pilih bulan dan tahun, lalu klik Tampilkan.</p></div>
@@ -311,7 +319,23 @@ function populateBucket(ap){let b=[];if(ap&&allBucketMap[ap]){b=allBucketMap[ap]
 function onAplikasiChange(){populateBucket(document.getElementById('selAplikasi').value);}
 function getFilteredRows(){const ap=document.getElementById('selAplikasi').value;const bk=document.getElementById('selBucket').value;let rows=allRows;if(ap)rows=rows.filter(r=>r.aplikasi===ap);if(bk)rows=rows.filter(r=>r.bucket===bk);return rows;}
 
-async function fetchJSON(url){const res=await fetch(url);const text=await res.text();if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));return await(await fetch(url)).json();}return JSON.parse(text);}
+function clearCache(){try{Object.keys(sessionStorage).filter(k=>k.startsWith('dca_c_')).forEach(k=>sessionStorage.removeItem(k));}catch(e){}}
+async function fetchJSON(url, useCache=true){
+  function _hash(s){let h=0;for(let i=0;i<s.length;i++)h=Math.imul(31,h)+s.charCodeAt(i)|0;return(h>>>0).toString(36);}
+  const cacheKey='dca_c_'+_hash(url.split('?')[1]||url);
+  if(useCache){
+    try{
+      const cached=sessionStorage.getItem(cacheKey);
+      if(cached){const {data,ts}=JSON.parse(cached);if(Date.now()-ts<300000)return data;}
+    }catch(e){}
+  }
+  const res=await fetch(url);const text=await res.text();
+  let data;
+  if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));data=await(await fetch(url)).json();}
+  else{data=JSON.parse(text);}
+  if(useCache&&data&&data.success){try{sessionStorage.setItem(cacheKey,JSON.stringify({data,ts:Date.now()}));}catch(e){}}
+  return data;
+}
 
 async function loadData(){
   const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
@@ -342,11 +366,28 @@ function summarizeRows(rows){
 }
 
 function renderAll(){
+  // Bersihkan cache summary
+  Object.keys(spvSummaryCache).forEach(k=>delete spvSummaryCache[k]);
   const filtered=getFilteredRows();
   const bySPV={};filtered.forEach(r=>{const spv=r.supervisor||'(Tanpa SPV)';if(!bySPV[spv])bySPV[spv]=[];bySPV[spv].push(r);});
   const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
   if(!Object.keys(bySPV).length){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
-  document.getElementById('content').innerHTML='<div class="spv-list">'+Object.keys(bySPV).sort().map(spv=>buildSPVBlock(spv,bySPV[spv],bulan,tahun)).join('')+'</div>';
+  // Progressive rendering: render SPV satu per satu agar UI tidak freeze
+  const spvKeys=Object.keys(bySPV).sort();
+  const container=document.createElement('div');
+  container.className='spv-list';
+  document.getElementById('content').innerHTML='';
+  document.getElementById('content').appendChild(container);
+  
+  function renderNextSPV(i){
+    if(i>=spvKeys.length) return;
+    const spv=spvKeys[i];
+    const el=document.createElement('div');
+    el.innerHTML=buildSPVBlock(spv,bySPV[spv],bulan,tahun);
+    container.appendChild(el.firstElementChild);
+    requestAnimationFrame(()=>renderNextSPV(i+1));
+  }
+  renderNextSPV(0);
 }
 
 function buildSPVBlock(spv,rows,bulan,tahun){
@@ -396,7 +437,11 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     </div>`;
   }).join('');
 
-  return `<div class="spv-block">
+  const spvBlockId='spvblock-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+  const setupBarId='setupbar-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+  const metricsGridId='metrics-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+
+  return `<div class="spv-block" id="${spvBlockId}">
     <div class="spv-header">
       <div class="spv-header-left">
         <div class="spv-avatar">${initials}</div>
@@ -407,8 +452,8 @@ function buildSPVBlock(spv,rows,bulan,tahun){
         <button class="btn-add-setup" onclick="openSetupModal('${safeSpv}',null)">+ Setup baru</button>
       </div>
     </div>
-    <div class="setup-bar">${setupTabs.length?setupTabs:'<span style="font-size:12px;color:var(--text3)">Belum ada setup</span>'}</div>
-    <div class="spv-metrics-grid">
+    <div class="setup-bar" id="${setupBarId}">${setupTabs.length?setupTabs:'<span style="font-size:12px;color:var(--text3)">Belum ada setup</span>'}</div>
+    <div class="spv-metrics-grid" id="${metricsGridId}">
       <div class="metric-box accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(s.dailyPayment)}</div><div class="sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
       <div class="metric-box"><div class="lbl">Avg Rate</div><div class="val">${fmtRate(s.avgRate)}</div><div class="sub">${fmtNum(s.jmlDataBayar)} data bayar</div></div>
       <div class="metric-box"><div class="lbl">PTP</div><div class="val">${fmtNum(s.ptp)}</div><div class="sub">${fmtNum(s.ptpBayar)} bayar</div></div>
@@ -468,7 +513,7 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
       {lbl:'PTP Bayar',val:fmtNum(a.s.ptpBayar)},
     ].map(x=>`<div class="preview-stat"><div class="lbl">${x.lbl}</div><div class="val">${x.val}</div></div>`).join('');
 
-    return `<tr class="agent-row">
+    return `<tr class="agent-row" data-agent="${escH(a.ag)}">
       <td><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:700;margin-right:6px;background:var(--surface2);color:var(--text3)">${j+1}</span>
         <span class="agent-link" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>
       </td>
@@ -551,13 +596,104 @@ function toggleAgentPreview(agId){
 }
 
 /* SWITCH SETUP - simpan state TL yang terbuka, re-render, restore */
+/* HELPER: generate ID yang sama dengan buildSPVBlock */
+function spvId(spv, prefix){
+  return prefix+'-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+}
+
+/* Cache summary per SPV untuk switchSetup */
+const spvSummaryCache={};
+function getSPVSummary(spv){
+  if(spvSummaryCache[spv]) return spvSummaryCache[spv];
+  const rows=getFilteredRows().filter(r=>(r.supervisor||'(Tanpa SPV)')===spv);
+  spvSummaryCache[spv]=summarizeRows(rows);
+  return spvSummaryCache[spv];
+}
+
 function switchSetup(spv,idx){
-  // Simpan TL yang sedang terbuka
-  const openTLs=getOpenTLs();
   setActiveIdx(spv,idx);
-  renderAll();
-  // Restore TL yang terbuka
-  setTimeout(()=>restoreOpenTLs(openTLs),50);
+
+  const setups=getSetups(spv);
+  const activeSetup=setups[idx]||null;
+  const setupMetrics=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
+
+  // 1. Update setup-bar: highlight tab aktif (tidak re-render, hanya toggle class)
+  const setupBar=document.getElementById(spvId(spv,'setupbar'));
+  if(setupBar){
+    setupBar.querySelectorAll('.tl-setup-tab,.setup-tab').forEach((btn,i)=>{
+      btn.classList.toggle('active',i===idx);
+      btn.classList.toggle('tl-setup-active',i===idx);
+    });
+  }
+
+  // 2. Update metric boxes (hanya bagian setelah 3 kotak fixed)
+  const metricsGrid=document.getElementById(spvId(spv,'metrics'));
+  if(metricsGrid){
+    // Hapus metric boxes lama (setelah 3 pertama yang fixed)
+    const allBoxes=[...metricsGrid.querySelectorAll('.metric-box')];
+    allBoxes.slice(3).forEach(el=>el.remove());
+    // Tambah metric boxes baru dari setup aktif
+    if(setupMetrics.length){
+      setupMetrics.forEach(m=>{
+        const div=document.createElement('div');
+        div.className='metric-box';
+        div.innerHTML=`<div class="lbl">${m.label}</div><div class="val">${fmtMetric(m,getSPVSummary(spv)[m.key]||0)}</div>`;
+        metricsGrid.appendChild(div);
+      });
+    } else {
+      const div=document.createElement('div');
+      div.style.cssText='color:var(--text3);font-size:12px;padding:6px 0';
+      div.textContent='Belum ada setup. Klik "+ Setup baru".';
+      metricsGrid.appendChild(div);
+    }
+  }
+
+  // 3. Update tl-setup-tab aktif di semua TL header dalam SPV ini
+  const spvBlock=document.getElementById(spvId(spv,'spvblock'));
+  if(spvBlock){
+    spvBlock.querySelectorAll('.tl-setup-tabs').forEach(tabGroup=>{
+      tabGroup.querySelectorAll('.tl-setup-tab').forEach((btn,i)=>{
+        btn.classList.toggle('tl-setup-active',i===idx);
+      });
+    });
+
+    // 4. Update kolom agent table header dan cells untuk setiap TL yang expand
+    spvBlock.querySelectorAll('.agent-detail.open').forEach(detail=>{
+      const table=detail.querySelector('.agent-table');
+      if(!table)return;
+      // Update header: kolom 1-2 (Agent, Hadir, Daily Payment) fixed, sisanya dari setup
+      const thead=table.querySelector('thead tr');
+      if(thead){
+        // Hapus th setelah kolom ke-3
+        const ths=[...thead.querySelectorAll('th')];
+        ths.slice(3).forEach(th=>th.remove());
+        setupMetrics.forEach(m=>{
+          const th=document.createElement('th');
+          th.textContent=m.label;
+          thead.appendChild(th);
+        });
+      }
+      // Update setiap baris agent
+      table.querySelectorAll('tbody tr.agent-row').forEach(row=>{
+        const tds=[...row.querySelectorAll('td')];
+        // Hapus td setelah kolom ke-3
+        tds.slice(3).forEach(td=>td.remove());
+        // Ambil data agent dari data-attribute jika ada, atau skip jika tidak
+        // Karena tidak ada data-attribute, update via allRows lookup
+        const agentName=row.getAttribute('data-agent');
+        if(agentName){
+          const agentRowsData=allRows.filter(r=>r.agent===agentName&&r.supervisor===spv);
+          const as=summarizeRows(agentRowsData);
+          setupMetrics.forEach(m=>{
+            const td=document.createElement('td');
+            td.className='num';
+            td.textContent=fmtMetric(m,as[m.key]||0);
+            row.appendChild(td);
+          });
+        }
+      });
+    });
+  }
 }
 
 function getOpenTLs(){

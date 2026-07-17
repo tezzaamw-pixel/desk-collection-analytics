@@ -176,6 +176,14 @@ select:focus{border-color:var(--accent);}
   .navbar{padding-left:20px;}
   .main{margin-left:0;padding:16px;}
 }
+
+/* Smooth transitions */
+.spv-block,.project-card,.sum-card,.stat-card,.acr-week-card{transition:box-shadow .15s,border-color .15s;}
+.agent-detail{transition:none;}
+.tl-header{transition:background .1s;}
+.setup-tab,.tl-setup-tab,.sort-tab,.chart-tab,.rank-switch-btn{transition:all .15s;}
+.metric-box{transition:opacity .12s;}
+.sidebar-item{transition:background .12s,color .12s;}
 </style>
 </head>
 <body>
@@ -191,7 +199,7 @@ select:focus{border-color:var(--accent);}
       <button class="theme-btn active" id="btnTerang" onclick="setTheme('light')">☀ Terang</button>
       <button class="theme-btn" id="btnGelap" onclick="setTheme('dark')">🌙 Gelap</button>
     </div>
-    <button class="btn-nav" id="btnRefresh" onclick="loadData()">↻ Refresh</button>
+    <button class="btn-nav" id="btnRefresh" onclick="clearCache();loadData()">↻ Refresh</button>
     <div class="nav-live"><div class="nav-live-dot"></div>Live</div>
   </div>
 </nav>
@@ -375,10 +383,24 @@ function setTheme(t){
 })();
 
 /* FETCH */
-async function fetchJSON(url){
+function debounce(fn, ms){let t;return function(...args){clearTimeout(t);t=setTimeout(()=>fn.apply(this,args),ms);};}
+const debouncedApplyFilter=debounce(applyFilter,150);
+function clearCache(){try{Object.keys(sessionStorage).filter(k=>k.startsWith('dca_c_')).forEach(k=>sessionStorage.removeItem(k));}catch(e){}}
+async function fetchJSON(url, useCache=true){
+  function _hash(s){let h=0;for(let i=0;i<s.length;i++)h=Math.imul(31,h)+s.charCodeAt(i)|0;return(h>>>0).toString(36);}
+  const cacheKey='dca_c_'+_hash(url.split('?')[1]||url);
+  if(useCache){
+    try{
+      const cached=sessionStorage.getItem(cacheKey);
+      if(cached){const {data,ts}=JSON.parse(cached);if(Date.now()-ts<300000)return data;}
+    }catch(e){}
+  }
   const res=await fetch(url);const text=await res.text();
-  if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));return await(await fetch(url)).json();}
-  return JSON.parse(text);
+  let data;
+  if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));data=await(await fetch(url)).json();}
+  else{data=JSON.parse(text);}
+  if(useCache&&data&&data.success){try{sessionStorage.setItem(cacheKey,JSON.stringify({data,ts:Date.now()}));}catch(e){}}
+  return data;
 }
 
 /* LOAD DATA */
