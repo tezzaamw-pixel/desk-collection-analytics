@@ -55,7 +55,29 @@ select:focus{border-color:var(--accent);}
 .btn-load{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
 .btn-load:disabled{opacity:.5;cursor:not-allowed;}
 
-/* SPV BLOCK */
+/* =========== SPV CARD GRID (view awal) =========== */
+.spv-card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;}
+.spv-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);cursor:pointer;transition:box-shadow .15s,border-color .15s,transform .1s;overflow:hidden;}
+.spv-card:hover{box-shadow:var(--shadow-md);border-color:var(--accent);transform:translateY(-2px);}
+.spv-card-header{padding:16px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
+.spv-card-avatar{width:44px;height:44px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--accent);flex-shrink:0;}
+.spv-card-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.spv-card-meta{font-size:11px;color:var(--text3);}
+.spv-card-body{padding:14px 18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.spv-card-stat{text-align:center;}
+.spv-card-stat .sv{font-size:14px;font-weight:700;color:var(--text);display:block;}
+.spv-card-stat .sk{font-size:10px;color:var(--text3);display:block;margin-top:1px;}
+.spv-card-footer{padding:10px 18px;background:var(--surface2);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.spv-card-apps{font-size:11px;color:var(--text3);}
+.spv-card-arrow{font-size:12px;color:var(--accent);font-weight:500;}
+
+/* BACK BUTTON */
+.back-bar{display:flex;align-items:center;gap:10px;margin-bottom:18px;}
+.btn-back{display:flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 14px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s;}
+.btn-back:hover{background:var(--surface2);color:var(--text);border-color:var(--accent);}
+.back-title{font-size:16px;font-weight:700;color:var(--text);}
+
+/* SPV BLOCK (detail view) */
 .spv-list{display:flex;flex-direction:column;gap:20px;}
 .spv-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
 .spv-header{padding:16px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;}
@@ -179,12 +201,9 @@ select:focus{border-color:var(--accent);}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px;}
 @keyframes spin{to{transform:rotate(360deg);}}
 @media(max-width:768px){:root{--sidebar-w:0px;}.sidebar{display:none;}.navbar{padding-left:20px;}.main{margin-left:0;}}
-
-/* Smooth transitions */
-.spv-block,.project-card,.sum-card,.stat-card,.acr-week-card{transition:box-shadow .15s,border-color .15s;}
-.agent-detail{transition:none;}
+.spv-block,.spv-card{transition:box-shadow .15s,border-color .15s;}
 .tl-header{transition:background .1s;}
-.setup-tab,.tl-setup-tab,.sort-tab,.chart-tab,.rank-switch-btn{transition:all .15s;}
+.setup-tab,.tl-setup-tab{transition:all .15s;}
 .metric-box{transition:opacity .12s;}
 .sidebar-item{transition:background .12s,color .12s;}
 </style>
@@ -292,7 +311,9 @@ function saveSetups(spv,s){localStorage.setItem('dca_setups_'+spv,JSON.stringify
 function getActiveIdx(spv){try{const r=localStorage.getItem('dca_active_'+spv);if(r!==null)return parseInt(r);}catch(e){}return 0;}
 function setActiveIdx(spv,i){localStorage.setItem('dca_active_'+spv,String(i));}
 
-let allRows=[],allBucketMap={},currentModalSpv=null,currentModalEditIdx=null;
+let allRows=[], allBucketMap={}, currentModalSpv=null, currentModalEditIdx=null;
+// VIEW STATE: null = kartu SPV, string = detail satu SPV
+let currentSpvView=null;
 
 function fmtRp(n){if(!n||n===0)return 'Rp 0';if(n>=1e9)return 'Rp '+(n/1e9).toFixed(2)+' M';if(n>=1e6)return 'Rp '+(n/1e6).toFixed(1)+' jt';if(n>=1e3)return 'Rp '+(n/1e3).toFixed(0)+' rb';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
 function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
@@ -347,6 +368,8 @@ async function loadData(){
     allRows=data.rows||[];
     buildBucketMap(allRows);populateAplikasi(allRows);populateBucket('');
     renderSidebar(allRows,bulan,tahun);
+    // Reset ke view kartu SPV setiap kali load data baru
+    currentSpvView=null;
     renderAll();
   }catch(e){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">⚠️</div><p>'+escH(e.message)+'</p></div>';}
   btn.disabled=false;btn.textContent='Tampilkan';
@@ -365,30 +388,112 @@ function summarizeRows(rows){
   return r;
 }
 
+// ============================================================
+// RENDER UTAMA: kartu SPV atau detail 1 SPV
+// ============================================================
 function renderAll(){
-  // Bersihkan cache summary
-  Object.keys(spvSummaryCache).forEach(k=>delete spvSummaryCache[k]);
   const filtered=getFilteredRows();
-  const bySPV={};filtered.forEach(r=>{const spv=r.supervisor||'(Tanpa SPV)';if(!bySPV[spv])bySPV[spv]=[];bySPV[spv].push(r);});
-  const bulan=document.getElementById('selBulan').value;const tahun=document.getElementById('selTahun').value;
-  if(!Object.keys(bySPV).length){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
-  // Progressive rendering: render SPV satu per satu agar UI tidak freeze
-  const spvKeys=Object.keys(bySPV).sort();
-  const container=document.createElement('div');
-  container.className='spv-list';
-  document.getElementById('content').innerHTML='';
-  document.getElementById('content').appendChild(container);
-  
-  function renderNextSPV(i){
-    if(i>=spvKeys.length) return;
-    const spv=spvKeys[i];
-    const el=document.createElement('div');
-    el.innerHTML=buildSPVBlock(spv,bySPV[spv],bulan,tahun);
-    container.appendChild(el.firstElementChild);
-    requestAnimationFrame(()=>renderNextSPV(i+1));
+  const bySPV={};
+  filtered.forEach(r=>{
+    const spv=r.supervisor||'(Tanpa SPV)';
+    if(!bySPV[spv])bySPV[spv]=[];
+    bySPV[spv].push(r);
+  });
+  if(!Object.keys(bySPV).length){
+    document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';
+    return;
   }
-  renderNextSPV(0);
+  if(currentSpvView && bySPV[currentSpvView]){
+    renderDetailSPV(currentSpvView, bySPV[currentSpvView], bySPV);
+  } else {
+    currentSpvView=null;
+    renderSpvCards(bySPV);
+  }
 }
+
+// ============================================================
+// VIEW 1: KARTU SUPERVISOR
+// ============================================================
+function renderSpvCards(bySPV){
+  const bulan=document.getElementById('selBulan').value;
+  const tahun=document.getElementById('selTahun').value;
+  const spvKeys=Object.keys(bySPV).sort();
+  const cards=spvKeys.map(spv=>{
+    const rows=bySPV[spv];
+    const s=summarizeRows(rows);
+    const agentCount=new Set(rows.map(r=>r.agent)).size;
+    const bucketCount=new Set(rows.map(r=>r.bucket).filter(Boolean)).size;
+    const tlCount=new Set(rows.map(r=>r.teamLeader).filter(Boolean)).size;
+    const appList=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))];
+    const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+    const avatarColor=appList.length===1?getColor(appList[0]):'var(--accent)';
+    return `<div class="spv-card" onclick="openSpvDetail('${escA(spv)}')">
+      <div class="spv-card-header">
+        <div class="spv-card-avatar" style="background:${avatarColor}22;color:${avatarColor}">${escH(initials)}</div>
+        <div>
+          <div class="spv-card-name">${escH(spv)}</div>
+          <div class="spv-card-meta">${bucketCount} bucket · ${tlCount} TL · ${agentCount} agent</div>
+        </div>
+      </div>
+      <div class="spv-card-body">
+        <div class="spv-card-stat">
+          <span class="sv">${fmtRp(s.dailyPayment)}</span>
+          <span class="sk">Total Payment</span>
+        </div>
+        <div class="spv-card-stat">
+          <span class="sv">${fmtRate(s.avgRate)}</span>
+          <span class="sk">Avg Rate</span>
+        </div>
+        <div class="spv-card-stat">
+          <span class="sv">${fmtNum(s.ptp)}</span>
+          <span class="sk">PTP</span>
+        </div>
+      </div>
+      <div class="spv-card-footer">
+        <span class="spv-card-apps">${appList.map(a=>a.charAt(0)+a.slice(1).toLowerCase()).join(', ')}</span>
+        <span class="spv-card-arrow">Lihat detail →</span>
+      </div>
+    </div>`;
+  }).join('');
+  document.getElementById('content').innerHTML=`<div class="spv-card-grid">${cards}</div>`;
+}
+
+function openSpvDetail(spv){
+  currentSpvView=spv;
+  renderAll();
+}
+
+function backToCards(){
+  currentSpvView=null;
+  renderAll();
+}
+
+// ============================================================
+// VIEW 2: DETAIL SATU SPV + SEMUA TL-NYA
+// ============================================================
+function renderDetailSPV(spv, rows, bySPV){
+  const bulan=document.getElementById('selBulan').value;
+  const tahun=document.getElementById('selTahun').value;
+  const container=document.getElementById('content');
+  container.innerHTML='';
+
+  // Back bar
+  const backBar=document.createElement('div');
+  backBar.className='back-bar';
+  backBar.innerHTML=`<button class="btn-back" onclick="backToCards()">← Kembali</button><span class="back-title">Supervisor: ${escH(spv)}</span>`;
+  container.appendChild(backBar);
+
+  // SPV block
+  const spvEl=document.createElement('div');
+  spvEl.className='spv-list';
+  spvEl.innerHTML=buildSPVBlock(spv,rows,bulan,tahun);
+  container.appendChild(spvEl);
+}
+
+// ============================================================
+// BUILD SPV BLOCK (HTML string)
+// ============================================================
+const spvSummaryCache={};
 
 function buildSPVBlock(spv,rows,bulan,tahun){
   const s=summarizeRows(rows);
@@ -402,7 +507,6 @@ function buildSPVBlock(spv,rows,bulan,tahun){
 
   const setupTabs=setups.map((st,i)=>`<div class="setup-tab ${i===activeIdx?'active':''}" onclick="switchSetup('${safeSpv}',${i})">${escH(st.name)}<button class="setup-tab-del" onclick="event.stopPropagation();deleteSetup('${safeSpv}',${i})" title="Hapus">×</button></div>`).join('');
 
-  // Metrik dari setup aktif
   const setupMetrics=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
   const metricBoxes=setupMetrics.length?setupMetrics.map(m=>`<div class="metric-box"><div class="lbl">${m.label}</div><div class="val">${fmtMetric(m,s[m.key]||0)}</div></div>`).join(''):'<div style="color:var(--text3);font-size:12px;padding:6px 0">Belum ada setup. Klik "+ Setup baru".</div>';
 
@@ -416,17 +520,23 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     byBucket[bk][tl].push(r);
   });
 
-  // Render bucket groups
-  let globalTLRank=0;
+  // ============================================================
+  // FIX BUG #2: ID TL menggunakan counter unik per-render,
+  // bukan btoa yang bisa menghasilkan ID identik atau bentrok.
+  // ============================================================
+  let tlCounter=0;
   const bucketBlocks=Object.keys(byBucket).sort().map(bk=>{
     const tlsInBucket=Object.keys(byBucket[bk]).map(tl=>{
       const ts=summarizeRows(byBucket[bk][tl]);
       return{tl,s:ts,rows:byBucket[bk][tl],agentCount:new Set(byBucket[bk][tl].map(r=>r.agent)).size};
     }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
-    const tlRows=tlsInBucket.map(t=>{
-      globalTLRank++;
-      return buildTLRow(t,globalTLRank-1,spv,bulan,tahun,activeSetup,bk);
+
+    const tlRows=tlsInBucket.map((t,rankInBucket)=>{
+      // ID unik berdasarkan counter — tidak akan pernah bentrok
+      const tlId='tl'+String(++tlCounter).padStart(4,'0');
+      return buildTLRow(t,rankInBucket,spv,bulan,tahun,activeSetup,bk,tlId);
     }).join('');
+
     const bkCount=new Set(Object.values(byBucket[bk]).flat().map(r=>r.agent)).size;
     return `<div class="bucket-group">
       <div class="bucket-header">
@@ -440,6 +550,8 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   const spvBlockId='spvblock-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
   const setupBarId='setupbar-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
   const metricsGridId='metrics-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+
+  spvSummaryCache[spv]=s;
 
   return `<div class="spv-block" id="${spvBlockId}">
     <div class="spv-header">
@@ -463,20 +575,14 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   </div>`;
 }
 
-function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
+function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
   const safeSpv=escA(spv);
-  const safeTL=escA(t.tl);
   const rankClass=rank===0?'r1':rank===1?'r2':rank===2?'r3':'rn';
-  const tlId='tl-'+btoa(encodeURIComponent(spv+bucket+t.tl)).replace(/[^a-zA-Z0-9]/g,'').substring(0,20);
 
-  // Setup metric columns untuk tabel agent
   const setupCols=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
-
-  // TL stats di header: Agent, Payment, Rate + metrik pertama setup
   const firstM=setupCols[0];
   const extraStat=firstM?`<div class="tl-stat"><span class="sk">${firstM.label}</span><span class="sv">${fmtMetric(firstM,t.s[firstM.key]||0)}</span></div>`:'';
 
-  // Agent list
   const byAgent=new Map();
   t.rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent.has(ag))byAgent.set(ag,[]);byAgent.get(ag).push(r);});
   const agentList=[...byAgent.entries()].map(([ag,rows])=>{
@@ -489,12 +595,10 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
   const thCols='<th>Agent</th><th>Hadir</th><th>Daily Payment</th>'+setupCols.map(m=>`<th>${m.label}</th>`).join('');
 
   const agentRows=agentList.map((a,j)=>{
-    const agId=tlId+'ag'+j;
-    const safeAg=escA(a.ag);
+    // ID unik agent: gabungkan tlId + index
+    const agId=tlId+'a'+j;
     const metricCells=setupCols.map(m=>`<td class="num">${fmtMetric(m,a.s[m.key]||0)}</td>`).join('');
     const hadir=a.hadir>0?'ab-hadir':'ab-off';
-
-    // Preview data agent (ringkasan + tabel harian singkat)
     const dailyRows=a.rows.sort((x,y)=>(x.tanggal||'').localeCompare(y.tanggal||'')).map(r=>`<tr>
       <td>${r.tanggal||'—'}</td>
       <td>${r.absensi||'—'}</td>
@@ -503,7 +607,6 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
       <td>${fmtNum(r.sentuhWA)}</td>
       <td>${fmtNum(r.ptp)}</td>
     </tr>`).join('');
-
     const previewGridItems=[
       {lbl:'Payment',val:fmtRp(a.s.dailyPayment)},
       {lbl:'Rate',val:fmtRate(a.s.avgRate)},
@@ -512,8 +615,7 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
       {lbl:'PTP',val:fmtNum(a.s.ptp)},
       {lbl:'PTP Bayar',val:fmtNum(a.s.ptpBayar)},
     ].map(x=>`<div class="preview-stat"><div class="lbl">${x.lbl}</div><div class="val">${x.val}</div></div>`).join('');
-
-    return `<tr class="agent-row" data-agent="${escH(a.ag)}">
+    return `<tr class="agent-row" data-agent="${escH(a.ag)}" data-spv="${escH(spv)}">
       <td><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:700;margin-right:6px;background:var(--surface2);color:var(--text3)">${j+1}</span>
         <span class="agent-link" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>
       </td>
@@ -548,12 +650,11 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
     </tr>`;
   }).join('');
 
-  // Setup switch tabs untuk TL ini (mini versi) - ambil langsung dari storage
   const tlSetups=getSetups(spv);
   const tlActiveIdx=Math.max(0,Math.min(getActiveIdx(spv),tlSetups.length-1));
   const tlSetupTabs=tlSetups.length?tlSetups.map((st,i)=>`<button class="tl-setup-tab ${i===tlActiveIdx?'tl-setup-active':''}" onclick="event.stopPropagation();switchSetup('${safeSpv}',${i})" title="${escH(st.name)}">${escH(st.name)}</button>`).join(''):'';
 
-  return `<div class="tl-row">
+  return `<div class="tl-row" id="row-${tlId}">
     <div class="tl-header" onclick="toggleTL('${tlId}')">
       <div class="tl-rank ${rankClass}">${rank+1}</div>
       <div class="tl-name">${escH(t.tl)}</div>
@@ -577,7 +678,10 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket){
   </div>`;
 }
 
-/* TOGGLE TL - tidak re-render, hanya toggle class */
+/* ============================================================
+   FIX BUG #2: toggleTL yang benar — hanya toggle elemen
+   yang di-klik, tidak perlu looping atau pencarian global
+   ============================================================ */
 function toggleTL(id){
   const el=document.getElementById(id);
   const icon=document.getElementById(id+'-icon');
@@ -587,68 +691,44 @@ function toggleTL(id){
   if(icon)icon.classList.toggle('open',!isOpen);
 }
 
-/* TOGGLE AGENT PREVIEW */
 function toggleAgentPreview(agId){
   const prev=document.getElementById('prev-'+agId);
   if(!prev)return;
-  const isOpen=prev.classList.contains('open');
-  prev.classList.toggle('open',!isOpen);
+  prev.classList.toggle('open');
 }
 
-/* SWITCH SETUP - simpan state TL yang terbuka, re-render, restore */
-/* HELPER: generate ID yang sama dengan buildSPVBlock */
-function spvId(spv, prefix){
+/* HELPER ID untuk switchSetup */
+function spvId(spv,prefix){
   return prefix+'-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
-}
-
-/* Cache summary per SPV untuk switchSetup */
-const spvSummaryCache={};
-function getSPVSummary(spv){
-  if(spvSummaryCache[spv]) return spvSummaryCache[spv];
-  const rows=getFilteredRows().filter(r=>(r.supervisor||'(Tanpa SPV)')===spv);
-  spvSummaryCache[spv]=summarizeRows(rows);
-  return spvSummaryCache[spv];
 }
 
 function switchSetup(spv,idx){
   setActiveIdx(spv,idx);
-
   const setups=getSetups(spv);
   const activeSetup=setups[idx]||null;
   const setupMetrics=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
 
-  // 1. Update setup-bar: highlight tab aktif (tidak re-render, hanya toggle class)
   const setupBar=document.getElementById(spvId(spv,'setupbar'));
   if(setupBar){
-    setupBar.querySelectorAll('.tl-setup-tab,.setup-tab').forEach((btn,i)=>{
+    setupBar.querySelectorAll('.setup-tab').forEach((btn,i)=>{
       btn.classList.toggle('active',i===idx);
-      btn.classList.toggle('tl-setup-active',i===idx);
     });
   }
 
-  // 2. Update metric boxes (hanya bagian setelah 3 kotak fixed)
   const metricsGrid=document.getElementById(spvId(spv,'metrics'));
   if(metricsGrid){
-    // Hapus metric boxes lama (setelah 3 pertama yang fixed)
     const allBoxes=[...metricsGrid.querySelectorAll('.metric-box')];
     allBoxes.slice(3).forEach(el=>el.remove());
-    // Tambah metric boxes baru dari setup aktif
     if(setupMetrics.length){
       setupMetrics.forEach(m=>{
         const div=document.createElement('div');
         div.className='metric-box';
-        div.innerHTML=`<div class="lbl">${m.label}</div><div class="val">${fmtMetric(m,getSPVSummary(spv)[m.key]||0)}</div>`;
+        div.innerHTML=`<div class="lbl">${m.label}</div><div class="val">${fmtMetric(m,(spvSummaryCache[spv]||{})[m.key]||0)}</div>`;
         metricsGrid.appendChild(div);
       });
-    } else {
-      const div=document.createElement('div');
-      div.style.cssText='color:var(--text3);font-size:12px;padding:6px 0';
-      div.textContent='Belum ada setup. Klik "+ Setup baru".';
-      metricsGrid.appendChild(div);
     }
   }
 
-  // 3. Update tl-setup-tab aktif di semua TL header dalam SPV ini
   const spvBlock=document.getElementById(spvId(spv,'spvblock'));
   if(spvBlock){
     spvBlock.querySelectorAll('.tl-setup-tabs').forEach(tabGroup=>{
@@ -656,33 +736,24 @@ function switchSetup(spv,idx){
         btn.classList.toggle('tl-setup-active',i===idx);
       });
     });
-
-    // 4. Update kolom agent table header dan cells untuk setiap TL yang expand
     spvBlock.querySelectorAll('.agent-detail.open').forEach(detail=>{
       const table=detail.querySelector('.agent-table');
       if(!table)return;
-      // Update header: kolom 1-2 (Agent, Hadir, Daily Payment) fixed, sisanya dari setup
       const thead=table.querySelector('thead tr');
       if(thead){
-        // Hapus th setelah kolom ke-3
         const ths=[...thead.querySelectorAll('th')];
         ths.slice(3).forEach(th=>th.remove());
         setupMetrics.forEach(m=>{
-          const th=document.createElement('th');
-          th.textContent=m.label;
-          thead.appendChild(th);
+          const th=document.createElement('th');th.textContent=m.label;thead.appendChild(th);
         });
       }
-      // Update setiap baris agent
       table.querySelectorAll('tbody tr.agent-row').forEach(row=>{
         const tds=[...row.querySelectorAll('td')];
-        // Hapus td setelah kolom ke-3
         tds.slice(3).forEach(td=>td.remove());
-        // Ambil data agent dari data-attribute jika ada, atau skip jika tidak
-        // Karena tidak ada data-attribute, update via allRows lookup
         const agentName=row.getAttribute('data-agent');
+        const agentSpv=row.getAttribute('data-spv');
         if(agentName){
-          const agentRowsData=allRows.filter(r=>r.agent===agentName&&r.supervisor===spv);
+          const agentRowsData=allRows.filter(r=>r.agent===agentName&&r.supervisor===agentSpv);
           const as=summarizeRows(agentRowsData);
           setupMetrics.forEach(m=>{
             const td=document.createElement('td');
@@ -696,21 +767,6 @@ function switchSetup(spv,idx){
   }
 }
 
-function getOpenTLs(){
-  const open=[];
-  document.querySelectorAll('.agent-detail.open').forEach(el=>open.push(el.id));
-  return open;
-}
-
-function restoreOpenTLs(ids){
-  ids.forEach(id=>{
-    const el=document.getElementById(id);
-    const icon=document.getElementById(id+'-icon');
-    if(el){el.classList.add('open');if(icon)icon.classList.add('open');}
-  });
-}
-
-/* DELETE SETUP */
 function deleteSetup(spv,idx){
   if(!confirm('Hapus setup ini?'))return;
   const setups=getSetups(spv);
@@ -718,14 +774,17 @@ function deleteSetup(spv,idx){
   saveSetups(spv,setups);
   const active=getActiveIdx(spv);
   if(active>=setups.length)setActiveIdx(spv,Math.max(0,setups.length-1));
-  const openTLs=getOpenTLs();
-  renderAll();
-  setTimeout(()=>restoreOpenTLs(openTLs),50);
+  // Re-render hanya detail SPV saat ini
+  if(currentSpvView===spv){
+    const filtered=getFilteredRows();
+    const bySPV={};filtered.forEach(r=>{const s=r.supervisor||'(Tanpa SPV)';if(!bySPV[s])bySPV[s]=[];bySPV[s].push(r);});
+    renderDetailSPV(spv, bySPV[spv]||[], bySPV);
+  }
 }
 
-/* SETUP MODAL */
+let currentModalSpv2=null,currentModalEditIdx2=null;
 function openSetupModal(spv,editIdx){
-  currentModalSpv=spv;currentModalEditIdx=editIdx;
+  currentModalSpv2=spv;currentModalEditIdx2=editIdx;
   const setups=getSetups(spv);
   const editing=editIdx!==null&&setups[editIdx];
   document.getElementById('modalTitle').textContent=editing?'Edit setup':'Setup baru';
@@ -736,22 +795,24 @@ function openSetupModal(spv,editIdx){
   setTimeout(()=>document.getElementById('modalSetupName').focus(),100);
 }
 
-function closeModal(){document.getElementById('modalOverlay').classList.remove('open');currentModalSpv=null;currentModalEditIdx=null;}
+function closeModal(){document.getElementById('modalOverlay').classList.remove('open');currentModalSpv2=null;currentModalEditIdx2=null;}
 
 function saveSetup(){
   const name=document.getElementById('modalSetupName').value.trim();
   if(!name){alert('Masukkan nama setup dulu.');return;}
   const metrics=Array.from(document.querySelectorAll('#modalBody input[type=checkbox]:checked')).map(c=>c.value);
   if(!metrics.length){alert('Pilih minimal 1 metrik.');return;}
-  const spv=currentModalSpv;
+  const spv=currentModalSpv2;
   const setups=getSetups(spv);
-  if(currentModalEditIdx!==null){setups[currentModalEditIdx]={name,metrics};}
+  if(currentModalEditIdx2!==null){setups[currentModalEditIdx2]={name,metrics};}
   else{setups.push({name,metrics});}
   saveSetups(spv,setups);
   closeModal();
-  const openTLs=getOpenTLs();
-  renderAll();
-  setTimeout(()=>restoreOpenTLs(openTLs),50);
+  if(currentSpvView===spv){
+    const filtered=getFilteredRows();
+    const bySPV={};filtered.forEach(r=>{const s=r.supervisor||'(Tanpa SPV)';if(!bySPV[s])bySPV[s]=[];bySPV[s].push(r);});
+    renderDetailSPV(spv, bySPV[spv]||[], bySPV);
+  }
 }
 
 document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
