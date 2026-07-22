@@ -714,63 +714,77 @@ function switchSetup(spv,idx){
   const activeSetup=setups[idx]||null;
   const setupMetrics=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
 
+  // 1. Update tab aktif di setup bar SPV
   const setupBar=document.getElementById(spvId(spv,'setupbar'));
-  if(setupBar){
-    setupBar.querySelectorAll('.setup-tab').forEach((btn,i)=>{
-      btn.classList.toggle('active',i===idx);
-    });
-  }
+  if(setupBar){setupBar.querySelectorAll('.setup-tab').forEach((btn,i)=>{btn.classList.toggle('active',i===idx);});}
 
+  // 2. Update metric boxes SPV
   const metricsGrid=document.getElementById(spvId(spv,'metrics'));
   if(metricsGrid){
-    const allBoxes=[...metricsGrid.querySelectorAll('.metric-box')];
-    allBoxes.slice(3).forEach(el=>el.remove());
-    if(setupMetrics.length){
-      setupMetrics.forEach(m=>{
-        const div=document.createElement('div');
-        div.className='metric-box';
-        div.innerHTML=`<div class="lbl">${m.label}</div><div class="val">${fmtMetric(m,(spvSummaryCache[spv]||{})[m.key]||0)}</div>`;
-        metricsGrid.appendChild(div);
-      });
-    }
+    [...metricsGrid.querySelectorAll('.metric-box')].slice(3).forEach(el=>el.remove());
+    setupMetrics.forEach(m=>{const div=document.createElement('div');div.className='metric-box';div.innerHTML=`<div class="lbl">${m.label}</div><div class="val">${fmtMetric(m,(spvSummaryCache[spv]||{})[m.key]||0)}</div>`;metricsGrid.appendChild(div);});
   }
 
   const spvBlock=document.getElementById(spvId(spv,'spvblock'));
-  if(spvBlock){
-    spvBlock.querySelectorAll('.tl-setup-tabs').forEach(tabGroup=>{
-      tabGroup.querySelectorAll('.tl-setup-tab').forEach((btn,i)=>{
-        btn.classList.toggle('tl-setup-active',i===idx);
-      });
-    });
-    spvBlock.querySelectorAll('.agent-detail.open').forEach(detail=>{
-      const table=detail.querySelector('.agent-table');
-      if(!table)return;
-      const thead=table.querySelector('thead tr');
-      if(thead){
-        const ths=[...thead.querySelectorAll('th')];
-        ths.slice(3).forEach(th=>th.remove());
-        setupMetrics.forEach(m=>{
-          const th=document.createElement('th');th.textContent=m.label;thead.appendChild(th);
-        });
+  if(!spvBlock)return;
+
+  // 3. Update tab aktif di tiap TL row
+  spvBlock.querySelectorAll('.tl-setup-tabs').forEach(tabGroup=>{
+    tabGroup.querySelectorAll('.tl-setup-tab').forEach((btn,i)=>{btn.classList.toggle('tl-setup-active',i===idx);});
+  });
+
+  // 4. Update kolom tabel agent yang terbuka
+  spvBlock.querySelectorAll('.agent-detail.open').forEach(detail=>{
+    const table=detail.querySelector('.agent-table');
+    if(!table)return;
+    const thead=table.querySelector('thead tr');
+    if(thead){[...thead.querySelectorAll('th')].slice(3).forEach(th=>th.remove());setupMetrics.forEach(m=>{const th=document.createElement('th');th.textContent=m.label;thead.appendChild(th);});}
+    table.querySelectorAll('tbody tr.agent-row').forEach(row=>{
+      [...row.querySelectorAll('td')].slice(3).forEach(td=>td.remove());
+      const agentName=row.getAttribute('data-agent');const agentSpv=row.getAttribute('data-spv');
+      if(agentName){
+        const as=summarizeRows(allRows.filter(r=>r.agent===agentName&&r.supervisor===agentSpv));
+        setupMetrics.forEach(m=>{const td=document.createElement('td');td.className='num';td.textContent=fmtMetric(m,as[m.key]||0);row.appendChild(td);});
       }
-      table.querySelectorAll('tbody tr.agent-row').forEach(row=>{
-        const tds=[...row.querySelectorAll('td')];
-        tds.slice(3).forEach(td=>td.remove());
-        const agentName=row.getAttribute('data-agent');
-        const agentSpv=row.getAttribute('data-spv');
-        if(agentName){
-          const agentRowsData=allRows.filter(r=>r.agent===agentName&&r.supervisor===agentSpv);
-          const as=summarizeRows(agentRowsData);
-          setupMetrics.forEach(m=>{
-            const td=document.createElement('td');
-            td.className='num';
-            td.textContent=fmtMetric(m,as[m.key]||0);
-            row.appendChild(td);
-          });
-        }
-      });
     });
-  }
+  });
+
+  // 5. Update tabel preview agent yang sedang terbuka
+  const previewCols=setupMetrics.length?setupMetrics:[
+    {key:'callManual',label:'Call Manual',fmt:'num'},
+    {key:'sentuhWA',label:'Sentuh WA',fmt:'num'},
+    {key:'ptp',label:'PTP',fmt:'num'},
+  ];
+  spvBlock.querySelectorAll('.agent-preview.open').forEach(previewEl=>{
+    const previewRow=previewEl.closest('tr.agent-preview-row');
+    if(!previewRow)return;
+    const agentDataRow=previewRow.previousElementSibling;
+    if(!agentDataRow)return;
+    const agentName=agentDataRow.getAttribute('data-agent');
+    const agentSpv=agentDataRow.getAttribute('data-spv');
+    if(!agentName)return;
+    const agentRowsData=allRows.filter(r=>r.agent===agentName&&r.supervisor===agentSpv);
+    const previewTable=previewEl.querySelector('.preview-daily-table');
+    if(!previewTable)return;
+    // Rebuild header
+    const pThead=previewTable.querySelector('thead tr');
+    if(pThead)pThead.innerHTML='<th>Tanggal</th><th>Absensi</th><th>Catatan SPV</th><th>Payment</th>'+previewCols.map(m=>`<th>${m.label}</th>`).join('');
+    // Rebuild body
+    const pTbody=previewTable.querySelector('tbody');
+    if(pTbody){
+      const sorted=[...agentRowsData].sort((x,y)=>(x.tanggal||'').localeCompare(y.tanggal||''));
+      pTbody.innerHTML=sorted.map(r=>`<tr>
+        <td>${r.tanggal||'—'}</td>
+        <td>${r.absensi||'—'}</td>
+        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis">${r.catatanSPV||'—'}</td>
+        <td>${fmtRp(r.dailyPayment)}</td>
+        ${previewCols.map(m=>`<td>${fmtMetric(m,r[m.key]||0)}</td>`).join('')}
+      </tr>`).join('');
+    }
+    // Update colspan
+    const previewTd=previewRow.querySelector('td');
+    if(previewTd)previewTd.setAttribute('colspan',String(3+setupMetrics.length));
+  });
 }
 
 function deleteSetup(spv,idx){
