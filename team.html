@@ -675,11 +675,10 @@ function buildSPVBlock(spv,rows,bulan,tahun){
 // ============================================================
 // POINT 2: Format label rotasi dengan tanggal
 // ============================================================
-function formatRotasiLabel(type, prevFirstName, dateStr) {
+function formatRotasiLabel(type, prevFirstName, dateStr, bucketAktif) {
   const BULAN_SHORT=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
   let dayStr='';
   if(dateStr){
-    // dateStr format: YYYY-MM-DD
     const parts=dateStr.split('-');
     if(parts.length===3){
       const day=parseInt(parts[2],10);
@@ -692,7 +691,8 @@ function formatRotasiLabel(type, prevFirstName, dateStr) {
   if(type==='pengganti'){
     return `<span class="label-pengganti">Pengganti (${escH(prevFirstName)})${escH(dayStr)}</span>`;
   }else if(type==='pindah'){
-    return `<span class="label-pindah">Pindah${escH(dayStr)}</span>`;
+    const tujuan=bucketAktif?' ke '+bucketAktif:'';
+    return `<span class="label-pindah">Pindah${escH(tujuan)}${escH(dayStr)}</span>`;
   }else{
     return `<span class="label-nonaktif">Nonaktif${escH(dayStr)}</span>`;
   }
@@ -983,8 +983,8 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
       } else {
         rotasiClass='rotasi-lama';
         if(a.rotasi.bucketAktif){
-          // "Pindah 7 Jul" — bucket tujuan ditampilkan di preview
-          rotasiLabel=formatRotasiLabel('pindah', '', a.rotasi.changeDate);
+          // "Pindah ke S1-1 HC 7 Jul"
+          rotasiLabel=formatRotasiLabel('pindah', '', a.rotasi.changeDate, a.rotasi.bucketAktif);
         } else {
           // "Nonaktif 7 Jul"
           rotasiLabel=formatRotasiLabel('nonaktif', '', a.rotasi.changeDate);
