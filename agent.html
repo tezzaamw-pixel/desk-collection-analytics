@@ -191,8 +191,8 @@ select:focus{border-color:var(--accent);}
 
 <script>
 const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
-const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
-function getColor(ap){return APP_COLORS[ap]||'#6366f1';}
+const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','GOPIN FV':'#7C3AED','GOPIN FV NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
+function getColor(ap){const k=String(ap||'').toUpperCase().trim();for(const key of Object.keys(APP_COLORS)){if(k===key||k.startsWith(key)||key.startsWith(k))return APP_COLORS[key];}return'#6366f1';}
 
 let chartInstance=null;
 let agentRows=[];

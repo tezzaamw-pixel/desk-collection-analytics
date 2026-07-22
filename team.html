@@ -280,8 +280,9 @@ select:focus{border-color:var(--accent);}
 
 <script>
 const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
-const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
-function getColor(ap){return APP_COLORS[ap]||'#6366f1';}
+const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','GOPIN FV':'#7C3AED','GOPIN FV NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
+function getColor(ap){const k=String(ap||'').toUpperCase().trim();for(const key of Object.keys(APP_COLORS)){if(k===key||k.startsWith(key)||key.startsWith(k))return APP_COLORS[key];}return'#6366f1';}
+// getColor defined above with APP_COLORS
 
 const ALL_METRICS=[
   {key:'dailyPayment',label:'Daily Payment',fmt:'rp'},
@@ -599,13 +600,18 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
     const agId=tlId+'a'+j;
     const metricCells=setupCols.map(m=>`<td class="num">${fmtMetric(m,a.s[m.key]||0)}</td>`).join('');
     const hadir=a.hadir>0?'ab-hadir':'ab-off';
+    // Kolom setup: gunakan setupCols jika ada, fallback ke default
+    const previewSetupCols=setupCols.length?setupCols:[
+      {key:'callManual',label:'Call Manual',fmt:'num'},
+      {key:'sentuhWA',label:'Sentuh WA',fmt:'num'},
+      {key:'ptp',label:'PTP',fmt:'num'},
+    ];
     const dailyRows=a.rows.sort((x,y)=>(x.tanggal||'').localeCompare(y.tanggal||'')).map(r=>`<tr>
       <td>${r.tanggal||'—'}</td>
       <td>${r.absensi||'—'}</td>
+      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;color:var(--text2)">${r.catatanSPV||'—'}</td>
       <td>${fmtRp(r.dailyPayment)}</td>
-      <td>${fmtNum(r.callManual)}</td>
-      <td>${fmtNum(r.sentuhWA)}</td>
-      <td>${fmtNum(r.ptp)}</td>
+      ${previewSetupCols.map(m=>`<td>${fmtMetric(m,r[m.key]||0)}</td>`).join('')}
     </tr>`).join('');
     const previewGridItems=[
       {lbl:'Payment',val:fmtRp(a.s.dailyPayment)},
@@ -640,7 +646,7 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
             <div class="preview-grid">${previewGridItems}</div>
             <div class="preview-daily">
               <table class="preview-daily-table">
-                <thead><tr><th>Tanggal</th><th>Absensi</th><th>Payment</th><th>Call Manual</th><th>Sentuh WA</th><th>PTP</th></tr></thead>
+                <thead><tr><th>Tanggal</th><th>Absensi</th><th>Catatan SPV</th><th>Payment</th>${previewSetupCols.map(m=>`<th>${m.label}</th>`).join('')}</tr></thead>
                 <tbody>${dailyRows}</tbody>
               </table>
             </div>
