@@ -206,6 +206,16 @@ select:focus{border-color:var(--accent);}
 .setup-tab,.tl-setup-tab{transition:all .15s;}
 .metric-box{transition:opacity .12s;}
 .sidebar-item{transition:background .12s,color .12s;}
+
+/* CATATAN SPV DOT */
+.catatan-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:5px;vertical-align:middle;flex-shrink:0;cursor:default;}
+
+/* ROTATION LABELS */
+.label-pengganti{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#dbeafe;color:#1d4ed8;margin-left:6px;vertical-align:middle;white-space:nowrap;}
+.label-pindah{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e;margin-left:6px;vertical-align:middle;white-space:nowrap;}
+.label-nonaktif{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#f3f4f6;color:#6b7280;margin-left:6px;vertical-align:middle;white-space:nowrap;}
+.agent-row.rotasi-lama td{opacity:0.5;}
+.agent-row.rotasi-lama td:first-child{opacity:1;}
 </style>
 </head>
 <body>
@@ -586,12 +596,63 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
 
   const byAgent=new Map();
   t.rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent.has(ag))byAgent.set(ag,[]);byAgent.get(ag).push(r);});
+
+  // --- DETEKSI ROTASI ---
+  // Kumpulkan semua nama akun yang dipegang >1 agent → ada rotasi
+  const akunToAgents={};
+  [...byAgent.entries()].forEach(([ag,rows])=>{
+    rows.forEach(r=>{
+      const akun=r.namaAkun||'';
+      if(!akun||akun==='—')return;
+      if(!akunToAgents[akun])akunToAgents[akun]=new Set();
+      akunToAgents[akun].add(ag);
+    });
+  });
+  // Nama akun yang punya rotasi (>1 agent)
+  const rotasiAkun=new Set(Object.keys(akunToAgents).filter(akun=>akunToAgents[akun].size>1));
+
+  // Untuk tiap agent yang terlibat rotasi, tentukan siapa "lama" vs "baru"
+  // berdasarkan tanggal terakhir hadir di akun yang berotasi
+  const agentRotasiInfo={}; // ag -> {status:'lama'|'baru', lawanNama:string, lawanFirstName:string, lastDate:string}
+  rotasiAkun.forEach(akun=>{
+    const agents=[...akunToAgents[akun]];
+    // Hitung tanggal terakhir masing-masing agent pegang akun ini
+    const agLastDate={};
+    agents.forEach(ag=>{
+      const rows=(byAgent.get(ag)||[]).filter(r=>r.namaAkun===akun&&r.tanggal);
+      const last=rows.map(r=>r.tanggal).sort().pop()||'';
+      agLastDate[ag]=last;
+    });
+    // Sort: yang tanggal terakhirnya lebih awal = agent lama
+    const sorted=[...agents].sort((a,b)=>agLastDate[a].localeCompare(agLastDate[b]));
+    const agLama=sorted[0];
+    const agBaru=sorted[sorted.length-1];
+    if(agLama===agBaru)return;
+    const firstNameLama=agLama.split(' ')[0];
+    // Agent lama: cek apakah aktif di bucket/TL lain di bulan yang sama
+    const bucketLainLama=allRows
+      .filter(r=>r.agent===agLama&&r.bucket!==bucket&&r.absensi==='Hadir')
+      .map(r=>r.bucket).filter(Boolean);
+    const bucketAktifLama=bucketLainLama.length?[...new Set(bucketLainLama)][0]:null;
+    agentRotasiInfo[agLama]={status:'lama',lawan:agBaru,lawanFirstName:agBaru.split(' ')[0],bucketAktif:bucketAktifLama,akun};
+    agentRotasiInfo[agBaru]={status:'baru',lawan:agLama,lawanFirstName:firstNameLama,akun};
+  });
+
   const agentList=[...byAgent.entries()].map(([ag,rows])=>{
     const as=summarizeRows(rows);
     const hadir=rows.filter(r=>r.absensi==='Hadir').length;
     const namaAkun=rows[0]&&rows[0].namaAkun?rows[0].namaAkun:'—';
-    return{ag,s:as,hadir,total:rows.length,namaAkun,rows};
-  }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
+    const rotasi=agentRotasiInfo[ag]||null;
+    // Ada catatan SPV jika minimal 1 baris punya catatanSPV tidak kosong
+    const hasCatatan=rows.some(r=>r.catatanSPV&&r.catatanSPV.trim()!=='');
+    return{ag,s:as,hadir,total:rows.length,namaAkun,rows,rotasi,hasCatatan};
+  }).sort((a,b)=>{
+    // Agent lama/nonaktif ke paling bawah
+    const aLama=a.rotasi&&a.rotasi.status==='lama'?1:0;
+    const bLama=b.rotasi&&b.rotasi.status==='lama'?1:0;
+    if(aLama!==bLama)return aLama-bLama;
+    return b.s.dailyPayment-a.s.dailyPayment;
+  });
 
   const thCols='<th>Agent</th><th>Hadir</th><th>Daily Payment</th>'+setupCols.map(m=>`<th>${m.label}</th>`).join('');
 
@@ -621,9 +682,27 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
       {lbl:'PTP',val:fmtNum(a.s.ptp)},
       {lbl:'PTP Bayar',val:fmtNum(a.s.ptpBayar)},
     ].map(x=>`<div class="preview-stat"><div class="lbl">${x.lbl}</div><div class="val">${x.val}</div></div>`).join('');
-    return `<tr class="agent-row" data-agent="${escH(a.ag)}" data-spv="${escH(spv)}">
-      <td><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:700;margin-right:6px;background:var(--surface2);color:var(--text3)">${j+1}</span>
-        <span class="agent-link" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>
+    // Label rotasi
+    let rotasiLabel='';
+    let rotasiClass='';
+    if(a.rotasi){
+      if(a.rotasi.status==='baru'){
+        rotasiLabel=`<span class="label-pengganti">Pengganti ${escH(a.rotasi.lawanFirstName)}</span>`;
+      } else {
+        rotasiClass='rotasi-lama';
+        if(a.rotasi.bucketAktif){
+          rotasiLabel=`<span class="label-pindah">Pindah ke ${escH(a.rotasi.bucketAktif)}</span>`;
+        } else {
+          rotasiLabel=`<span class="label-nonaktif">Nonaktif</span>`;
+        }
+      }
+    }
+    // Dot catatan SPV
+    const catatanDot=a.hasCatatan?`<span class="catatan-dot" title="Ada catatan SPV"></span>`:'';
+
+    return `<tr class="agent-row ${rotasiClass}" data-agent="${escH(a.ag)}" data-spv="${escH(spv)}">
+      <td><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:700;margin-right:6px;flex-shrink:0;background:var(--surface2);color:var(--text3)">${j+1}</span>
+        <span class="agent-link" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${catatanDot}${rotasiLabel}
       </td>
       <td><span class="absensi-pill ${hadir}">${a.hadir}/${a.total}</span></td>
       <td class="num">${fmtRp(a.s.dailyPayment)}</td>
@@ -635,8 +714,8 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
           <div class="agent-preview-inner">
             <div class="agent-preview-header">
               <div>
-                <div class="agent-preview-name">${escH(a.ag)}</div>
-                <div class="agent-preview-meta">Akun: ${escH(a.namaAkun)} · ${a.hadir}/${a.total} hari hadir</div>
+                <div class="agent-preview-name">${escH(a.ag)}${catatanDot}${rotasiLabel}</div>
+                <div class="agent-preview-meta">Akun: ${escH(a.namaAkun)} · ${a.hadir}/${a.total} hari hadir${a.rotasi&&a.rotasi.status==='lama'?` · Digantikan oleh <strong>${escH(a.rotasi.lawan)}</strong>`:''}</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
                 <a class="preview-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(document.getElementById('selBulan').value)}&tahun=${encodeURIComponent(document.getElementById('selTahun').value)}">Detail lengkap →</a>
