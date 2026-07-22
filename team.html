@@ -225,6 +225,7 @@ select:focus{border-color:var(--accent);}
 .bucket-filter-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
 .bucket-filter-row label{font-size:11px;color:var(--text3);font-weight:500;}
 .bucket-filter-row select{font-size:12px;padding:5px 9px;}
+.bucket-filter-row label{font-size:12px;color:var(--text3);font-weight:500;white-space:nowrap;}
 .attention-list{display:flex;flex-direction:column;gap:6px;}
 .attention-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:border-color .15s;}
 .attention-item:hover{border-color:var(--accent);}
@@ -232,6 +233,7 @@ select:focus{border-color:var(--accent);}
 .attention-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
 .av-danger{background:var(--danger-bg);color:var(--danger);}
 .av-warning{background:var(--warning-bg);color:var(--warning);}
+.av-ok{background:var(--success-bg);color:var(--success);}
 .attention-info{flex:1;min-width:0;}
 .attention-name{font-size:12px;font-weight:600;color:var(--text);}
 .attention-sub{font-size:10px;color:var(--text3);}
@@ -647,13 +649,18 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       <div class="metric-box"><div class="lbl">WA Blokir</div><div class="val">${fmtNum(s.waBlokir)}</div></div>
       ${metricBoxes}
     </div>
+    ${bucketBlocks}
     <div class="bucket-analysis-wrap" id="${bucketAnalysisId}">
       <div class="bucket-analysis-title">⚠ Perhatian Khusus Agent per Bucket</div>
       <div class="bucket-filter-row">
-        <label>Pilih Bucket:</label>
-        <select id="selAnalysisBucket-${safeSpvId}" onchange="renderAttentionPanel('${safeSpv}','${safeSpvId}')">
+        <label>Bucket:</label>
+        <select id="selAnalysisBucket-${safeSpvId}" onchange="onAnalysisBucketChange('${safeSpv}','${safeSpvId}')">
           <option value="">-- Pilih Bucket --</option>
           ${bucketOptionsHtml}
+        </select>
+        <label style="margin-left:10px">Tanggal:</label>
+        <select id="selAnalysisTanggal-${safeSpvId}" onchange="renderAttentionPanel('${safeSpv}','${safeSpvId}')">
+          <option value="">-- Semua Tanggal --</option>
         </select>
         <span style="font-size:11px;color:var(--text3)">→ Pilih bucket untuk lihat agent yang butuh perhatian</span>
       </div>
@@ -668,7 +675,6 @@ function buildSPVBlock(spv,rows,bulan,tahun){
         </div>
       </div>
     </div>
-    ${bucketBlocks}
   </div>`;
 }
 
@@ -775,49 +781,106 @@ function calcRiskScore(agentRows, allSpvRows){
 // ============================================================
 // POINT 3: Render attention panel (list agent + analisa)
 // ============================================================
+// Saat bucket berubah: isi dropdown tanggal, lalu render panel
+function onAnalysisBucketChange(spv, safeSpvId){
+  const selBucket=document.getElementById('selAnalysisBucket-'+safeSpvId);
+  const selTanggal=document.getElementById('selAnalysisTanggal-'+safeSpvId);
+  if(!selBucket||!selTanggal)return;
+  const selectedBucket=selBucket.value;
+  // Reset & isi dropdown tanggal berdasarkan data bucket yang dipilih
+  selTanggal.innerHTML='<option value="">-- Semua Tanggal --</option>';
+  if(selectedBucket){
+    const allSpvRows=spvAgentDataCache[spv]||[];
+    const tanggalList=[...new Set(
+      allSpvRows.filter(r=>r.bucket===selectedBucket&&r.tanggal).map(r=>r.tanggal)
+    )].sort();
+    tanggalList.forEach(tgl=>{
+      const opt=document.createElement('option');
+      opt.value=tgl;
+      // Format tampilan: DD/MM/YYYY atau langsung YYYY-MM-DD
+      const parts=tgl.split('-');
+      opt.textContent=parts.length===3?parts[2]+'/'+parts[1]+'/'+parts[0]:tgl;
+      selTanggal.appendChild(opt);
+    });
+  }
+  renderAttentionPanel(spv, safeSpvId);
+}
+
 function renderAttentionPanel(spv, safeSpvId){
   const selEl=document.getElementById('selAnalysisBucket-'+safeSpvId);
+  const selTgl=document.getElementById('selAnalysisTanggal-'+safeSpvId);
   const listEl=document.getElementById('attList-'+safeSpvId);
   const analysisEl=document.getElementById('attAnalysis-'+safeSpvId);
   if(!selEl||!listEl||!analysisEl)return;
   const selectedBucket=selEl.value;
+  const selectedTanggal=selTgl?selTgl.value:'';
   analysisEl.innerHTML='<div class="analysis-empty">← Klik agent untuk lihat analisa</div>';
   if(!selectedBucket){listEl.innerHTML='<div class="no-attention">Pilih bucket di atas</div>';return;}
   const allSpvRows=spvAgentDataCache[spv]||[];
-  const bucketRows=allSpvRows.filter(r=>r.bucket===selectedBucket);
+  // Filter bucket, lalu opsional filter tanggal
+  let bucketRows=allSpvRows.filter(r=>r.bucket===selectedBucket);
   if(!bucketRows.length){listEl.innerHTML='<div class="no-attention">Tidak ada data di bucket ini.</div>';return;}
-  // Kelompokkan per agent
+
+  // Jika filter tanggal aktif: tampilkan performa agent di tanggal itu saja
+  const isTanggalFilter=!!selectedTanggal;
+  const rowsForScoring=isTanggalFilter?bucketRows.filter(r=>r.tanggal===selectedTanggal):bucketRows;
+
+  if(isTanggalFilter&&!rowsForScoring.length){
+    listEl.innerHTML='<div class="no-attention">Tidak ada data di tanggal ini.</div>';
+    return;
+  }
+
+  // Kelompokkan per agent (gunakan rows yang sudah difilter)
   const byAgent={};
-  bucketRows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
-  // Hitung skor risiko tiap agent
+  rowsForScoring.forEach(r=>{const ag=r.agent||('?');if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
+
+  // Hitung skor risiko — jika filter tanggal aktif, skor berbasis data 1 hari
   const agentScores=Object.entries(byAgent).map(([ag,rows])=>{
-    const risk=calcRiskScore(rows,allSpvRows);
+    // Untuk context perbandingan tim, selalu pakai semua data bucket (bukan 1 tanggal)
+    const risk=calcRiskScore(rows, allSpvRows, isTanggalFilter);
     return{ag,rows,risk};
-  }).filter(x=>x.risk.score>20) // hanya tampilkan yang punya skor risiko > 20
-    .sort((a,b)=>b.risk.score-a.risk.score);
+  }).filter(x=>isTanggalFilter?true:x.risk.score>20) // saat 1 tanggal: tampilkan semua, sorted by payment
+    .sort((a,b)=>isTanggalFilter
+      ?(b.rows.reduce((s,r)=>s+(r.dailyPayment||0),0))-(a.rows.reduce((s,r)=>s+(r.dailyPayment||0),0))
+      :b.risk.score-a.risk.score
+    );
 
   if(!agentScores.length){
     listEl.innerHTML='<div class="no-attention" style="color:var(--success);padding:20px 0">✅ Semua agent di bucket ini dalam kondisi baik!</div>';
     return;
   }
-  listEl.innerHTML=agentScores.map((x,i)=>{
+
+  // Label header berbeda tergantung mode
+  const headerBadge=isTanggalFilter
+    ?`<div style="font-size:11px;color:var(--accent);padding:6px 0 8px;font-weight:500">📅 Menampilkan performa tanggal ${selectedTanggal.split('-').reverse().join('/')} — ${agentScores.length} agent</div>`
+    :'';
+
+  listEl.innerHTML=headerBadge+agentScores.map((x,i)=>{
     const initials=x.ag.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
     const isKritis=x.risk.score>=50;
-    const avCls=isKritis?'av-danger':'av-warning';
+    const avCls=isTanggalFilter?(x.rows.reduce((s,r)=>s+(r.dailyPayment||0),0)>0?'av-ok':'av-warning'):isKritis?'av-danger':'av-warning';
     const badgeCls=isKritis?'risk-kritis':'risk-waspada';
     const badgeLabel=isKritis?'Kritis':'Waspada';
+    // Info sub berbeda: 1 tanggal tampilkan payment hari itu
+    const dailyPay=x.rows.reduce((s,r)=>s+(r.dailyPayment||0),0);
+    const subText=isTanggalFilter
+      ?`${x.rows[0]?x.rows[0].absensi||'—':'—'} · Payment: ${fmtRp(dailyPay)}`
+      :`${x.rows.length} hari data · ${x.risk.hadirCount}/${x.risk.totalHari} hadir`;
+    const rightBadge=isTanggalFilter
+      ?`<span style="font-size:11px;font-weight:600;color:${dailyPay>0?'var(--success)':'var(--text3)'}">${fmtRp(dailyPay)}</span>`
+      :`<span class="risk-badge ${badgeCls}">${badgeLabel}</span><span class="risk-score-num" style="color:${isKritis?'var(--danger)':'var(--warning)'}">${x.risk.score}</span>`;
     return `<div class="attention-item" id="attItem-${safeSpvId}-${i}" onclick="selectAttentionAgent('${escA(spv)}','${safeSpvId}',${i})">
       <div class="attention-avatar ${avCls}">${escH(initials)}</div>
       <div class="attention-info">
         <div class="attention-name">${escH(x.ag)}</div>
-        <div class="attention-sub">${x.rows.length} hari data · ${x.risk.hadirCount}/${x.risk.totalHari} hadir</div>
+        <div class="attention-sub">${subText}</div>
       </div>
-      <span class="risk-badge ${badgeCls}">${badgeLabel}</span>
-      <span class="risk-score-num" style="color:${isKritis?'var(--danger)':'var(--warning)'}">${x.risk.score}</span>
+      ${rightBadge}
     </div>`;
   }).join('');
   // Simpan data untuk diakses saat klik
   window['_attData_'+safeSpvId]=agentScores;
+  window['_attTanggal_'+safeSpvId]=selectedTanggal;
 }
 
 function selectAttentionAgent(spv, safeSpvId, idx){
@@ -831,6 +894,8 @@ function selectAttentionAgent(spv, safeSpvId, idx){
   if(!data||!analysisEl)return;
   const{ag,rows,risk}=data;
   const{score,issues,saranList,s,hadirCount,totalHari}=risk;
+  const activeTanggal=window['_attTanggal_'+safeSpvId]||'';
+  const isTglMode=!!activeTanggal;
   const isKritis=score>=50;
   const firstRow=rows[0]||{};
 
@@ -857,7 +922,7 @@ function selectAttentionAgent(spv, safeSpvId, idx){
       ${escH(ag)}
       <span class="risk-badge ${isKritis?'risk-kritis':'risk-waspada'}" style="margin-left:4px">Skor ${score}</span>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${escH(firstRow.aplikasi||'')} · ${escH(firstRow.bucket||'')} · SPV: ${escH(firstRow.supervisor||spv)}</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${escH(firstRow.aplikasi||'')} · ${escH(firstRow.bucket||'')} · SPV: ${escH(firstRow.supervisor||spv)}${isTglMode?` · <span style="color:var(--accent);font-weight:500">📅 ${activeTanggal.split('-').reverse().join('/')}</span>`:''}</div>
     <div class="analysis-stat-grid">
       <div class="analysis-stat"><div class="lbl">Payment</div><div class="val ${s.dailyPayment<100000?'bad':''}">${fmtRp(s.dailyPayment)}</div></div>
       <div class="analysis-stat"><div class="lbl">Rate Bayar</div><div class="val ${s.avgRate<0.01?'bad':s.avgRate<0.02?'ok':''}">${fmtRate(s.avgRate)}</div></div>
