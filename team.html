@@ -216,6 +216,57 @@ select:focus{border-color:var(--accent);}
 .label-nonaktif{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#f3f4f6;color:#6b7280;margin-left:6px;vertical-align:middle;white-space:nowrap;}
 .agent-row.rotasi-lama td{opacity:0.5;}
 .agent-row.rotasi-lama td:first-child{opacity:1;}
+
+/* BUCKET ANALYSIS PANEL */
+.bucket-analysis-wrap{border-top:1px solid var(--border);background:var(--surface);padding:14px 18px 18px;}
+.bucket-analysis-title{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.bucket-analysis-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.5fr);gap:14px;}
+@media(max-width:900px){.bucket-analysis-grid{grid-template-columns:1fr;}}
+.bucket-filter-row{display:flex;align-items:center;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+.bucket-filter-row label{font-size:11px;color:var(--text3);font-weight:500;}
+.bucket-filter-row select{font-size:12px;padding:5px 9px;}
+.attention-list{display:flex;flex-direction:column;gap:6px;}
+.attention-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;transition:border-color .15s;}
+.attention-item:hover{border-color:var(--accent);}
+.attention-item.selected{border-color:var(--accent);background:var(--accent-bg);}
+.attention-avatar{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;}
+.av-danger{background:var(--danger-bg);color:var(--danger);}
+.av-warning{background:var(--warning-bg);color:var(--warning);}
+.attention-info{flex:1;min-width:0;}
+.attention-name{font-size:12px;font-weight:600;color:var(--text);}
+.attention-sub{font-size:10px;color:var(--text3);}
+.risk-badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;flex-shrink:0;}
+.risk-kritis{background:var(--danger-bg);color:var(--danger);}
+.risk-waspada{background:var(--warning-bg);color:var(--warning);}
+.risk-score-num{font-size:15px;font-weight:700;flex-shrink:0;}
+.analysis-panel{background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px 14px;}
+.analysis-empty{color:var(--text3);font-size:12px;text-align:center;padding:30px 0;}
+.analysis-agent-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.analysis-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px;}
+.analysis-stat{background:var(--surface);border-radius:var(--radius-sm);padding:7px 9px;border:1px solid var(--border);}
+.analysis-stat .lbl{font-size:10px;color:var(--text3);margin-bottom:2px;}
+.analysis-stat .val{font-size:14px;font-weight:700;color:var(--text);}
+.analysis-stat .val.bad{color:var(--danger);}
+.analysis-stat .val.ok{color:var(--warning);}
+.analysis-issue{background:var(--surface);border-radius:var(--radius-sm);border:1px solid var(--border);padding:9px 11px;margin-bottom:7px;}
+.analysis-issue-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+.analysis-issue-title{font-size:12px;font-weight:600;color:var(--text);display:flex;align-items:center;gap:5px;}
+.analysis-metric-row{display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-bottom:3px;}
+.analysis-metric-val{font-weight:600;color:var(--text);}
+.analysis-metric-val.bad{color:var(--danger);}
+.analysis-metric-val.ok{color:var(--warning);}
+.progress-bar{height:3px;background:var(--border);border-radius:2px;margin-top:4px;overflow:hidden;}
+.progress-fill{height:100%;border-radius:2px;}
+.fill-danger{background:var(--danger);}
+.fill-warning{background:var(--warning);}
+.fill-success{background:var(--success);}
+.saran-box{background:var(--accent-bg);border:1px solid;border-color:var(--accent);border-radius:var(--radius-sm);padding:9px 11px;margin-top:8px;}
+.saran-box-title{font-size:10px;font-weight:700;color:var(--accent);margin-bottom:6px;letter-spacing:.05em;text-transform:uppercase;}
+.saran-list{list-style:none;padding:0;}
+.saran-list li{font-size:11px;color:var(--text);padding:2px 0;display:flex;align-items:flex-start;gap:5px;}
+.saran-list li::before{content:"→";color:var(--accent);font-weight:700;flex-shrink:0;margin-top:1px;}
+.no-attention{color:var(--text3);font-size:12px;padding:16px 0;text-align:center;}
+.bucket-analysis-panel-wrap{min-height:80px;}
 </style>
 </head>
 <body>
@@ -505,6 +556,7 @@ function renderDetailSPV(spv, rows, bySPV){
 // BUILD SPV BLOCK (HTML string)
 // ============================================================
 const spvSummaryCache={};
+const spvAgentDataCache={}; // cache rows per spv untuk analisa attention panel
 
 function buildSPVBlock(spv,rows,bulan,tahun){
   const s=summarizeRows(rows);
@@ -561,8 +613,17 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   const spvBlockId='spvblock-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
   const setupBarId='setupbar-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
   const metricsGridId='metrics-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+  // safeSpvId: ID-safe version untuk dipakai di element ID HTML
+  const safeSpvId=btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+  const bucketAnalysisId='bkanal-'+safeSpvId;
+
+  // Simpan data agent per bucket untuk keperluan analisa
+  spvAgentDataCache[spv]=rows;
 
   spvSummaryCache[spv]=s;
+
+  // Build bucket options untuk filter analisa
+  const bucketOptionsHtml=Object.keys(byBucket).sort().map(bk=>`<option value="${escH(bk)}">${escH(bk)}</option>`).join('');
 
   return `<div class="spv-block" id="${spvBlockId}">
     <div class="spv-header">
@@ -580,10 +641,234 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       <div class="metric-box accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(s.dailyPayment)}</div><div class="sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
       <div class="metric-box"><div class="lbl">Avg Rate</div><div class="val">${fmtRate(s.avgRate)}</div><div class="sub">${fmtNum(s.jmlDataBayar)} data bayar</div></div>
       <div class="metric-box"><div class="lbl">PTP</div><div class="val">${fmtNum(s.ptp)}</div><div class="sub">${fmtNum(s.ptpBayar)} bayar</div></div>
+      <div class="metric-box"><div class="lbl">Sentuh WA</div><div class="val">${fmtNum(s.sentuhWA)}</div><div class="sub">${fmtNum(s.responWA)} respon</div></div>
+      <div class="metric-box"><div class="lbl">Sentuh Gojek</div><div class="val">${fmtNum(s.sentuhGojek)}</div><div class="sub">${fmtNum(s.responGojek)} respon</div></div>
+      <div class="metric-box"><div class="lbl">Sentuh WABA</div><div class="val">${fmtNum(s.sentuhWABA)}</div><div class="sub">${fmtNum(s.responWABA)} respon</div></div>
+      <div class="metric-box"><div class="lbl">WA Blokir</div><div class="val">${fmtNum(s.waBlokir)}</div></div>
       ${metricBoxes}
+    </div>
+    <div class="bucket-analysis-wrap" id="${bucketAnalysisId}">
+      <div class="bucket-analysis-title">⚠ Perhatian Khusus Agent per Bucket</div>
+      <div class="bucket-filter-row">
+        <label>Pilih Bucket:</label>
+        <select id="selAnalysisBucket-${safeSpvId}" onchange="renderAttentionPanel('${safeSpv}','${safeSpvId}')">
+          <option value="">-- Pilih Bucket --</option>
+          ${bucketOptionsHtml}
+        </select>
+        <span style="font-size:11px;color:var(--text3)">→ Pilih bucket untuk lihat agent yang butuh perhatian</span>
+      </div>
+      <div class="bucket-analysis-grid">
+        <div class="bucket-analysis-panel-wrap">
+          <div class="attention-list" id="attList-${safeSpvId}">
+            <div class="no-attention">Pilih bucket di atas</div>
+          </div>
+        </div>
+        <div class="analysis-panel" id="attAnalysis-${safeSpvId}">
+          <div class="analysis-empty">← Pilih bucket lalu klik agent untuk lihat analisa</div>
+        </div>
+      </div>
     </div>
     ${bucketBlocks}
   </div>`;
+}
+
+// ============================================================
+// POINT 2: Format label rotasi dengan tanggal
+// ============================================================
+function formatRotasiLabel(type, prevFirstName, dateStr) {
+  const BULAN_SHORT=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+  let dayStr='';
+  if(dateStr){
+    // dateStr format: YYYY-MM-DD
+    const parts=dateStr.split('-');
+    if(parts.length===3){
+      const day=parseInt(parts[2],10);
+      const monthIdx=parseInt(parts[1],10)-1;
+      if(!isNaN(day)&&monthIdx>=0&&monthIdx<12){
+        dayStr=' '+day+' '+BULAN_SHORT[monthIdx];
+      }
+    }
+  }
+  if(type==='pengganti'){
+    return `<span class="label-pengganti">Pengganti (${escH(prevFirstName)})${escH(dayStr)}</span>`;
+  }else if(type==='pindah'){
+    return `<span class="label-pindah">Pindah${escH(dayStr)}</span>`;
+  }else{
+    return `<span class="label-nonaktif">Nonaktif${escH(dayStr)}</span>`;
+  }
+}
+
+// ============================================================
+// POINT 3: Kalkulasi skor risiko agent
+// ============================================================
+function calcRiskScore(agentRows, allSpvRows){
+  const s=summarizeRows(agentRows);
+  // Hitung avg tim (agent lain di bucket + aplikasi yang sama)
+  const firstRow=agentRows[0]||{};
+  const aplikasi=firstRow.aplikasi||'';
+  const bucket=firstRow.bucket||'';
+  const agentName=firstRow.agent||'';
+  const peers=allSpvRows.filter(r=>r.aplikasi===aplikasi&&r.bucket===bucket&&r.agent!==agentName);
+  const peerAgents=[...new Set(peers.map(r=>r.agent))];
+  let avgSentuhWA=0,avgPayment=0,avgRate=0;
+  if(peerAgents.length>0){
+    const peerS=summarizeRows(peers);
+    avgSentuhWA=peerS.sentuhWA/peerAgents.length;
+    avgPayment=peerS.dailyPayment/peerAgents.length;
+    avgRate=peerS.avgRate;
+  }
+  // Hitung hari hadir
+  const hadirCount=agentRows.filter(r=>r.absensi==='Hadir').length;
+  const totalHari=agentRows.length||1;
+  const hadirRatio=hadirCount/totalHari;
+  // Hitung catatan SPV
+  const catatanCount=agentRows.filter(r=>r.catatanSPV&&r.catatanSPV.trim()!=='').length;
+
+  let score=0;
+  const issues=[];
+
+  // 1. Sentuh WA vs rata-rata tim
+  if(avgSentuhWA>0){
+    const ratio=s.sentuhWA/avgSentuhWA;
+    if(ratio<0.4){score+=35;issues.push({type:'sentuh',level:'kritis',label:'Sentuh WA sangat rendah',detail:`${fmtNum(s.sentuhWA)} vs rata-rata ${fmtNum(Math.round(avgSentuhWA))}`,pct:Math.round(ratio*100)});}
+    else if(ratio<0.7){score+=20;issues.push({type:'sentuh',level:'waspada',label:'Sentuh WA di bawah rata-rata',detail:`${fmtNum(s.sentuhWA)} vs rata-rata ${fmtNum(Math.round(avgSentuhWA))}`,pct:Math.round(ratio*100)});}
+  }else if(s.sentuhWA<100){
+    score+=25;issues.push({type:'sentuh',level:'kritis',label:'Sentuh WA sangat rendah',detail:`Hanya ${fmtNum(s.sentuhWA)} sentuhan`,pct:0});
+  }
+
+  // 2. Absensi
+  if(hadirRatio<0.6){score+=30;issues.push({type:'absensi',level:'kritis',label:'Absensi buruk',detail:`${hadirCount}/${totalHari} hari hadir (${Math.round(hadirRatio*100)}%)`,pct:Math.round(hadirRatio*100)});}
+  else if(hadirRatio<0.8){score+=15;issues.push({type:'absensi',level:'waspada',label:'Absensi perlu diperhatikan',detail:`${hadirCount}/${totalHari} hari hadir (${Math.round(hadirRatio*100)}%)`,pct:Math.round(hadirRatio*100)});}
+
+  // 3. Payment vs rata-rata tim
+  if(avgPayment>0){
+    const ratio=s.dailyPayment/avgPayment;
+    if(ratio<0.3){score+=25;issues.push({type:'payment',level:'kritis',label:'Payment sangat rendah',detail:`${fmtRp(s.dailyPayment)} vs rata-rata ${fmtRp(Math.round(avgPayment))}`,pct:Math.round(ratio*100)});}
+    else if(ratio<0.6){score+=12;issues.push({type:'payment',level:'waspada',label:'Payment di bawah rata-rata',detail:`${fmtRp(s.dailyPayment)} vs rata-rata ${fmtRp(Math.round(avgPayment))}`,pct:Math.round(ratio*100)});}
+  }
+
+  // 4. Rate bayar
+  if(s.avgRate<0.005){score+=15;issues.push({type:'rate',level:'kritis',label:'Rate bayar sangat rendah',detail:`${fmtRate(s.avgRate)} (${fmtNum(s.jmlDataBayar)} data bayar)`,pct:Math.round(s.avgRate*10000)/100});}
+  else if(s.avgRate<0.015){score+=8;issues.push({type:'rate',level:'waspada',label:'Rate bayar rendah',detail:`${fmtRate(s.avgRate)} (${fmtNum(s.jmlDataBayar)} data bayar)`,pct:Math.round(s.avgRate*10000)/100});}
+
+  // 5. Catatan SPV negatif
+  if(catatanCount>=3){score+=10;issues.push({type:'catatan',level:'waspada',label:'Banyak catatan SPV',detail:`${catatanCount} hari ada catatan dari SPV`,pct:0});}
+
+  // Batas maks 100
+  score=Math.min(score,100);
+
+  // Susun saran berdasarkan issues
+  const saranList=[];
+  issues.forEach(iss=>{
+    if(iss.type==='sentuh')saranList.push('Wajibkan minimal sentuh WA '+fmtNum(Math.round(avgSentuhWA*0.8||500))+' per bulan');
+    if(iss.type==='absensi')saranList.push('Lakukan coaching & verifikasi alasan absen, tegakkan aturan minimum '+Math.ceil(totalHari*0.8)+' hari hadir');
+    if(iss.type==='payment')saranList.push('Review strategi penagihan, pastikan agent sentuh akun prioritas terlebih dahulu');
+    if(iss.type==='rate')saranList.push('Cek kualitas data akun yang dipegang, pertimbangkan rotasi ke akun yang lebih potensial');
+    if(iss.type==='catatan')saranList.push('Tindak lanjuti catatan SPV secara 1-on-1, buat action plan tertulis');
+  });
+  if(saranList.length===0&&score<20)saranList.push('Performa baik! Pertahankan dan jadikan benchmark untuk agent lain.');
+  if(score>=60)saranList.push('Jika tidak ada perbaikan dalam 3 hari, pertimbangkan eskalasi ke admin atau rotasi akun.');
+
+  return{score,issues,saranList,s,hadirCount,totalHari,catatanCount};
+}
+
+// ============================================================
+// POINT 3: Render attention panel (list agent + analisa)
+// ============================================================
+function renderAttentionPanel(spv, safeSpvId){
+  const selEl=document.getElementById('selAnalysisBucket-'+safeSpvId);
+  const listEl=document.getElementById('attList-'+safeSpvId);
+  const analysisEl=document.getElementById('attAnalysis-'+safeSpvId);
+  if(!selEl||!listEl||!analysisEl)return;
+  const selectedBucket=selEl.value;
+  analysisEl.innerHTML='<div class="analysis-empty">← Klik agent untuk lihat analisa</div>';
+  if(!selectedBucket){listEl.innerHTML='<div class="no-attention">Pilih bucket di atas</div>';return;}
+  const allSpvRows=spvAgentDataCache[spv]||[];
+  const bucketRows=allSpvRows.filter(r=>r.bucket===selectedBucket);
+  if(!bucketRows.length){listEl.innerHTML='<div class="no-attention">Tidak ada data di bucket ini.</div>';return;}
+  // Kelompokkan per agent
+  const byAgent={};
+  bucketRows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
+  // Hitung skor risiko tiap agent
+  const agentScores=Object.entries(byAgent).map(([ag,rows])=>{
+    const risk=calcRiskScore(rows,allSpvRows);
+    return{ag,rows,risk};
+  }).filter(x=>x.risk.score>20) // hanya tampilkan yang punya skor risiko > 20
+    .sort((a,b)=>b.risk.score-a.risk.score);
+
+  if(!agentScores.length){
+    listEl.innerHTML='<div class="no-attention" style="color:var(--success);padding:20px 0">✅ Semua agent di bucket ini dalam kondisi baik!</div>';
+    return;
+  }
+  listEl.innerHTML=agentScores.map((x,i)=>{
+    const initials=x.ag.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
+    const isKritis=x.risk.score>=50;
+    const avCls=isKritis?'av-danger':'av-warning';
+    const badgeCls=isKritis?'risk-kritis':'risk-waspada';
+    const badgeLabel=isKritis?'Kritis':'Waspada';
+    return `<div class="attention-item" id="attItem-${safeSpvId}-${i}" onclick="selectAttentionAgent('${escA(spv)}','${safeSpvId}',${i})">
+      <div class="attention-avatar ${avCls}">${escH(initials)}</div>
+      <div class="attention-info">
+        <div class="attention-name">${escH(x.ag)}</div>
+        <div class="attention-sub">${x.rows.length} hari data · ${x.risk.hadirCount}/${x.risk.totalHari} hadir</div>
+      </div>
+      <span class="risk-badge ${badgeCls}">${badgeLabel}</span>
+      <span class="risk-score-num" style="color:${isKritis?'var(--danger)':'var(--warning)'}">${x.risk.score}</span>
+    </div>`;
+  }).join('');
+  // Simpan data untuk diakses saat klik
+  window['_attData_'+safeSpvId]=agentScores;
+}
+
+function selectAttentionAgent(spv, safeSpvId, idx){
+  // Highlight item terpilih
+  document.querySelectorAll('[id^="attItem-'+safeSpvId+'"]').forEach(el=>el.classList.remove('selected'));
+  const itemEl=document.getElementById('attItem-'+safeSpvId+'-'+idx);
+  if(itemEl)itemEl.classList.add('selected');
+
+  const data=(window['_attData_'+safeSpvId]||[])[idx];
+  const analysisEl=document.getElementById('attAnalysis-'+safeSpvId);
+  if(!data||!analysisEl)return;
+  const{ag,rows,risk}=data;
+  const{score,issues,saranList,s,hadirCount,totalHari}=risk;
+  const isKritis=score>=50;
+  const firstRow=rows[0]||{};
+
+  const issueHtml=issues.length?issues.map(iss=>{
+    const pctBar=iss.pct>0?`<div class="progress-bar"><div class="progress-fill ${iss.level==='kritis'?'fill-danger':'fill-warning'}" style="width:${Math.min(iss.pct,100)}%"></div></div>`:'';
+    return `<div class="analysis-issue">
+      <div class="analysis-issue-header">
+        <div class="analysis-issue-title">${iss.level==='kritis'?'🔴':'🟡'} ${escH(iss.label)}</div>
+        <span class="risk-badge ${iss.level==='kritis'?'risk-kritis':'risk-waspada'}">${iss.level==='kritis'?'Kritis':'Waspada'}</span>
+      </div>
+      <div class="analysis-metric-row"><span>${escH(iss.detail)}</span></div>
+      ${pctBar}
+    </div>`;
+  }).join(''):'<div style="color:var(--success);font-size:12px;padding:6px 0">✅ Tidak ada masalah signifikan terdeteksi.</div>';
+
+  const saranHtml=saranList.length?`<div class="saran-box">
+    <div class="saran-box-title">💡 Saran Tindak Lanjut</div>
+    <ul class="saran-list">${saranList.map(s=>`<li>${escH(s)}</li>`).join('')}</ul>
+  </div>`:'';
+
+  analysisEl.innerHTML=`
+    <div class="analysis-agent-name">
+      <div class="attention-avatar ${isKritis?'av-danger':'av-warning'}" style="width:28px;height:28px;font-size:11px">${escH(ag.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase())}</div>
+      ${escH(ag)}
+      <span class="risk-badge ${isKritis?'risk-kritis':'risk-waspada'}" style="margin-left:4px">Skor ${score}</span>
+    </div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${escH(firstRow.aplikasi||'')} · ${escH(firstRow.bucket||'')} · SPV: ${escH(firstRow.supervisor||spv)}</div>
+    <div class="analysis-stat-grid">
+      <div class="analysis-stat"><div class="lbl">Payment</div><div class="val ${s.dailyPayment<100000?'bad':''}">${fmtRp(s.dailyPayment)}</div></div>
+      <div class="analysis-stat"><div class="lbl">Rate Bayar</div><div class="val ${s.avgRate<0.01?'bad':s.avgRate<0.02?'ok':''}">${fmtRate(s.avgRate)}</div></div>
+      <div class="analysis-stat"><div class="lbl">Sentuh WA</div><div class="val ${s.sentuhWA<500?'bad':s.sentuhWA<1000?'ok':''}">${fmtNum(s.sentuhWA)}</div></div>
+      <div class="analysis-stat"><div class="lbl">Kehadiran</div><div class="val ${hadirCount/totalHari<0.7?'bad':hadirCount/totalHari<0.85?'ok':''}">${hadirCount}/${totalHari} hari</div></div>
+    </div>
+    ${issueHtml}
+    ${saranHtml}
+    <div style="margin-top:10px">
+      <a href="agent.html?agent=${encodeURIComponent(ag)}&bulan=${encodeURIComponent(document.getElementById('selBulan').value)}&tahun=${encodeURIComponent(document.getElementById('selTahun').value)}" style="font-size:12px;color:var(--accent);text-decoration:none;font-weight:500">Detail lengkap agent →</a>
+    </div>`;
 }
 
 function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
@@ -629,13 +914,19 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
     const agBaru=sorted[sorted.length-1];
     if(agLama===agBaru)return;
     const firstNameLama=agLama.split(' ')[0];
+    // Tanggal pergantian = tanggal pertama agent baru muncul di akun ini
+    const baruFirstDate=(byAgent.get(agBaru)||[])
+      .filter(r=>r.namaAkun===akun&&r.tanggal)
+      .map(r=>r.tanggal).sort()[0]||'';
     // Agent lama: cek apakah aktif di bucket/TL lain di bulan yang sama
     const bucketLainLama=allRows
       .filter(r=>r.agent===agLama&&r.bucket!==bucket&&r.absensi==='Hadir')
       .map(r=>r.bucket).filter(Boolean);
     const bucketAktifLama=bucketLainLama.length?[...new Set(bucketLainLama)][0]:null;
-    agentRotasiInfo[agLama]={status:'lama',lawan:agBaru,lawanFirstName:agBaru.split(' ')[0],bucketAktif:bucketAktifLama,akun};
-    agentRotasiInfo[agBaru]={status:'baru',lawan:agLama,lawanFirstName:firstNameLama,akun};
+    // Tanggal nonaktif = tanggal terakhir agent lama
+    const lamaLastDate=agLastDate[agLama]||'';
+    agentRotasiInfo[agLama]={status:'lama',lawan:agBaru,lawanFirstName:agBaru.split(' ')[0],bucketAktif:bucketAktifLama,akun,changeDate:lamaLastDate};
+    agentRotasiInfo[agBaru]={status:'baru',lawan:agLama,lawanFirstName:firstNameLama,akun,changeDate:baruFirstDate};
   });
 
   const agentList=[...byAgent.entries()].map(([ag,rows])=>{
@@ -682,18 +973,21 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
       {lbl:'PTP',val:fmtNum(a.s.ptp)},
       {lbl:'PTP Bayar',val:fmtNum(a.s.ptpBayar)},
     ].map(x=>`<div class="preview-stat"><div class="lbl">${x.lbl}</div><div class="val">${x.val}</div></div>`).join('');
-    // Label rotasi
+    // Label rotasi — Point 2: pakai formatRotasiLabel dengan tanggal
     let rotasiLabel='';
     let rotasiClass='';
     if(a.rotasi){
       if(a.rotasi.status==='baru'){
-        rotasiLabel=`<span class="label-pengganti">Pengganti ${escH(a.rotasi.lawanFirstName)}</span>`;
+        // "Pengganti (NamaDepan) 7 Jul"
+        rotasiLabel=formatRotasiLabel('pengganti', a.rotasi.lawanFirstName, a.rotasi.changeDate);
       } else {
         rotasiClass='rotasi-lama';
         if(a.rotasi.bucketAktif){
-          rotasiLabel=`<span class="label-pindah">Pindah ke ${escH(a.rotasi.bucketAktif)}</span>`;
+          // "Pindah 7 Jul" — bucket tujuan ditampilkan di preview
+          rotasiLabel=formatRotasiLabel('pindah', '', a.rotasi.changeDate);
         } else {
-          rotasiLabel=`<span class="label-nonaktif">Nonaktif</span>`;
+          // "Nonaktif 7 Jul"
+          rotasiLabel=formatRotasiLabel('nonaktif', '', a.rotasi.changeDate);
         }
       }
     }
