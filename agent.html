@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Agent — Desk Collection Analytics</title>
+<title>Agent — System TZ Analytics</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
@@ -47,6 +47,7 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 .sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
 .main{margin-left:var(--sidebar-w);margin-top:52px;padding:28px;min-height:calc(100vh - 52px);}
 .section-title{font-size:11px;font-weight:600;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;}
+
 /* SEARCH */
 .search-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:24px;box-shadow:var(--shadow);}
 .search-bar h3{font-size:15px;font-weight:600;margin-bottom:14px;}
@@ -58,6 +59,7 @@ select:focus{border-color:var(--accent);}
 .btn-search{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:8px 18px;font-size:13px;font-weight:500;cursor:pointer;}
 .btn-search:hover{opacity:.88;}
 .btn-search:disabled{opacity:.5;cursor:not-allowed;}
+
 /* AGENT HEADER */
 .agent-header{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;margin-bottom:20px;box-shadow:var(--shadow);display:flex;align-items:center;gap:20px;flex-wrap:wrap;}
 .agent-avatar{width:52px;height:52px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:700;color:var(--accent);flex-shrink:0;}
@@ -67,6 +69,7 @@ select:focus{border-color:var(--accent);}
 .pill-blue{background:var(--accent-bg);color:var(--accent);}
 .pill-green{background:var(--success-bg);color:var(--success);}
 .pill-warn{background:var(--warning-bg);color:var(--warning);}
+
 /* SUMMARY */
 .summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:24px;}
 .sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;box-shadow:var(--shadow);}
@@ -77,6 +80,7 @@ select:focus{border-color:var(--accent);}
 .sum-card.accent .val{color:var(--accent);}
 .sum-card.good{border-color:var(--success);background:var(--success-bg);}
 .sum-card.good .val{color:var(--success);}
+
 /* CHART */
 .chart-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;margin-bottom:20px;box-shadow:var(--shadow);}
 .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:8px;}
@@ -85,6 +89,7 @@ select:focus{border-color:var(--accent);}
 .chart-tabs{display:flex;gap:6px;flex-wrap:wrap;}
 .chart-tab{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:4px 10px;font-size:11px;color:var(--text2);cursor:pointer;transition:all .15s;}
 .chart-tab.active{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);font-weight:500;}
+
 /* COMPARISON */
 .comp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;box-shadow:var(--shadow);margin-bottom:20px;}
 .comp-title{font-size:13px;font-weight:600;margin-bottom:14px;}
@@ -98,6 +103,7 @@ select:focus{border-color:var(--accent);}
 .comp-bar.agent-bar{background:var(--accent);}
 .comp-bar.team-bar{background:var(--text3);}
 .comp-vals{font-size:12px;color:var(--text2);min-width:80px;text-align:right;}
+
 /* DAILY TABLE */
 .daily-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);margin-bottom:24px;overflow:hidden;}
 .daily-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
@@ -110,12 +116,16 @@ select:focus{border-color:var(--accent);}
 .daily-table tr:hover td{background:var(--surface2);}
 .daily-table td:first-child{font-weight:500;color:var(--text);}
 .daily-table td.num{color:var(--text);font-weight:500;}
+/* [FIX BUG-21] Catatan SPV bisa dibaca penuh */
+.daily-table td.catatan-col{max-width:220px;white-space:normal;word-break:break-word;line-height:1.4;color:var(--warning);}
+.daily-table td.catatan-col.empty{color:var(--text3);}
 .absensi-pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:11px;font-weight:500;}
 .ab-hadir{background:var(--success-bg);color:var(--success);}
 .ab-izin{background:var(--warning-bg);color:var(--warning);}
 .ab-sakit{background:var(--accent-bg);color:var(--accent);}
 .ab-alpha{background:var(--danger-bg);color:var(--danger);}
 .ab-off{background:var(--surface2);color:var(--text3);}
+
 /* STATE */
 .state-box{text-align:center;padding:60px 20px;color:var(--text3);}
 .state-box .icon{font-size:36px;margin-bottom:12px;}
@@ -123,27 +133,15 @@ select:focus{border-color:var(--accent);}
 .state-box .hint{font-size:12px;}
 .spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 14px;}
 @keyframes spin{to{transform:rotate(360deg);}}
-@media(max-width:768px){
-  :root{--sidebar-w:0px;}
-  .sidebar{display:none;}
-  .navbar{padding-left:20px;}
-  .main{margin-left:0;}
-}
-
-/* Smooth transitions */
-.spv-block,.project-card,.sum-card,.stat-card,.acr-week-card{transition:box-shadow .15s,border-color .15s;}
-.agent-detail{transition:none;}
-.tl-header{transition:background .1s;}
-.setup-tab,.tl-setup-tab,.sort-tab,.chart-tab,.rank-switch-btn{transition:all .15s;}
-.metric-box{transition:opacity .12s;}
-.sidebar-item{transition:background .12s,color .12s;}
+@media(max-width:768px){:root{--sidebar-w:0px;}.sidebar{display:none;}.navbar{padding-left:20px;}.main{margin-left:0;}}
+.sidebar-item,.chart-tab{transition:all .15s;}
 </style>
 </head>
 <body>
 
 <nav class="navbar">
   <div style="display:flex;align-items:center;gap:12px;">
-    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">DC</span> DeskCollection Analytics</a>
+    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">TZ</span> System TZ Analytics</a>
     <span class="nav-page-title">Agent</span>
   </div>
   <div class="nav-right">
@@ -185,21 +183,21 @@ select:focus{border-color:var(--accent);}
     </div>
   </div>
   <div id="result">
-    <div class="state-box"><div class="icon">👤</div><p>Masukkan nama agent untuk melihat detail performa.</p><p class="hint">Atau klik nama agent dari halaman Tim.</p></div>
+    <div class="state-box">
+      <div class="icon">👤</div>
+      <p>Masukkan nama agent untuk melihat detail performa.</p>
+      <p class="hint">Atau klik nama agent dari halaman Tim.</p>
+    </div>
   </div>
 </main>
 
 <script>
 const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
-const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','GOPIN FV':'#7C3AED','GOPIN FV NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
-function getColor(ap){const k=String(ap||'').toUpperCase().trim();for(const key of Object.keys(APP_COLORS)){if(k===key||k.startsWith(key)||key.startsWith(k))return APP_COLORS[key];}return'#6366f1';}
+const APP_COLORS={'GOPIN':'#1D60C8','GOPIN NURUL':'#1D60C8','GOPIN NANDALIKA':'#7C3AED','PINJAMIN':'#059669','RUPIAH CEPAT':'#D97706','KREDIONE':'#DB2777','KREDITOK':'#DC2626','KREDIT OK':'#DC2626'};
+function getColor(ap){return APP_COLORS[ap]||'#6366f1';}
 
-let chartInstance=null;
-let agentRows=[];
-let teamRows=[];
-let currentMetric='dailyPayment';
-
-const METRIC_OPTIONS=[
+// [FIX BUG-19] Gunakan key-based tab switching, bukan textContent matching
+const METRIC_KEYS=[
   {key:'dailyPayment',label:'Payment',fmt:'rp'},
   {key:'callManual',label:'Call Manual',fmt:'num'},
   {key:'sentuhWA',label:'Sentuh WA',fmt:'num'},
@@ -207,15 +205,36 @@ const METRIC_OPTIONS=[
   {key:'jmlDataBayar',label:'Data Bayar',fmt:'num'},
 ];
 
+let chartInstance=null;
+let agentRows=[];
+let teamRows=[];
+let currentMetric='dailyPayment';
+
 /* FORMAT */
 function fmtRp(n){if(!n||n===0)return 'Rp 0';if(n>=1e9)return 'Rp '+(n/1e9).toFixed(2)+' M';if(n>=1e6)return 'Rp '+(n/1e6).toFixed(1)+' jt';if(n>=1e3)return 'Rp '+(n/1e3).toFixed(0)+' rb';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
 function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
 function fmtRate(n){return n?(n*100).toFixed(2)+'%':'0%';}
-function fmtByKey(key,val){const m=METRIC_OPTIONS.find(x=>x.key===key);if(!m)return val;if(m.fmt==='rp')return fmtRp(val);return fmtNum(val);}
+function fmtByKey(key,val){
+  const m=METRIC_KEYS.find(x=>x.key===key);
+  if(!m)return fmtNum(val);
+  return m.fmt==='rp'?fmtRp(val):fmtNum(val);
+}
+function escH(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 /* THEME */
-function setTheme(t){document.documentElement.setAttribute('data-theme',t);localStorage.setItem('dca_theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');if(agentRows.length)renderChart(currentMetric);}
-(function(){const t=localStorage.getItem('dca_theme')||'light';document.documentElement.setAttribute('data-theme',t);document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');})();
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  localStorage.setItem('dca_theme',t);
+  document.getElementById('btnTerang').classList.toggle('active',t==='light');
+  document.getElementById('btnGelap').classList.toggle('active',t==='dark');
+  if(agentRows.length)renderChart(currentMetric);
+}
+(function(){
+  const t=localStorage.getItem('dca_theme')||'light';
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('btnTerang').classList.toggle('active',t==='light');
+  document.getElementById('btnGelap').classList.toggle('active',t==='dark');
+})();
 
 /* FILTER INIT */
 (function(){
@@ -224,34 +243,37 @@ function setTheme(t){document.documentElement.setAttribute('data-theme',t);local
   document.getElementById('selBulan').value=bl[now.getMonth()];
   document.getElementById('selTahun').value=String(now.getFullYear());
   const p=new URLSearchParams(window.location.search);
+  if(p.get('bulan'))document.getElementById('selBulan').value=p.get('bulan');
+  if(p.get('tahun'))document.getElementById('selTahun').value=p.get('tahun');
   if(p.get('agent')){
     document.getElementById('inputAgent').value=p.get('agent');
-    if(p.get('bulan'))document.getElementById('selBulan').value=p.get('bulan');
-    if(p.get('tahun'))document.getElementById('selTahun').value=p.get('tahun');
     doSearch();
   }
 })();
 
-/* FETCH */
+/* CACHE & FETCH */
+// [PERF] Sama dengan team.html — cache sessionStorage 5 menit
 function clearCache(){try{Object.keys(sessionStorage).filter(k=>k.startsWith('dca_c_')).forEach(k=>sessionStorage.removeItem(k));}catch(e){}}
-async function fetchJSON(url, useCache=true){
+
+async function fetchJSON(url){
   function _hash(s){let h=0;for(let i=0;i<s.length;i++)h=Math.imul(31,h)+s.charCodeAt(i)|0;return(h>>>0).toString(36);}
   const cacheKey='dca_c_'+_hash(url.split('?')[1]||url);
-  if(useCache){
-    try{
-      const cached=sessionStorage.getItem(cacheKey);
-      if(cached){const {data,ts}=JSON.parse(cached);if(Date.now()-ts<300000)return data;}
-    }catch(e){}
-  }
-  const res=await fetch(url);const text=await res.text();
+  try{
+    const cached=sessionStorage.getItem(cacheKey);
+    if(cached){const{data,ts}=JSON.parse(cached);if(Date.now()-ts<300000)return data;}
+  }catch(e){}
+  const res=await fetch(url);
+  const text=await res.text();
   let data;
   if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));data=await(await fetch(url)).json();}
   else{data=JSON.parse(text);}
-  if(useCache&&data&&data.success){try{sessionStorage.setItem(cacheKey,JSON.stringify({data,ts:Date.now()}));}catch(e){}}
+  if(data&&data.success){try{sessionStorage.setItem(cacheKey,JSON.stringify({data,ts:Date.now()}));}catch(e){}}
   return data;
 }
 
 /* SEARCH */
+// [FIX BUG-17 & PERF-3] Gunakan cache yang sama — jika data bulan sudah di-cache
+// dari tim, request tim tidak perlu fetch ulang
 async function doSearch(){
   const agentName=document.getElementById('inputAgent').value.trim();
   const bulan=document.getElementById('selBulan').value;
@@ -261,23 +283,27 @@ async function doSearch(){
   btn.disabled=true;btn.textContent='⏳ Mencari...';
   document.getElementById('result').innerHTML='<div class="state-box"><div class="spinner"></div><p>Memuat data agent...</p></div>';
   try{
-    const[agentData,teamData]=await Promise.all([
-      fetchJSON(`${API_URL}?action=agentdata&agent=${encodeURIComponent(agentName)}&bulan=${bulan}&tahun=${tahun}`),
-      fetchJSON(`${API_URL}?action=agentdata&bulan=${bulan}&tahun=${tahun}`)
+    // Fetch data agent spesifik DAN data tim (untuk perbandingan)
+    // Keduanya di-cache — jika tim sudah di-load dari team.html, tidak perlu fetch lagi
+    const[agentData, teamData]=await Promise.all([
+      fetchJSON(`${API_URL}?action=agentdata&agent=${encodeURIComponent(agentName)}&bulan=${encodeURIComponent(bulan)}&tahun=${encodeURIComponent(tahun)}`),
+      fetchJSON(`${API_URL}?action=agentdata&bulan=${encodeURIComponent(bulan)}&tahun=${encodeURIComponent(tahun)}`)
     ]);
-    if(!agentData.success)throw new Error(agentData.message);
+    if(!agentData.success)throw new Error(agentData.message||'Gagal memuat data');
     if(agentData.totalRows===0){
-      document.getElementById('result').innerHTML=`<div class="state-box"><div class="icon">🔍</div><p>Agent "<strong>${agentName}</strong>" tidak ditemukan.</p><p class="hint">Cek ejaan nama atau pilih bulan yang berbeda.</p></div>`;
+      document.getElementById('result').innerHTML=`<div class="state-box"><div class="icon">🔍</div><p>Agent "<strong>${escH(agentName)}</strong>" tidak ditemukan.</p><p class="hint">Cek ejaan atau pilih bulan yang berbeda.</p></div>`;
       return;
     }
     agentRows=agentData.rows;
-    teamRows=teamData.rows||[];
-    // Render sidebar aplikasi
+    teamRows=(teamData.success&&teamData.rows)||[];
+
+    // Sidebar
     const apps=[...new Set(teamRows.map(r=>r.aplikasi).filter(Boolean))].sort();
-    document.getElementById('sidebarApps').innerHTML=apps.map(ap=>`<a class="sidebar-item" href="app.html?ap=${encodeURIComponent(ap)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}"><span class="dot" style="background:${getColor(ap)}"></span>${ap.charAt(0)+ap.slice(1).toLowerCase()}</a>`).join('');
-    renderAll(agentData,teamData,bulan,tahun);
+    document.getElementById('sidebarApps').innerHTML=apps.map(ap=>`<a class="sidebar-item" href="app.html?ap=${encodeURIComponent(ap)}&bulan=${encodeURIComponent(bulan)}&tahun=${encodeURIComponent(tahun)}"><span class="dot" style="background:${getColor(ap)}"></span>${escH(ap.charAt(0)+ap.slice(1).toLowerCase())}</a>`).join('');
+
+    renderAll(agentData,bulan,tahun);
   }catch(e){
-    document.getElementById('result').innerHTML=`<div class="state-box"><div class="icon">⚠️</div><p>${e.message}</p></div>`;
+    document.getElementById('result').innerHTML=`<div class="state-box"><div class="icon">⚠️</div><p>${escH(e.message)}</p></div>`;
   }
   btn.disabled=false;btn.textContent='🔍 Cari';
 }
@@ -289,25 +315,27 @@ function summarizeRows(rows){
   const r={};
   keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
   const tb=r.jmlDataBayar;
-  r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*x.jmlDataBayar),0)/tb:rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length;
+  r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*(x.jmlDataBayar||0)),0)/tb:rows.length>0?rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length:0;
   return r;
 }
 function divideObj(obj,n){const r={};Object.keys(obj).forEach(k=>{r[k]=(obj[k]||0)/n;});return r;}
 
 /* RENDER ALL */
-function renderAll(agentData,teamData,bulan,tahun){
+function renderAll(agentData,bulan,tahun){
   const rows=agentData.rows;
-  const s=agentData.summary;
-  const first=rows.find(r=>r.agent)||rows[0];
+  // [FIX BUG-18] Pakai summary dari backend langsung
+  const s=agentData.summary||summarizeRows(rows);
+  const first=rows[0]||{};
   const agentName=first.agent||'—';
   const aplikasi=first.aplikasi||'—';
   const bucket=first.bucket||'—';
   const teamLeader=first.teamLeader||'—';
   const supervisor=first.supervisor||'—';
-  const initials=agentName.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+  const initials=agentName.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
   const hadirCount=rows.filter(r=>r.absensi==='Hadir').length;
   const totalHari=rows.length;
-  // Team comparison
+
+  // Team comparison — filter same aplikasi+bucket, exclude agent ini
   const teamFiltered=teamRows.filter(r=>r.aplikasi===aplikasi&&r.bucket===bucket&&r.agent!==agentName);
   const teamSummary=summarizeRows(teamFiltered);
   const teamCount=new Set(teamFiltered.map(r=>r.agent)).size;
@@ -315,16 +343,18 @@ function renderAll(agentData,teamData,bulan,tahun){
 
   document.getElementById('result').innerHTML=`
     <div class="agent-header">
-      <div class="agent-avatar">${initials}</div>
+      <div class="agent-avatar">${escH(initials)}</div>
       <div style="flex:1">
-        <div class="agent-name">${agentName}</div>
+        <div class="agent-name">${escH(agentName)}</div>
         <div class="agent-meta">
-          <span>📱 ${aplikasi}</span><span>🪣 ${bucket}</span>
-          <span>👥 TL: ${teamLeader}</span><span>👤 SPV: ${supervisor}</span>
+          <span>📱 ${escH(aplikasi)}</span>
+          <span>🪣 ${escH(bucket)}</span>
+          <span>👥 TL: ${escH(teamLeader)}</span>
+          <span>👤 SPV: ${escH(supervisor)}</span>
         </div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end">
-        <span class="pill pill-blue">${bulan} ${tahun}</span>
+        <span class="pill pill-blue">${escH(bulan)} ${escH(tahun)}</span>
         <span class="pill ${hadirCount===totalHari?'pill-green':'pill-warn'}">${hadirCount}/${totalHari} hari hadir</span>
       </div>
     </div>
@@ -335,19 +365,22 @@ function renderAll(agentData,teamData,bulan,tahun){
       <div class="chart-header">
         <span class="chart-title">Performa per Hari</span>
         <div class="chart-tabs" id="chartTabs">
-          ${METRIC_OPTIONS.map(m=>`<button class="chart-tab ${m.key===currentMetric?'active':''}" onclick="switchMetric('${m.key}')">${m.label}</button>`).join('')}
+          ${METRIC_KEYS.map(m=>`<button class="chart-tab ${m.key===currentMetric?'active':''}" data-metric="${m.key}" onclick="switchMetric('${m.key}')">${escH(m.label)}</button>`).join('')}
         </div>
       </div>
       <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
     </div>
-    <p class="section-title">Perbandingan dengan Tim (${aplikasi} · ${bucket})</p>
+    <p class="section-title">Perbandingan dengan Tim (${escH(aplikasi)} · ${escH(bucket)})</p>
     <div class="comp-card" id="compGrid"></div>
     <p class="section-title">Data Harian</p>
     <div class="daily-section">
-      <div class="daily-header"><span class="daily-title">Riwayat per Tanggal</span><span style="font-size:12px;color:var(--text3)">${totalHari} hari</span></div>
+      <div class="daily-header">
+        <span class="daily-title">Riwayat per Tanggal</span>
+        <span style="font-size:12px;color:var(--text3)">${totalHari} hari data</span>
+      </div>
       <div class="daily-body">
-        <table class="daily-table">
-          <thead><tr><th>Tanggal</th><th>Absensi</th><th>Payment</th><th>Data Bayar</th><th>Call Manual</th><th>Sentuh WA</th><th>Respon WA</th><th>PTP</th><th>PTP Bayar</th><th>Catatan SPV</th></tr></thead>
+        <table class="daily-table" id="dailyTable">
+          <thead id="dailyHead"></thead>
           <tbody id="dailyBody"></tbody>
         </table>
       </div>
@@ -356,7 +389,7 @@ function renderAll(agentData,teamData,bulan,tahun){
   renderSummaryCards(s,hadirCount,totalHari);
   renderChart(currentMetric);
   renderComparison(s,teamAvg,teamCount,aplikasi,bucket);
-  renderDailyTable(rows);
+  renderDailyTable(rows,bulan,tahun);
 }
 
 function renderSummaryCards(s,hadir,total){
@@ -369,15 +402,18 @@ function renderSummaryCards(s,hadir,total){
     <div class="sum-card"><div class="lbl">Kehadiran</div><div class="val">${hadir}<span style="font-size:14px;font-weight:400;color:var(--text3)">/${total}</span></div><div class="sub">hari hadir</div></div>`;
 }
 
+// [FIX BUG-19] switchMetric pakai data-metric attribute, bukan textContent matching
 function switchMetric(key){
   currentMetric=key;
-  document.querySelectorAll('.chart-tab').forEach(t=>{const m=METRIC_OPTIONS.find(x=>x.key===key);t.classList.toggle('active',t.textContent.trim()===m.label);});
+  document.querySelectorAll('#chartTabs .chart-tab').forEach(t=>{
+    t.classList.toggle('active',t.getAttribute('data-metric')===key);
+  });
   renderChart(key);
 }
 
 function renderChart(metricKey){
   const sorted=[...agentRows].filter(r=>r.tanggal).sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
-  const labels=sorted.map(r=>r.tanggal?r.tanggal.split('-')[2]+' '+((r.bulan||'').slice(0,3)):'?');
+  const labels=sorted.map(r=>{const parts=r.tanggal.split('-');return(parts[2]||'?')+' '+((r.bulan||'').slice(0,3));});
   const values=sorted.map(r=>metricKey==='avgRate'?+(r.rate*100).toFixed(2):(r[metricKey]||0));
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const gc=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.06)';
@@ -385,21 +421,38 @@ function renderChart(metricKey){
   if(chartInstance){chartInstance.destroy();chartInstance=null;}
   const ctx=document.getElementById('trendChart');
   if(!ctx)return;
-  chartInstance=new Chart(ctx,{type:'line',data:{labels,datasets:[{data:values,borderColor:'#1d60c8',backgroundColor:'rgba(29,96,200,0.08)',borderWidth:2,pointRadius:3,pointHoverRadius:5,fill:true,tension:0.3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtByKey(metricKey,ctx.parsed.y)}}},scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:11},maxTicksLimit:10}},y:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>fmtByKey(metricKey,v)}}}}});
+  chartInstance=new Chart(ctx,{
+    type:'line',
+    data:{labels,datasets:[{data:values,borderColor:'#1d60c8',backgroundColor:'rgba(29,96,200,0.08)',borderWidth:2,pointRadius:3,pointHoverRadius:5,fill:true,tension:0.3}]},
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>fmtByKey(metricKey,ctx.parsed.y)}}},
+      scales:{
+        x:{grid:{color:gc},ticks:{color:tc,font:{size:11},maxTicksLimit:12}},
+        y:{grid:{color:gc},ticks:{color:tc,font:{size:11},callback:v=>fmtByKey(metricKey,v)}}
+      }
+    }
+  });
 }
 
 function renderComparison(agentS,teamAvg,teamCount,aplikasi,bucket){
   if(!teamAvg||teamCount===0){
-    document.getElementById('compGrid').innerHTML='<p style="color:var(--text3);font-size:13px">Tidak ada data rekan tim untuk dibandingkan.</p>';
+    document.getElementById('compGrid').innerHTML='<p style="color:var(--text3);font-size:13px;padding:4px 0">Tidak ada data rekan tim untuk dibandingkan.</p>';
     return;
   }
-  const metrics=[{key:'dailyPayment',label:'Daily Payment'},{key:'callManual',label:'Call Manual'},{key:'sentuhWA',label:'Sentuh WA'},{key:'ptp',label:'PTP'},{key:'jmlDataBayar',label:'Data Bayar'}];
-  const rows=metrics.map(m=>{
+  const metrics=[
+    {key:'dailyPayment',label:'Daily Payment'},
+    {key:'callManual',label:'Call Manual'},
+    {key:'sentuhWA',label:'Sentuh WA'},
+    {key:'ptp',label:'PTP'},
+    {key:'jmlDataBayar',label:'Data Bayar'}
+  ];
+  const rowsHtml=metrics.map(m=>{
     const aVal=agentS[m.key]||0;const tVal=teamAvg[m.key]||0;const maxVal=Math.max(aVal,tVal,1);
     const aW=Math.round(aVal/maxVal*100);const tW=Math.round(tVal/maxVal*100);
     const better=aVal>=tVal;
     return `<div class="comp-row">
-      <span class="comp-label">${m.label}</span>
+      <span class="comp-label">${escH(m.label)}</span>
       <div style="flex:1">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:4px"><div class="comp-bar-wrap"><div class="comp-bar agent-bar" style="width:${aW}%"></div></div><span class="comp-vals" style="color:${better?'var(--success)':'var(--danger)'}">${fmtByKey(m.key,aVal)}</span></div>
         <div style="display:flex;align-items:center;gap:6px"><div class="comp-bar-wrap"><div class="comp-bar team-bar" style="width:${tW}%"></div></div><span class="comp-vals">${fmtByKey(m.key,tVal)}</span></div>
@@ -407,25 +460,48 @@ function renderComparison(agentS,teamAvg,teamCount,aplikasi,bucket){
     </div>`;
   }).join('');
   document.getElementById('compGrid').innerHTML=`
-    <div class="comp-title">vs Rata-rata Tim (${teamCount} agent lain di ${aplikasi} · ${bucket})</div>
+    <div class="comp-title">vs Rata-rata Tim (${teamCount} agent lain di ${escH(aplikasi)} · ${escH(bucket)})</div>
     <div class="comp-legend">
       <div class="comp-legend-item"><div class="comp-dot" style="background:var(--accent)"></div>Agent ini</div>
       <div class="comp-legend-item"><div class="comp-dot" style="background:var(--text3)"></div>Rata-rata tim</div>
-    </div>${rows}`;
+    </div>${rowsHtml}`;
 }
 
-function renderDailyTable(rows){
+// [FIX REQ-3] Daily table dengan Catatan SPV
+// Kolom default: Tanggal | Absensi | Catatan SPV | Payment | Data Bayar | Call Manual | Sentuh WA | Respon WA | PTP | PTP Bayar
+function renderDailyTable(rows,bulan,tahun){
   const sorted=[...rows].sort((a,b)=>(a.tanggal||'').localeCompare(b.tanggal||''));
   const ac={Hadir:'ab-hadir',Izin:'ab-izin',Sakit:'ab-sakit',Alpha:'ab-alpha',Off:'ab-off'};
-  document.getElementById('dailyBody').innerHTML=sorted.map(r=>`<tr>
-    <td>${r.tanggal||'—'}</td>
-    <td><span class="absensi-pill ${ac[r.absensi]||'ab-off'}">${r.absensi||'—'}</span></td>
-    <td class="num">${fmtRp(r.dailyPayment)}</td><td class="num">${fmtNum(r.jmlDataBayar)}</td>
-    <td class="num">${fmtNum(r.callManual)}</td><td class="num">${fmtNum(r.sentuhWA)}</td>
-    <td class="num">${fmtNum(r.responWA)}</td><td class="num">${fmtNum(r.ptp)}</td>
-    <td class="num">${fmtNum(r.ptpBayar)}</td>
-    <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis">${r.catatanSPV||'—'}</td>
-  </tr>`).join('');
+
+  document.getElementById('dailyHead').innerHTML=`<tr>
+    <th>Tanggal</th>
+    <th>Absensi</th>
+    <th>Catatan SPV</th>
+    <th>Payment</th>
+    <th>Data Bayar</th>
+    <th>Call Manual</th>
+    <th>Sentuh WA</th>
+    <th>Respon WA</th>
+    <th>PTP</th>
+    <th>PTP Bayar</th>
+  </tr>`;
+
+  document.getElementById('dailyBody').innerHTML=sorted.map(r=>{
+    const catatanClass=r.catatanSPV?'catatan-col':'catatan-col empty';
+    const catatanText=r.catatanSPV||'—';
+    return `<tr>
+      <td>${escH(r.tanggal||'—')}</td>
+      <td><span class="absensi-pill ${ac[r.absensi]||'ab-off'}">${escH(r.absensi||'—')}</span></td>
+      <td class="${catatanClass}" title="${escH(catatanText)}">${escH(catatanText)}</td>
+      <td class="num">${fmtRp(r.dailyPayment)}</td>
+      <td class="num">${fmtNum(r.jmlDataBayar)}</td>
+      <td class="num">${fmtNum(r.callManual)}</td>
+      <td class="num">${fmtNum(r.sentuhWA)}</td>
+      <td class="num">${fmtNum(r.responWA)}</td>
+      <td class="num">${fmtNum(r.ptp)}</td>
+      <td class="num">${fmtNum(r.ptpBayar)}</td>
+    </tr>`;
+  }).join('');
 }
 </script>
 </body>
