@@ -241,7 +241,34 @@ select:focus{border-color:var(--accent);}
 .risk-kritis{background:var(--danger-bg);color:var(--danger);}
 .risk-waspada{background:var(--warning-bg);color:var(--warning);}
 .risk-score-num{font-size:15px;font-weight:700;flex-shrink:0;}
-.analysis-panel{background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px 14px;}
+.analysis-panel{background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);padding:12px 14px;overflow-y:auto;max-height:600px;}
+.bucket-summary-panel{background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);padding:14px 16px;margin-bottom:10px;}
+.bucket-sum-title{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+.bucket-sum-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px;}
+.bucket-sum-stat{background:var(--surface);border-radius:var(--radius-sm);padding:8px 10px;border:1px solid var(--border);}
+.bucket-sum-stat .lbl{font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px;}
+.bucket-sum-stat .val{font-size:14px;font-weight:700;color:var(--text);}
+.bucket-sum-stat .sub{font-size:10px;color:var(--text3);margin-top:1px;}
+.bucket-sum-stat.accent .val{color:var(--accent);}
+.bucket-sum-stat.good .val{color:var(--success);}
+.bucket-sum-stat.warn .val{color:var(--warning);}
+.bucket-sum-stat.bad .val{color:var(--danger);}
+.bucket-rank-row{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:var(--radius-sm);background:var(--surface);border:1px solid var(--border);margin-bottom:4px;}
+.bucket-rank-medal{width:20px;height:20px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;flex-shrink:0;}
+.medal-1{background:#FEF3C7;color:#92400E;} .medal-2{background:#F1F5F9;color:#475569;} .medal-3{background:#FEE2E2;color:#7F1D1D;} .medal-n{background:var(--surface2);color:var(--text3);}
+.bucket-rank-name{font-size:12px;font-weight:600;color:var(--text);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.bucket-rank-val{font-size:12px;font-weight:600;color:var(--success);flex-shrink:0;}
+.bucket-rank-badge{font-size:10px;padding:1px 6px;border-radius:10px;flex-shrink:0;}
+.badge-top{background:var(--success-bg);color:var(--success);}
+.badge-low{background:var(--danger-bg);color:var(--danger);}
+.insight-box{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;margin-top:10px;}
+.insight-box-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;}
+.insight-item{display:flex;align-items:flex-start;gap:7px;margin-bottom:7px;font-size:11px;color:var(--text2);line-height:1.5;}
+.insight-item:last-child{margin-bottom:0;}
+.insight-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;}
+.dot-green{background:var(--success);} .dot-warn{background:var(--warning);} .dot-red{background:var(--danger);} .dot-blue{background:var(--accent);}
+.divider-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin:10px 0 6px;display:flex;align-items:center;gap:6px;}
+.divider-label::after{content:'';flex:1;height:1px;background:var(--border);}
 .analysis-empty{color:var(--text3);font-size:12px;text-align:center;padding:30px 0;}
 .analysis-agent-name{font-size:13px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px;}
 .analysis-stat-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:10px;}
@@ -707,75 +734,253 @@ function formatRotasiLabel(type, prevFirstName, dateStr, bucketAktif) {
 // ============================================================
 // POINT 3: Kalkulasi skor risiko agent
 // ============================================================
-function calcRiskScore(agentRows, allSpvRows){
+/* ============================================================
+   SCORING ENGINE — poin analisa per agent
+   Skor 0-100: makin tinggi makin berisiko
+   ============================================================ */
+function calcRiskScore(agentRows, allSpvRows, isSingleDay){
   const s=summarizeRows(agentRows);
-  // Hitung avg tim (agent lain di bucket + aplikasi yang sama)
   const firstRow=agentRows[0]||{};
   const aplikasi=firstRow.aplikasi||'';
   const bucket=firstRow.bucket||'';
   const agentName=firstRow.agent||'';
+
+  // Hitung rata-rata PEERS (seluruh agent di bucket yg sama, bukan hanya SPV ini)
   const peers=allSpvRows.filter(r=>r.aplikasi===aplikasi&&r.bucket===bucket&&r.agent!==agentName);
   const peerAgents=[...new Set(peers.map(r=>r.agent))];
-  let avgSentuhWA=0,avgPayment=0,avgRate=0;
+  let peerAvg={sentuhWA:0,callManual:0,callTerhubung:0,dailyPayment:0,avgRate:0,ptp:0,sentuhGojek:0,sentuhWABA:0,waBlokir:0};
   if(peerAgents.length>0){
     const peerS=summarizeRows(peers);
-    avgSentuhWA=peerS.sentuhWA/peerAgents.length;
-    avgPayment=peerS.dailyPayment/peerAgents.length;
-    avgRate=peerS.avgRate;
+    const n=peerAgents.length;
+    peerAvg.sentuhWA=peerS.sentuhWA/n;
+    peerAvg.callManual=peerS.callManual/n;
+    peerAvg.callTerhubung=peerS.callTerhubung/n;
+    peerAvg.dailyPayment=peerS.dailyPayment/n;
+    peerAvg.avgRate=peerS.avgRate;
+    peerAvg.ptp=peerS.ptp/n;
+    peerAvg.sentuhGojek=peerS.sentuhGojek/n;
+    peerAvg.sentuhWABA=peerS.sentuhWABA/n;
+    peerAvg.waBlokir=peerS.waBlokir/n;
   }
-  // Hitung hari hadir
+
   const hadirCount=agentRows.filter(r=>r.absensi==='Hadir').length;
+  const offCount=agentRows.filter(r=>r.absensi==='Off').length;
+  const izinCount=agentRows.filter(r=>r.absensi==='Izin').length;
+  const sakitCount=agentRows.filter(r=>r.absensi==='Sakit').length;
+  const alphaCount=agentRows.filter(r=>r.absensi==='Alpha').length;
   const totalHari=agentRows.length||1;
   const hadirRatio=hadirCount/totalHari;
-  // Hitung catatan SPV
-  const catatanCount=agentRows.filter(r=>r.catatanSPV&&r.catatanSPV.trim()!=='').length;
+
+  const catatanRows=agentRows.filter(r=>r.catatanSPV&&r.catatanSPV.trim()!=='');
+  const catatanCount=catatanRows.length;
+
+  // Hari hadir tapi payment nol
+  const hadirTapiNolPayment=agentRows.filter(r=>r.absensi==='Hadir'&&(r.dailyPayment||0)===0).length;
+
+  // WA blokir vs sentuh: rasio blokir tinggi = spammer / tidak efektif
+  const waBlokRatio=s.sentuhWA>0?s.waBlokir/s.sentuhWA:0;
+
+  // Call terhubung ratio: dari call manual, berapa yang terhubung?
+  const callConnRatio=s.callManual>0?s.callTerhubung/s.callManual:0;
+
+  // PTP ratio: dari data bayar berapa yang PTP?
+  const ptpBayarRatio=s.ptp>0?s.ptpBayar/s.ptp:0;
 
   let score=0;
   const issues=[];
 
-  // 1. Sentuh WA vs rata-rata tim
-  if(avgSentuhWA>0){
-    const ratio=s.sentuhWA/avgSentuhWA;
-    if(ratio<0.4){score+=35;issues.push({type:'sentuh',level:'kritis',label:'Sentuh WA sangat rendah',detail:`${fmtNum(s.sentuhWA)} vs rata-rata ${fmtNum(Math.round(avgSentuhWA))}`,pct:Math.round(ratio*100)});}
-    else if(ratio<0.7){score+=20;issues.push({type:'sentuh',level:'waspada',label:'Sentuh WA di bawah rata-rata',detail:`${fmtNum(s.sentuhWA)} vs rata-rata ${fmtNum(Math.round(avgSentuhWA))}`,pct:Math.round(ratio*100)});}
-  }else if(s.sentuhWA<100){
-    score+=25;issues.push({type:'sentuh',level:'kritis',label:'Sentuh WA sangat rendah',detail:`Hanya ${fmtNum(s.sentuhWA)} sentuhan`,pct:0});
+  // ── KELOMPOK A: KEHADIRAN ──────────────────────────────────
+  if(alphaCount>0){
+    score+=alphaCount*10;
+    issues.push({type:'alpha',group:'Kehadiran',level:'kritis',
+      label:`Alpha ${alphaCount} hari`,
+      detail:`Tidak hadir tanpa keterangan ${alphaCount} hari`,
+      pct:Math.round(alphaCount/totalHari*100)});
+  }
+  if(hadirRatio<0.6&&alphaCount===0){
+    score+=30;
+    issues.push({type:'absensi',group:'Kehadiran',level:'kritis',
+      label:'Tingkat kehadiran rendah',
+      detail:`${hadirCount}/${totalHari} hari hadir (${Math.round(hadirRatio*100)}%) — Off: ${offCount}, Izin: ${izinCount}, Sakit: ${sakitCount}`,
+      pct:Math.round(hadirRatio*100)});
+  } else if(hadirRatio<0.8&&alphaCount===0){
+    score+=12;
+    issues.push({type:'absensi',group:'Kehadiran',level:'waspada',
+      label:'Kehadiran perlu diperhatikan',
+      detail:`${hadirCount}/${totalHari} hari hadir (${Math.round(hadirRatio*100)}%) — Off: ${offCount}, Izin: ${izinCount}`,
+      pct:Math.round(hadirRatio*100)});
   }
 
-  // 2. Absensi
-  if(hadirRatio<0.6){score+=30;issues.push({type:'absensi',level:'kritis',label:'Absensi buruk',detail:`${hadirCount}/${totalHari} hari hadir (${Math.round(hadirRatio*100)}%)`,pct:Math.round(hadirRatio*100)});}
-  else if(hadirRatio<0.8){score+=15;issues.push({type:'absensi',level:'waspada',label:'Absensi perlu diperhatikan',detail:`${hadirCount}/${totalHari} hari hadir (${Math.round(hadirRatio*100)}%)`,pct:Math.round(hadirRatio*100)});}
-
-  // 3. Payment vs rata-rata tim
-  if(avgPayment>0){
-    const ratio=s.dailyPayment/avgPayment;
-    if(ratio<0.3){score+=25;issues.push({type:'payment',level:'kritis',label:'Payment sangat rendah',detail:`${fmtRp(s.dailyPayment)} vs rata-rata ${fmtRp(Math.round(avgPayment))}`,pct:Math.round(ratio*100)});}
-    else if(ratio<0.6){score+=12;issues.push({type:'payment',level:'waspada',label:'Payment di bawah rata-rata',detail:`${fmtRp(s.dailyPayment)} vs rata-rata ${fmtRp(Math.round(avgPayment))}`,pct:Math.round(ratio*100)});}
+  // ── KELOMPOK B: AKTIVITAS PENAGIHAN ───────────────────────
+  // B1. Sentuh WA
+  if(peerAvg.sentuhWA>0){
+    const r=s.sentuhWA/peerAvg.sentuhWA;
+    if(r<0.4){score+=30;issues.push({type:'sentuhWA',group:'Aktivitas',level:'kritis',label:'Sentuh WA jauh di bawah rata-rata',detail:`${fmtNum(s.sentuhWA)} vs rata-rata ${fmtNum(Math.round(peerAvg.sentuhWA))} (${Math.round(r*100)}%)`,pct:Math.round(r*100)});}
+    else if(r<0.7){score+=15;issues.push({type:'sentuhWA',group:'Aktivitas',level:'waspada',label:'Sentuh WA di bawah rata-rata',detail:`${fmtNum(s.sentuhWA)} vs rata-rata ${fmtNum(Math.round(peerAvg.sentuhWA))} (${Math.round(r*100)}%)`,pct:Math.round(r*100)});}
+  } else if(s.sentuhWA<50){
+    score+=25;issues.push({type:'sentuhWA',group:'Aktivitas',level:'kritis',label:'Sentuh WA sangat sedikit',detail:`Hanya ${fmtNum(s.sentuhWA)} sentuhan`,pct:0});
   }
 
-  // 4. Rate bayar
-  if(s.avgRate<0.005){score+=15;issues.push({type:'rate',level:'kritis',label:'Rate bayar sangat rendah',detail:`${fmtRate(s.avgRate)} (${fmtNum(s.jmlDataBayar)} data bayar)`,pct:Math.round(s.avgRate*10000)/100});}
-  else if(s.avgRate<0.015){score+=8;issues.push({type:'rate',level:'waspada',label:'Rate bayar rendah',detail:`${fmtRate(s.avgRate)} (${fmtNum(s.jmlDataBayar)} data bayar)`,pct:Math.round(s.avgRate*10000)/100});}
+  // B2. Call Manual
+  if(peerAvg.callManual>0){
+    const r=s.callManual/peerAvg.callManual;
+    if(r<0.4){score+=15;issues.push({type:'callManual',group:'Aktivitas',level:'kritis',label:'Call Manual sangat rendah',detail:`${fmtNum(s.callManual)} vs rata-rata ${fmtNum(Math.round(peerAvg.callManual))} (${Math.round(r*100)}%)`,pct:Math.round(r*100)});}
+    else if(r<0.65){score+=8;issues.push({type:'callManual',group:'Aktivitas',level:'waspada',label:'Call Manual di bawah rata-rata',detail:`${fmtNum(s.callManual)} vs rata-rata ${fmtNum(Math.round(peerAvg.callManual))} (${Math.round(r*100)}%)`,pct:Math.round(r*100)});}
+  }
 
-  // 5. Catatan SPV negatif
-  if(catatanCount>=3){score+=10;issues.push({type:'catatan',level:'waspada',label:'Banyak catatan SPV',detail:`${catatanCount} hari ada catatan dari SPV`,pct:0});}
+  // B3. Call terhubung ratio
+  if(s.callManual>50&&callConnRatio<0.15){
+    score+=10;issues.push({type:'callConn',group:'Aktivitas',level:'waspada',label:'Rasio call terhubung rendah',detail:`${fmtNum(s.callTerhubung)} terhubung dari ${fmtNum(s.callManual)} call (${Math.round(callConnRatio*100)}%)`,pct:Math.round(callConnRatio*100)});
+  }
 
-  // Batas maks 100
+  // B4. WA Blokir ratio tinggi
+  if(s.sentuhWA>100&&waBlokRatio>0.1){
+    score+=8;issues.push({type:'waBlokir',group:'Aktivitas',level:'waspada',label:'Tingkat WA diblokir tinggi',detail:`${fmtNum(s.waBlokir)} blokir dari ${fmtNum(s.sentuhWA)} sentuh (${Math.round(waBlokRatio*100)}%)`,pct:Math.round(waBlokRatio*100)});
+  }
+
+  // ── KELOMPOK C: HASIL / OUTCOME ────────────────────────────
+  // C1. Payment vs rata-rata
+  if(peerAvg.dailyPayment>0){
+    const r=s.dailyPayment/peerAvg.dailyPayment;
+    if(r<0.3){score+=25;issues.push({type:'payment',group:'Hasil',level:'kritis',label:'Payment jauh di bawah rata-rata',detail:`${fmtRp(s.dailyPayment)} vs rata-rata ${fmtRp(Math.round(peerAvg.dailyPayment))} (${Math.round(r*100)}%)`,pct:Math.round(r*100)});}
+    else if(r<0.6){score+=12;issues.push({type:'payment',group:'Hasil',level:'waspada',label:'Payment di bawah rata-rata',detail:`${fmtRp(s.dailyPayment)} vs rata-rata ${fmtRp(Math.round(peerAvg.dailyPayment))} (${Math.round(r*100)}%)`,pct:Math.round(r*100)});}
+  }
+
+  // C2. Rate bayar
+  if(s.avgRate<0.005){score+=20;issues.push({type:'rate',group:'Hasil',level:'kritis',label:'Rate bayar sangat rendah',detail:`${fmtRate(s.avgRate)} dari ${fmtNum(s.jmlDataBayar)} data bayar`,pct:Math.round(s.avgRate*10000)/100});}
+  else if(s.avgRate<0.015){score+=10;issues.push({type:'rate',group:'Hasil',level:'waspada',label:'Rate bayar rendah',detail:`${fmtRate(s.avgRate)} dari ${fmtNum(s.jmlDataBayar)} data bayar`,pct:Math.round(s.avgRate*10000)/100});}
+
+  // C3. PTP tapi realisasi bayar rendah
+  if(s.ptp>5&&ptpBayarRatio<0.3){
+    score+=10;issues.push({type:'ptp',group:'Hasil',level:'waspada',label:'Realisasi PTP rendah',detail:`${fmtNum(s.ptpBayar)} bayar dari ${fmtNum(s.ptp)} PTP (${Math.round(ptpBayarRatio*100)}%) — janji tidak terpenuhi`,pct:Math.round(ptpBayarRatio*100)});
+  }
+
+  // C4. Hadir tapi tidak ada payment
+  if(hadirCount>0&&hadirTapiNolPayment/hadirCount>0.5){
+    score+=12;issues.push({type:'nolPayment',group:'Hasil',level:'waspada',label:'Banyak hari hadir tanpa payment',detail:`${hadirTapiNolPayment} dari ${hadirCount} hari hadir payment-nya Rp 0`,pct:Math.round(hadirTapiNolPayment/hadirCount*100)});
+  }
+
+  // ── KELOMPOK D: CATATAN & KEDISIPLINAN ─────────────────────
+  if(catatanCount>=5){score+=15;issues.push({type:'catatan',group:'Kedisiplinan',level:'kritis',label:'Sangat banyak catatan SPV',detail:`${catatanCount} hari ada catatan — cek rincian di data harian`,pct:0});}
+  else if(catatanCount>=3){score+=8;issues.push({type:'catatan',group:'Kedisiplinan',level:'waspada',label:'Banyak catatan SPV',detail:`${catatanCount} hari ada catatan dari SPV`,pct:0});}
+
   score=Math.min(score,100);
 
-  // Susun saran berdasarkan issues
+  // ── SARAN TINDAK LANJUT ─────────────────────────────────────
   const saranList=[];
-  issues.forEach(iss=>{
-    if(iss.type==='sentuh')saranList.push('Wajibkan minimal sentuh WA '+fmtNum(Math.round(avgSentuhWA*0.8||500))+' per bulan');
-    if(iss.type==='absensi')saranList.push('Lakukan coaching & verifikasi alasan absen, tegakkan aturan minimum '+Math.ceil(totalHari*0.8)+' hari hadir');
-    if(iss.type==='payment')saranList.push('Review strategi penagihan, pastikan agent sentuh akun prioritas terlebih dahulu');
-    if(iss.type==='rate')saranList.push('Cek kualitas data akun yang dipegang, pertimbangkan rotasi ke akun yang lebih potensial');
-    if(iss.type==='catatan')saranList.push('Tindak lanjuti catatan SPV secara 1-on-1, buat action plan tertulis');
-  });
-  if(saranList.length===0&&score<20)saranList.push('Performa baik! Pertahankan dan jadikan benchmark untuk agent lain.');
-  if(score>=60)saranList.push('Jika tidak ada perbaikan dalam 3 hari, pertimbangkan eskalasi ke admin atau rotasi akun.');
+  const types=issues.map(i=>i.type);
+  if(types.includes('alpha'))saranList.push(`Tindak disiplin pelanggaran alpha — wajib klarifikasi tertulis dari agent`);
+  if(types.includes('absensi'))saranList.push(`Buat jadwal coaching kehadiran, target minimum ${Math.ceil(totalHari*0.85)} hari hadir`);
+  if(types.includes('sentuhWA'))saranList.push(`Target sentuh WA minimal ${fmtNum(Math.round(peerAvg.sentuhWA*0.85||300))} — minta laporan harian`);
+  if(types.includes('callManual'))saranList.push(`Tambah call session harian, review daftar nomor yang perlu dihubungi ulang`);
+  if(types.includes('callConn'))saranList.push(`Evaluasi kualitas data nomor — banyak yang tidak aktif, perlu update nomor kontak`);
+  if(types.includes('waBlokir'))saranList.push(`Kurangi frekuensi blast WA otomatis, fokus ke pesan personal agar tidak diblokir`);
+  if(types.includes('payment'))saranList.push(`Review strategi penagihan, prioritaskan akun dengan DPD tinggi dan saldo besar`);
+  if(types.includes('rate'))saranList.push(`Cek kualitas akun yang dipegang — pertimbangkan rotasi ke akun yang lebih potensial`);
+  if(types.includes('ptp'))saranList.push(`Follow-up PTP yang belum bayar sebelum jatuh tempo, catat alasan di sistem`);
+  if(types.includes('nolPayment'))saranList.push(`Identifikasi hari hadir tanpa payment — apakah akun sudah disentuh atau hanya absen teknis?`);
+  if(types.includes('catatan'))saranList.push(`Jadwalkan sesi 1-on-1 segera, buat action plan tertulis dan pantau progres harian`);
+  if(saranList.length===0)saranList.push('Performa baik! Pertahankan dan jadikan benchmark tim.');
+  if(score>=60)saranList.push('⚠ Risiko tinggi — pertimbangkan monitoring harian & eskalasi ke manajemen jika tidak ada perbaikan dalam 3 hari.');
 
-  return{score,issues,saranList,s,hadirCount,totalHari,catatanCount};
+  return{score,issues,saranList,s,hadirCount,hadirRatio,offCount,izinCount,sakitCount,alphaCount,totalHari,catatanCount,catatanRows,hadirTapiNolPayment,waBlokRatio,callConnRatio,ptpBayarRatio,peerAvg,peerAgents};
+}
+
+/* ============================================================
+   BUCKET SUMMARY — analisa level bucket (tampil saat bucket dipilih)
+   ============================================================ */
+function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
+  if(!bucketRows||!bucketRows.length)return'';
+  const s=summarizeRows(bucketRows);
+  const byAgent={};
+  bucketRows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
+  const agList=Object.keys(byAgent);
+  const n=agList.length||1;
+
+  // Rank by payment
+  const ranked=agList.map(ag=>{
+    const rs=summarizeRows(byAgent[ag]);
+    const hadir=byAgent[ag].filter(r=>r.absensi==='Hadir').length;
+    return{ag,payment:rs.dailyPayment,rate:rs.avgRate,sentuhWA:rs.sentuhWA,ptp:rs.ptp,hadir,total:byAgent[ag].length,rows:byAgent[ag]};
+  }).sort((a,b)=>b.payment-a.payment);
+
+  // Hitung rata-rata & temukan outlier
+  const avgPayment=s.dailyPayment/n;
+  const avgSentuhWA=s.sentuhWA/n;
+  const avgHadirRatio=ranked.reduce((a,x)=>a+x.hadir/x.total,0)/n;
+
+  // Insights bucket
+  const insights=[];
+  const topAgent=ranked[0];
+  const bottomAgent=ranked[ranked.length-1];
+
+  // 1. Agent paling beda dari rata-rata
+  if(topAgent&&n>1){
+    const topRatio=avgPayment>0?topAgent.payment/avgPayment:0;
+    if(topRatio>2.5)insights.push({dot:'dot-blue',text:`<b>${topAgent.ag}</b> mendominasi payment (${fmtRp(topAgent.payment)} = ${Math.round(topRatio*100)}% dari rata-rata). Tim sangat bergantung pada 1 agent — risiko jika agent ini berhalangan.`});
+  }
+  // 2. Agent payment nol tapi hadir
+  const nolPayHadir=ranked.filter(a=>a.payment===0&&a.hadir>0);
+  if(nolPayHadir.length>0)insights.push({dot:'dot-red',text:`<b>${nolPayHadir.length} agent</b> hadir tapi payment Rp 0 sepanjang bulan: ${nolPayHadir.slice(0,3).map(a=>a.ag).join(', ')}${nolPayHadir.length>3?'...':''}`});
+  // 3. Rate rata-rata bucket
+  if(s.avgRate>0&&s.avgRate<0.01)insights.push({dot:'dot-warn',text:`Rate rata-rata bucket rendah (${fmtRate(s.avgRate)}) — evaluasi kualitas data akun di bucket ini`});
+  if(s.avgRate>=0.03)insights.push({dot:'dot-green',text:`Rate rata-rata bucket bagus (${fmtRate(s.avgRate)}) — pertahankan strategi penagihan`});
+  // 4. WA Blokir vs Sentuh
+  const bucketBlokRatio=s.sentuhWA>0?s.waBlokir/s.sentuhWA:0;
+  if(bucketBlokRatio>0.08)insights.push({dot:'dot-warn',text:`Rasio WA diblokir tinggi di bucket ini (${Math.round(bucketBlokRatio*100)}%) — evaluasi cara penghubungan debitor`});
+  // 5. Kehadiran rata-rata
+  if(avgHadirRatio<0.75)insights.push({dot:'dot-red',text:`Rata-rata kehadiran bucket rendah (${Math.round(avgHadirRatio*100)}%) — perlu evaluasi absensi tim`});
+  // 6. Kesenjangan payment tertinggi vs terendah
+  if(n>2&&bottomAgent&&topAgent&&bottomAgent.payment<topAgent.payment*0.1&&topAgent.payment>0){
+    insights.push({dot:'dot-warn',text:`Kesenjangan payment besar: tertinggi ${fmtRp(topAgent.payment)} (${topAgent.ag}) vs terendah ${fmtRp(bottomAgent.payment)} (${bottomAgent.ag}) — kemungkinan ketidakmerataan distribusi akun`});
+  }
+  // 7. PTP realisasi
+  if(s.ptp>10){
+    const ptpReal=s.ptpBayar/s.ptp;
+    if(ptpReal<0.3)insights.push({dot:'dot-warn',text:`Realisasi PTP bucket rendah: ${fmtNum(s.ptpBayar)} bayar dari ${fmtNum(s.ptp)} PTP (${Math.round(ptpReal*100)}%) — perlu follow-up lebih ketat`});
+  }
+  if(!insights.length)insights.push({dot:'dot-green',text:'Tidak ada temuan kritis di level bucket — performa relatif merata.'});
+
+  // Top 3 & bottom 3 agent
+  const top3=ranked.slice(0,3);
+  const bot3=ranked.slice(-3).filter(a=>!top3.includes(a));
+
+  const medalCls=(i)=>i===0?'medal-1':i===1?'medal-2':i===2?'medal-3':'medal-n';
+
+  const topRows=top3.map((a,i)=>`
+    <div class="bucket-rank-row">
+      <div class="bucket-rank-medal ${medalCls(i)}">${i+1}</div>
+      <div class="bucket-rank-name">${escH(a.ag)}</div>
+      <span class="bucket-rank-badge badge-top">${a.hadir}/${a.total} hadir</span>
+      <div class="bucket-rank-val">${fmtRp(a.payment)}</div>
+    </div>`).join('');
+
+  const botRows=bot3.length?bot3.map((a,i)=>`
+    <div class="bucket-rank-row">
+      <div class="bucket-rank-medal medal-n">${ranked.length-bot3.length+i+1}</div>
+      <div class="bucket-rank-name">${escH(a.ag)}</div>
+      <span class="bucket-rank-badge badge-low">${fmtRp(a.payment)}</span>
+      <div class="bucket-rank-val" style="color:var(--text3)">${a.hadir}/${a.total} hadir</div>
+    </div>`).join(''):'';
+
+  return `<div class="bucket-summary-panel">
+    <div class="bucket-sum-title">📊 Ringkasan Bucket</div>
+    <div class="bucket-sum-grid">
+      <div class="bucket-sum-stat accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(s.dailyPayment)}</div><div class="sub">rata-rata ${fmtRp(Math.round(avgPayment))}/agent</div></div>
+      <div class="bucket-sum-stat ${s.avgRate>=0.02?'good':s.avgRate>=0.01?'':'warn'}"><div class="lbl">Avg Rate</div><div class="val">${fmtRate(s.avgRate)}</div><div class="sub">${fmtNum(s.jmlDataBayar)} data bayar</div></div>
+      <div class="bucket-sum-stat"><div class="lbl">Agent Aktif</div><div class="val">${n}</div><div class="sub">${fmtNum(s.ptp)} PTP · ${fmtNum(s.ptpBayar)} bayar</div></div>
+      <div class="bucket-sum-stat"><div class="lbl">Sentuh WA</div><div class="val">${fmtNum(s.sentuhWA)}</div><div class="sub">rata-rata ${fmtNum(Math.round(avgSentuhWA))}/agent</div></div>
+      <div class="bucket-sum-stat"><div class="lbl">Call Manual</div><div class="val">${fmtNum(s.callManual)}</div><div class="sub">${fmtNum(s.callTerhubung)} terhubung</div></div>
+      <div class="bucket-sum-stat ${s.waBlokir>s.sentuhWA*0.08?'warn':''}"><div class="lbl">WA Diblokir</div><div class="val">${fmtNum(s.waBlokir)}</div><div class="sub">${s.sentuhWA>0?Math.round(s.waBlokir/s.sentuhWA*100)+'% dari sentuh':'-'}</div></div>
+    </div>
+    <div class="insight-box">
+      <div class="insight-box-title">💡 Temuan Otomatis</div>
+      ${insights.map(ins=>`<div class="insight-item"><div class="insight-dot ${ins.dot}"></div><span>${ins.text}</span></div>`).join('')}
+    </div>
+    <div class="divider-label">Top Agent</div>
+    ${topRows}
+    ${botRows?`<div class="divider-label" style="margin-top:8px">Perlu Perhatian</div>${botRows}`:''}
+  </div>`;
 }
 
 // ============================================================
@@ -814,8 +1019,11 @@ function renderAttentionPanel(spv, safeSpvId){
   if(!selEl||!listEl||!analysisEl)return;
   const selectedBucket=selEl.value;
   const selectedTanggal=selTgl?selTgl.value:'';
-  analysisEl.innerHTML='<div class="analysis-empty">← Klik agent untuk lihat analisa</div>';
-  if(!selectedBucket){listEl.innerHTML='<div class="no-attention">Pilih bucket di atas</div>';return;}
+  if(!selectedBucket){
+    listEl.innerHTML='<div class="no-attention">Pilih bucket di atas</div>';
+    analysisEl.innerHTML='<div class="analysis-empty">← Pilih bucket lalu klik agent untuk lihat analisa</div>';
+    return;
+  }
   const allSpvRows=spvAgentDataCache[spv]||[];
   // Filter bucket, lalu opsional filter tanggal
   let bucketRows=allSpvRows.filter(r=>r.bucket===selectedBucket);
@@ -844,6 +1052,9 @@ function renderAttentionPanel(spv, safeSpvId){
       ?(b.rows.reduce((s,r)=>s+(r.dailyPayment||0),0))-(a.rows.reduce((s,r)=>s+(r.dailyPayment||0),0))
       :b.risk.score-a.risk.score
     );
+
+  // Selalu tampilkan bucket summary di panel kanan dulu
+  analysisEl.innerHTML=buildBucketSummaryHtml(spv, safeSpvId, rowsForScoring, allSpvRows);
 
   if(!agentScores.length){
     listEl.innerHTML='<div class="no-attention" style="color:var(--success);padding:20px 0">✅ Semua agent di bucket ini dalam kondisi baik!</div>';
@@ -893,7 +1104,7 @@ function selectAttentionAgent(spv, safeSpvId, idx){
   const analysisEl=document.getElementById('attAnalysis-'+safeSpvId);
   if(!data||!analysisEl)return;
   const{ag,rows,risk}=data;
-  const{score,issues,saranList,s,hadirCount,totalHari}=risk;
+  const{score,issues,saranList,s,hadirCount,totalHari,catatanCount,catatanRows,alphaCount,izinCount,hadirTapiNolPayment,waBlokRatio,callConnRatio,ptpBayarRatio,peerAvg,peerAgents}=risk;
   const activeTanggal=window['_attTanggal_'+safeSpvId]||'';
   const isTglMode=!!activeTanggal;
   const isKritis=score>=50;
@@ -916,24 +1127,76 @@ function selectAttentionAgent(spv, safeSpvId, idx){
     <ul class="saran-list">${saranList.map(s=>`<li>${escH(s)}</li>`).join('')}</ul>
   </div>`:'';
 
-  analysisEl.innerHTML=`
+  // Simpan bucket summary dulu, lalu append detail agent
+  const bucketSummaryHtml=buildBucketSummaryHtml(spv, safeSpvId,
+    (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===(firstRow.bucket||'')),
+    spvAgentDataCache[spv]||[]);
+
+  // Kelompokkan issues per group untuk tampilan terstruktur
+  const groups={};
+  issues.forEach(iss=>{
+    const g=iss.group||'Lainnya';
+    if(!groups[g])groups[g]=[];
+    groups[g].push(iss);
+  });
+  const groupIcons={'Kehadiran':'📅','Aktivitas':'📞','Hasil':'💰','Kedisiplinan':'📋','Lainnya':'⚠'};
+  const issueGroupHtml=Object.keys(groups).length?Object.keys(groups).map(g=>`
+    <div style="margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">${groupIcons[g]||'⚠'} ${g}</div>
+      ${groups[g].map(iss=>{
+        const pctBar=iss.pct>0?`<div class="progress-bar"><div class="progress-fill ${iss.level==='kritis'?'fill-danger':'fill-warning'}" style="width:${Math.min(iss.pct,100)}%"></div></div>`:'';
+        return`<div class="analysis-issue">
+          <div class="analysis-issue-header">
+            <div class="analysis-issue-title">${iss.level==='kritis'?'🔴':'🟡'} ${escH(iss.label)}</div>
+            <span class="risk-badge ${iss.level==='kritis'?'risk-kritis':'risk-waspada'}">${iss.level==='kritis'?'Kritis':'Waspada'}</span>
+          </div>
+          <div class="analysis-metric-row"><span>${escH(iss.detail)}</span></div>
+          ${pctBar}
+        </div>`;
+      }).join('')}
+    </div>`).join('')
+  :'<div style="color:var(--success);font-size:12px;padding:6px 0">✅ Tidak ada masalah signifikan terdeteksi.</div>';
+
+  // Catatan SPV terbaru (maks 3)
+  const catatanHtml=catatanCount>0?`<div style="margin-top:8px">
+    <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">📋 Catatan SPV Terbaru</div>
+    ${catatanRows.slice(-3).reverse().map(r=>`<div style="background:var(--warning-bg);border:1px solid var(--warning);border-radius:var(--radius-sm);padding:6px 9px;margin-bottom:4px;font-size:11px"><span style="color:var(--text3);margin-right:6px">${escH(r.tanggal||'—')}</span><span style="color:var(--text)">${escH(r.catatanSPV)}</span></div>`).join('')}
+    ${catatanCount>3?`<div style="font-size:11px;color:var(--text3);margin-top:3px">+${catatanCount-3} catatan lainnya — lihat detail agent</div>`:''}
+  </div>`:'';
+
+  const avCls=isKritis?'av-danger':score>=30?'av-warning':'av-ok';
+  const agentDetailHtml=`
     <div class="analysis-agent-name">
-      <div class="attention-avatar ${isKritis?'av-danger':'av-warning'}" style="width:28px;height:28px;font-size:11px">${escH(ag.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase())}</div>
+      <div class="attention-avatar ${avCls}" style="width:28px;height:28px;font-size:11px">${escH(ag.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase())}</div>
       ${escH(ag)}
-      <span class="risk-badge ${isKritis?'risk-kritis':'risk-waspada'}" style="margin-left:4px">Skor ${score}</span>
+      <span class="risk-badge ${isKritis?'risk-kritis':score>=30?'risk-waspada':''}" style="margin-left:4px">${isKritis?'Kritis':score>=30?'Waspada':'Aman'} · Skor ${score}</span>
     </div>
-    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${escH(firstRow.aplikasi||'')} · ${escH(firstRow.bucket||'')} · SPV: ${escH(firstRow.supervisor||spv)}${isTglMode?` · <span style="color:var(--accent);font-weight:500">📅 ${activeTanggal.split('-').reverse().join('/')}</span>`:''}</div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">
+      ${escH(firstRow.aplikasi||'')} · Bucket: ${escH(firstRow.bucket||'')} · SPV: ${escH(firstRow.supervisor||spv)}
+      ${isTglMode?` · <span style="color:var(--accent);font-weight:500">📅 ${activeTanggal.split('-').reverse().join('/')}</span>`:''}
+    </div>
     <div class="analysis-stat-grid">
-      <div class="analysis-stat"><div class="lbl">Payment</div><div class="val ${s.dailyPayment<100000?'bad':''}">${fmtRp(s.dailyPayment)}</div></div>
-      <div class="analysis-stat"><div class="lbl">Rate Bayar</div><div class="val ${s.avgRate<0.01?'bad':s.avgRate<0.02?'ok':''}">${fmtRate(s.avgRate)}</div></div>
-      <div class="analysis-stat"><div class="lbl">Sentuh WA</div><div class="val ${s.sentuhWA<500?'bad':s.sentuhWA<1000?'ok':''}">${fmtNum(s.sentuhWA)}</div></div>
-      <div class="analysis-stat"><div class="lbl">Kehadiran</div><div class="val ${hadirCount/totalHari<0.7?'bad':hadirCount/totalHari<0.85?'ok':''}">${hadirCount}/${totalHari} hari</div></div>
+      <div class="analysis-stat"><div class="lbl">Payment</div><div class="val ${s.dailyPayment<(risk.peerAvg.dailyPayment*0.4||100000)?'bad':''}">${fmtRp(s.dailyPayment)}</div><div class="lbl">vs avg ${fmtRp(Math.round(risk.peerAvg.dailyPayment||0))}</div></div>
+      <div class="analysis-stat"><div class="lbl">Rate Bayar</div><div class="val ${s.avgRate<0.01?'bad':s.avgRate<0.02?'ok':''}">${fmtRate(s.avgRate)}</div><div class="lbl">${fmtNum(s.jmlDataBayar)} data bayar</div></div>
+      <div class="analysis-stat"><div class="lbl">Sentuh WA</div><div class="val ${s.sentuhWA<(risk.peerAvg.sentuhWA*0.5||200)?'bad':''}">${fmtNum(s.sentuhWA)}</div><div class="lbl">vs avg ${fmtNum(Math.round(risk.peerAvg.sentuhWA||0))}</div></div>
+      <div class="analysis-stat"><div class="lbl">Call Manual</div><div class="val">${fmtNum(s.callManual)}</div><div class="lbl">${fmtNum(s.callTerhubung)} terhubung (${s.callManual>0?Math.round(risk.callConnRatio*100):0}%)</div></div>
+      <div class="analysis-stat"><div class="lbl">Kehadiran</div><div class="val ${hadirCount/totalHari<0.7?'bad':hadirCount/totalHari<0.85?'ok':''}">${hadirCount}/${totalHari} hari</div><div class="lbl">Alpha: ${risk.alphaCount} · Izin: ${risk.izinCount}</div></div>
+      <div class="analysis-stat"><div class="lbl">PTP Bayar</div><div class="val ${risk.ptpBayarRatio<0.3&&s.ptp>5?'bad':''}">${fmtNum(s.ptpBayar)}/${fmtNum(s.ptp)}</div><div class="lbl">${s.ptp>0?Math.round(risk.ptpBayarRatio*100)+'%':'-'} realisasi</div></div>
     </div>
-    ${issueHtml}
+    ${issueGroupHtml}
+    ${catatanHtml}
     ${saranHtml}
-    <div style="margin-top:10px">
+    <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border)">
       <a href="agent.html?agent=${encodeURIComponent(ag)}&bulan=${encodeURIComponent(document.getElementById('selBulan').value)}&tahun=${encodeURIComponent(document.getElementById('selTahun').value)}" style="font-size:12px;color:var(--accent);text-decoration:none;font-weight:500">Detail lengkap agent →</a>
     </div>`;
+
+  analysisEl.innerHTML=bucketSummaryHtml+agentDetailHtml;
+  // Scroll panel analisa ke bagian agent
+  setTimeout(()=>{
+    const panel=analysisEl;
+    const agentPart=panel.querySelector('.analysis-agent-name');
+    if(agentPart)agentPart.scrollIntoView({behavior:'smooth',block:'nearest'});
+  },50);
 }
 
 function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
