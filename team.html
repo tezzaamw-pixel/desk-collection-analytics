@@ -2567,9 +2567,13 @@ function initPresCharts(slideIdx){
   const tooltipRpY={callbacks:{label:ctx=>fmtRpFull(ctx.parsed.y)}};
   const tooltipAct={callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmtNum(Math.round(ctx.parsed.y))}`}};
 
+  const DL=(typeof ChartDataLabels!=='undefined')?ChartDataLabels:null;
+
   const makeBarH=(id,labels,data,colors)=>{
     const el=document.getElementById(id);if(!el)return;
-    const ch=new Chart(el,{type:'bar',
+    const ch=new Chart(el,{
+      plugins:DL?[DL]:[],
+      type:'bar',
       data:{labels,datasets:[{data,backgroundColor:colors||'rgba(29,96,200,0.75)',borderRadius:3}]},
       options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
         layout:{padding:{right:70}},
@@ -2581,7 +2585,9 @@ function initPresCharts(slideIdx){
 
   const makeLineMulti=(id,labels,datasets)=>{
     const el=document.getElementById(id);if(!el)return;
-    const ch=new Chart(el,{type:'line',
+    const ch=new Chart(el,{
+      plugins:DL?[DL]:[],
+      type:'line',
       data:{labels,datasets:datasets.map(d=>({...d,tension:0.3,borderWidth:2,pointRadius:4,fill:false}))},
       options:{responsive:true,maintainAspectRatio:false,
         layout:{padding:{top:20}},
@@ -2593,7 +2599,9 @@ function initPresCharts(slideIdx){
 
   const makeBarMulti=(id,labels,datasets,tooltipCb,isAct)=>{
     const el=document.getElementById(id);if(!el)return;
-    const ch=new Chart(el,{type:'bar',
+    const ch=new Chart(el,{
+      plugins:DL?[DL]:[],
+      type:'bar',
       data:{labels,datasets:datasets.map(d=>({...d,borderRadius:3,borderWidth:0}))},
       options:{responsive:true,maintainAspectRatio:false,
         layout:{padding:{top:20}},
