@@ -1881,6 +1881,7 @@ function buildPresentation(){
       const bkTrend=trendLabel(weeklyPayments(bkRows));
       presSlides.push({
         id:'bkt-'+ap+'-'+bk,
+        apKey:ap, bkKey:bk,
         navLabel:'  └ '+bk,
         navSub:`${bkAgents} agent · ${fmtRp(bkS.dailyPayment)}`,
         appColor:color,navGroup:ap,isGroupChild:true,
@@ -2086,6 +2087,9 @@ function buildAppSlide(ap, rows, s, color, bulan, tahun){
   // ── Per Agent ───────────────────────────────────────────────
   const byAgent={};
   rows.forEach(r=>{const ag=r.agent||'?';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
+  // [FIX LABEL] Deteksi rotasi di level aplikasi
+  const {rotasiMap: apRotasiMap} = buildRotasiMap(rows);
+
   const agRanked=Object.keys(byAgent).map(ag=>{
     const rs=summarizeRows(byAgent[ag]);
     const wPays=weeklyPayments(byAgent[ag]);
@@ -2094,8 +2098,15 @@ function buildAppSlide(ap, rows, s, color, bulan, tahun){
     const total=byAgent[ag].length;
     const hadirNol=byAgent[ag].filter(r=>r.absensi==='Hadir'&&(r.dailyPayment||0)===0).length;
     const catatanCnt=byAgent[ag].filter(r=>r.catatanSPV&&r.catatanSPV.trim()).length;
-    return{ag,s:rs,wPays,trend,hadir,total,hadirNol,catatanCnt};
-  }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
+    const rotasi=apRotasiMap[ag]||null;
+    return{ag,s:rs,wPays,trend,hadir,total,hadirNol,catatanCnt,rotasi};
+  })
+  .sort((a,b)=>{
+    const aL=a.rotasi&&a.rotasi.status==='lama'?1:0;
+    const bL=b.rotasi&&b.rotasi.status==='lama'?1:0;
+    if(aL!==bL)return aL-bL;
+    return b.s.dailyPayment-a.s.dailyPayment;
+  });
 
   // ── Per Bucket ──────────────────────────────────────────────
   const byBucket={};
@@ -2276,15 +2287,16 @@ function buildAppSlide(ap, rows, s, color, bulan, tahun){
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Semua Agent — Detail Lengkap</div>
     <table class="pres-table">
       <thead><tr>
-        <th>#</th><th>Agent</th><th>Hadir</th><th>Payment</th><th>Rate</th>
+        <th>#</th><th>Agent</th><th>Label</th><th>Hadir</th><th>Payment</th><th>Rate</th>
         <th>Sentuh WA</th><th>Respon WA</th><th>Call</th><th>Gojek</th>
         <th>WABA</th><th>SMS</th><th>WA Blokir</th>
         <th>PTP</th><th>PTP Bayar</th><th>Data Bayar</th>
         <th>Catatan</th><th>M1</th><th>M2</th><th>M3</th><th>M4</th><th>Tren</th>
       </tr></thead>
-      <tbody>${agRanked.map((a,i)=>`<tr>
+      <tbody>${agRanked.map((a,i)=>`<tr style="opacity:${a.rotasi&&a.rotasi.status==='lama'?0.55:1}">
         <td style="color:var(--text3);font-weight:600">${i+1}</td>
-        <td style="font-weight:600;color:var(--text);white-space:nowrap">${escH(a.ag)}</td>
+        <td style="font-weight:600;color:${a.rotasi&&a.rotasi.status==='lama'?'var(--text3)':'var(--text)'};white-space:nowrap">${escH(a.ag)}</td>
+        <td style="white-space:nowrap">${a.rotasi?a.rotasi.status==='lama'?'<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:var(--surface2);color:var(--text3)">Nonaktif</span>':'<span style="font-size:10px;padding:1px 5px;border-radius:8px;background:#dbeafe;color:#1d4ed8">Pengganti</span>':'—'}</td>
         <td><span class="absensi-pill ${a.hadir/a.total>0.8?'ab-hadir':'ab-off'}">${a.hadir}/${a.total}</span></td>
         <td style="font-weight:600;color:var(--success)">${fmtRp(a.s.dailyPayment)}</td>
         <td style="${a.s.avgRate<0.01?'color:var(--danger)':a.s.avgRate>=0.02?'color:var(--success)':''}">${fmtRate(a.s.avgRate)}</td>
@@ -2318,6 +2330,9 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
   const sid=SAFE_ID(ap+'_'+bk);
 
   // ── Agent di bucket ini ──────────────────────────────────────
+  // [FIX LABEL] Deteksi rotasi di level bucket
+  const {rotasiMap: bkRotasiMap} = buildRotasiMap(bkRows);
+
   const byAgent={};
   bkRows.forEach(r=>{const ag=r.agent||'?';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
   const agRanked=Object.keys(byAgent).map(ag=>{
@@ -2332,8 +2347,18 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
     const ptpReal=rs.ptp>0?rs.ptpBayar/rs.ptp:0;
     const blokR=rs.sentuhWA>0?rs.waBlokir/rs.sentuhWA:0;
     const connR=rs.callManual>0?rs.callTerhubung/rs.callManual:0;
-    return{ag,s:rs,wPays,trend,hadir,total,hadirNol,alphaCount,catatanCnt,ptpReal,blokR,connR};
-  }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
+    // [FIX LABEL] Info rotasi
+    const rotasi=bkRotasiMap[ag]||null;
+    const namaAkun=byAgent[ag][0]?.namaAkun||'';
+    return{ag,s:rs,wPays,trend,hadir,total,hadirNol,alphaCount,catatanCnt,ptpReal,blokR,connR,rotasi,namaAkun};
+  })
+  .sort((a,b)=>{
+    // [FIX LABEL] Agent lama (nonaktif) ke paling bawah
+    const aLama=a.rotasi&&a.rotasi.status==='lama'?1:0;
+    const bLama=b.rotasi&&b.rotasi.status==='lama'?1:0;
+    if(aLama!==bLama)return aLama-bLama;
+    return b.s.dailyPayment-a.s.dailyPayment;
+  });
 
   const n=agRanked.length||1;
   const wPaysBkt=weeklyPayments(bkRows);
@@ -2473,15 +2498,16 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Detail Semua Agent di Bucket ${escH(bk)}</div>
     <table class="pres-table">
       <thead><tr>
-        <th>#</th><th>Agent</th><th>Hadir</th><th>Alpha</th><th>Payment</th><th>Rate</th>
+        <th>#</th><th>Agent</th><th>Label</th><th>Hadir</th><th>Alpha</th><th>Payment</th><th>Rate</th>
         <th>Sentuh WA</th><th>Respon WA</th><th>WA Blokir%</th>
         <th>Call</th><th>Terhubung%</th><th>Gojek</th><th>WABA</th><th>SMS</th>
         <th>PTP</th><th>PTP Bayar%</th><th>Data Bayar</th>
         <th>Catatan</th><th>M1</th><th>M2</th><th>M3</th><th>M4</th><th>Tren</th>
       </tr></thead>
       <tbody>${agRanked.map((a,i)=>`<tr>
-        <td style="color:var(--text3);font-weight:600">${i===0?'🥇':i===1?'🥈':i===2?'🥉':i+1}</td>
-        <td style="font-weight:600;color:var(--text);white-space:nowrap">${escH(a.ag)}</td>
+        <td style="color:var(--text3);font-weight:600;opacity:${a.rotasi&&a.rotasi.status==='lama'?0.5:1}">${i===0&&(!a.rotasi||a.rotasi.status!=='lama')?'🥇':i===1&&(!a.rotasi||a.rotasi.status!=='lama')?'🥈':i===2&&(!a.rotasi||a.rotasi.status!=='lama')?'🥉':i+1}</td>
+        <td style="font-weight:600;color:${a.rotasi&&a.rotasi.status==='lama'?'var(--text3)':'var(--text)'};white-space:nowrap;opacity:${a.rotasi&&a.rotasi.status==='lama'?0.6:1}">${escH(a.ag)}${a.namaAkun?`<div style="font-size:9px;color:var(--text3);font-weight:400;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px">${escH(a.namaAkun)}</div>`:''}</td>
+        <td style="white-space:nowrap">${a.rotasi?a.rotasi.status==='lama'?`<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--surface2);color:var(--text3)">Nonaktif</span>`+( a.rotasi.lawan?` <span style="font-size:10px;color:var(--text3)">→ ${escH(a.rotasi.lawan.split(' ')[0])}</span>`:''): `<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:#dbeafe;color:#1d4ed8">Pengganti</span>`+(a.rotasi.lawan?` <span style="font-size:10px;color:var(--text3)">dari ${escH(a.rotasi.lawan.split(' ')[0])}</span>`:''): '<span style="color:var(--text3);font-size:10px">—</span>'}</td>
         <td><span class="absensi-pill ${a.hadir/a.total>0.8?'ab-hadir':'ab-off'}">${a.hadir}/${a.total}</span></td>
         <td style="${a.alphaCount>0?'color:var(--danger);font-weight:700':''}">${a.alphaCount||'—'}</td>
         <td style="font-weight:600;color:${a.s.dailyPayment===0?'var(--danger)':'var(--success)'}">${fmtRp(a.s.dailyPayment)}</td>
@@ -2517,6 +2543,37 @@ function toggleNavGroup(groupId){
 function fmtRpFull(v){
   if(!v||v===0)return'Rp 0';
   return'Rp '+Math.round(v).toLocaleString('id-ID');
+}
+
+// ================================================================
+// HELPER: Deteksi rotasi agent dari rows (reusable)
+// Return: { akunMap, rotasiMap }
+// rotasiMap[ag] = { status:'lama'|'baru', lawan, changeDate, bucketAktif }
+// ================================================================
+function buildRotasiMap(rows){
+  const akunToAgents={};
+  rows.forEach(r=>{
+    if(!r.namaAkun||!r.agent)return;
+    if(!akunToAgents[r.namaAkun])akunToAgents[r.namaAkun]=new Set();
+    akunToAgents[r.namaAkun].add(r.agent);
+  });
+  const rotasiMap={};
+  Object.keys(akunToAgents).filter(akun=>akunToAgents[akun].size>1).forEach(akun=>{
+    const agList=[...akunToAgents[akun]];
+    const lastRow={};
+    rows.filter(r=>r.namaAkun===akun&&r.tanggal).forEach(r=>{
+      if(!lastRow[r.agent]||r.tanggal>lastRow[r.agent])lastRow[r.agent]=r.tanggal;
+    });
+    const sorted=agList.sort((a,b)=>lastRow[b]>lastRow[a]?1:-1);
+    const agBaru=sorted[0];
+    sorted.slice(1).forEach(agLama=>{
+      rotasiMap[agLama]={status:'lama',lawan:agBaru,changeDate:lastRow[agLama]||'',bucketAktif:null};
+    });
+    if(!rotasiMap[agBaru]){
+      rotasiMap[agBaru]={status:'baru',lawan:sorted[1]||'',changeDate:lastRow[agBaru]||'',bucketAktif:null};
+    }
+  });
+  return{akunMap:akunToAgents, rotasiMap};
 }
 
 function initPresCharts(slideIdx){
@@ -2629,34 +2686,46 @@ function initPresCharts(slideIdx){
 
   // ── Slide Bucket ──────────────────────────────────────────────
   if(slide.id.startsWith('bkt-')){
-    ap=slide.navGroup||'';
-    const rest=slide.id.replace(/^bkt-/,'');
-    let bk=rest.replace(ap+'-','');
-    if(!bk&&ap)bk=rest.slice(ap.length+1);
-    if(!bk)bk=rest;
+    // [FIX GRAFIK] Gunakan apKey & bkKey yang disimpan langsung di slide object
+    // bukan parsing string ID yang rawan error
+    const ap=slide.apKey||slide.navGroup||'';
+    const bk=slide.bkKey||'';
+    if(!ap||!bk){console.warn('initPresCharts: apKey/bkKey missing',slide);return;}
 
     const sid=SAFE_ID(ap+'_'+bk);
     const bkRows=allRows.filter(r=>r.aplikasi===ap&&r.bucket===bk);
+    if(!bkRows.length){console.warn('initPresCharts: no rows for',ap,bk);return;}
     const color=getColor(ap);
+
+    // Deteksi rotasi untuk filter nonaktif
+    const {akunMap, rotasiMap} = buildRotasiMap(bkRows);
 
     const byAgent={};
     bkRows.forEach(r=>{const ag=r.agent||'?';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
-    const agRanked=Object.keys(byAgent).map(ag=>{
-      const s=summarizeRows(byAgent[ag]);
-      return{ag,pay:s.dailyPayment,wPays:weeklyPayments(byAgent[ag]),wa:s.sentuhWA,call:s.callManual,gojek:s.sentuhGojek};
-    }).sort((a,b)=>b.pay-a.pay);
+    const agRanked=Object.keys(byAgent)
+      .filter(ag=>{
+        // [FIX LABEL 1] Exclude agent nonaktif (status lama tidak ada di range)
+        const rot=rotasiMap[ag];
+        return!(rot&&rot.status==='lama');
+      })
+      .map(ag=>{
+        const s=summarizeRows(byAgent[ag]);
+        return{ag,pay:s.dailyPayment,wPays:weeklyPayments(byAgent[ag]),wa:s.sentuhWA,call:s.callManual,gojek:s.sentuhGojek};
+      }).sort((a,b)=>b.pay-a.pay);
     const top5=agRanked.slice(0,5);
 
-    makeBarMulti('presChart-bkwk-'+sid,wkLabels,[{label:bk,data:weeklyPayments(bkRows),backgroundColor:color+'AA'}]);
-    makeBarH('presChart-bkag-'+sid,agRanked.slice(0,10).map(x=>x.ag.split(' ')[0]),agRanked.slice(0,10).map(x=>x.pay),PALETTE.concat(PALETTE).slice(0,10));
-    makeLineMulti('presChart-bkagw-'+sid,wkLabels,
+    // Pastikan canvas ada sebelum membuat chart
+    const tryMake=(fn)=>{try{fn();}catch(e){console.warn('Chart error:',e);}};
+    tryMake(()=>makeBarMulti('presChart-bkwk-'+sid,wkLabels,[{label:bk,data:weeklyPayments(bkRows),backgroundColor:color+'AA'}]));
+    tryMake(()=>makeBarH('presChart-bkag-'+sid,agRanked.slice(0,10).map(x=>x.ag.split(' ')[0]),agRanked.slice(0,10).map(x=>x.pay),PALETTE.concat(PALETTE).slice(0,10)));
+    tryMake(()=>makeLineMulti('presChart-bkagw-'+sid,wkLabels,
       top5.map((a,i)=>({label:a.ag.split(' ')[0],data:a.wPays,borderColor:PALETTE[i%PALETTE.length],backgroundColor:PALETTE[i%PALETTE.length].replace('0.85','0.15')}))
-    );
-    makeBarMulti('presChart-bkact-'+sid,top5.map(a=>a.ag.split(' ')[0]),[
+    ));
+    tryMake(()=>makeBarMulti('presChart-bkact-'+sid,top5.map(a=>a.ag.split(' ')[0]),[
       {label:'Sentuh WA',data:top5.map(a=>a.wa),backgroundColor:'rgba(29,96,200,0.8)'},
       {label:'Call Manual',data:top5.map(a=>a.call),backgroundColor:'rgba(16,185,129,0.8)'},
       {label:'Sentuh Gojek',data:top5.map(a=>a.gojek),backgroundColor:'rgba(245,158,11,0.8)'},
-    ],tooltipAct,true);
+    ],tooltipAct,true));
     return;
   }
 
@@ -2674,12 +2743,13 @@ function initPresCharts(slideIdx){
   appRows.forEach(r=>{const bk=r.bucket||'?';if(!byBucket[bk])byBucket[bk]=[];byBucket[bk].push(r);});
   const bkRanked=Object.keys(byBucket).map(bk=>({bk,pay:summarizeRows(byBucket[bk]).dailyPayment,wPays:weeklyPayments(byBucket[bk])})).sort((a,b)=>b.pay-a.pay);
 
-  makeBarMulti('presChart-wk-'+sid,wkLabels,[{label:ap,data:weeklyPayments(appRows),backgroundColor:color+'AA'}]);
-  makeBarH('presChart-ag-'+sid,agRanked.slice(0,5).map(x=>x.ag.split(' ')[0]),agRanked.slice(0,5).map(x=>x.pay),color+'BB');
-  makeBarH('presChart-bk-'+sid,bkRanked.map(x=>x.bk),bkRanked.map(x=>x.pay),'rgba(16,185,129,0.7)');
-  makeBarMulti('presChart-bkw-'+sid,wkLabels,bkRanked.slice(0,5).map((b,i)=>({label:b.bk,data:b.wPays,backgroundColor:PALETTE[i%PALETTE.length]})));
-  makeLineMulti('presChart-agw-'+sid,wkLabels,agRanked.slice(0,5).map((a,i)=>({label:a.ag.split(' ')[0],data:a.wPays,borderColor:PALETTE[i%PALETTE.length],backgroundColor:PALETTE[i%PALETTE.length].replace('0.85','0.15')})));
-  makeBarH('presChart-agacc-'+sid,agRanked.slice(0,10).map(x=>x.ag.split(' ')[0]),agRanked.slice(0,10).map(x=>x.pay),PALETTE.concat(PALETTE).slice(0,10));
+  const tryMakeApp=(fn)=>{try{fn();}catch(e){console.warn('App chart error:',e);}};
+  tryMakeApp(()=>makeBarMulti('presChart-wk-'+sid,wkLabels,[{label:ap,data:weeklyPayments(appRows),backgroundColor:color+'AA'}]));
+  tryMakeApp(()=>makeBarH('presChart-ag-'+sid,agRanked.slice(0,5).map(x=>x.ag.split(' ')[0]),agRanked.slice(0,5).map(x=>x.pay),color+'BB'));
+  tryMakeApp(()=>makeBarH('presChart-bk-'+sid,bkRanked.map(x=>x.bk),bkRanked.map(x=>x.pay),'rgba(16,185,129,0.7)'));
+  tryMakeApp(()=>makeBarMulti('presChart-bkw-'+sid,wkLabels,bkRanked.slice(0,5).map((b,i)=>({label:b.bk,data:b.wPays,backgroundColor:PALETTE[i%PALETTE.length]}))));
+  tryMakeApp(()=>makeLineMulti('presChart-agw-'+sid,wkLabels,agRanked.slice(0,5).map((a,i)=>({label:a.ag.split(' ')[0],data:a.wPays,borderColor:PALETTE[i%PALETTE.length],backgroundColor:PALETTE[i%PALETTE.length].replace('0.85','0.15')}))));
+  tryMakeApp(()=>makeBarH('presChart-agacc-'+sid,agRanked.slice(0,10).map(x=>x.ag.split(' ')[0]),agRanked.slice(0,10).map(x=>x.pay),PALETTE.concat(PALETTE).slice(0,10)));
 }
 
 // Enable tombol presentasi setelah data load — dilakukan di loadData(), bukan override renderAll
