@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Tim — Desk Collection Analytics</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
 <style>
 :root{
   --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
@@ -1599,7 +1600,7 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
         <span class="agent-link" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${catatanDot}${rotasiLabel}
       </td>
       <td><span class="absensi-pill ${hadir}">${a.hadir}/${a.total}</span></td>
-      <td class="num">${fmtRp(a.s.dailyPayment)}</td>
+      <td class="num" style="white-space:nowrap">${fmtRpFull(a.s.dailyPayment)}</td>
       ${metricCells}
     </tr>
     <tr class="agent-preview-row" id="prev-row-${agId}">
@@ -2512,14 +2513,58 @@ function toggleNavGroup(groupId){
   if(toggle)toggle.classList.toggle('collapsed');
 }
 
+// Format angka: selalu penuh untuk payment
+function fmtRpFull(v){
+  if(!v||v===0)return'Rp 0';
+  return'Rp '+Math.round(v).toLocaleString('id-ID');
+}
+
 function initPresCharts(slideIdx){
   const isDark=document.documentElement.getAttribute('data-theme')==='dark';
   const gc=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)';
   const tc=isDark?'#9aa5be':'#9ca3af';
+  const labelColor=isDark?'rgba(255,255,255,0.75)':'rgba(0,0,0,0.65)';
 
-  const rpFmt=v=>v>=1e6?(v/1e6).toFixed(1)+'jt':v>=1e3?(v/1e3).toFixed(0)+'rb':v>0?String(Math.round(v)):'0';
-  const tooltipRp={callbacks:{label:ctx=>{const v=ctx.parsed.x??ctx.parsed.y;return'Rp '+rpFmt(v);}}};
-  const tooltipRpY={callbacks:{label:ctx=>{const v=ctx.parsed.y;return'Rp '+rpFmt(v);}}};
+  const rpFmt=v=>v>=1e9?(v/1e9).toFixed(2)+'M':v>=1e6?(v/1e6).toFixed(1)+'jt':v>=1e3?(v/1e3).toFixed(0)+'rb':v>0?String(Math.round(v)):'0';
+  const rpFmtShort=v=>v>=1e9?'Rp '+(v/1e9).toFixed(2)+'M':v>=1e6?'Rp '+(v/1e6).toFixed(1)+'jt':v>=1e3?'Rp '+(v/1e3).toFixed(0)+'rb':v>0?'Rp '+Math.round(v):'Rp 0';
+
+  // Datalabels plugin — tampilkan angka di tiap bar/point
+  const datalabelsBarH={
+    id:'datalabels',
+    formatter:(v)=>rpFmtShort(v),
+    anchor:'end',align:'end',
+    color:labelColor,
+    font:{size:9,weight:'600'},
+    padding:{left:2}
+  };
+  const datalabelsBarV={
+    id:'datalabels',
+    formatter:(v)=>rpFmtShort(v),
+    anchor:'end',align:'top',
+    color:labelColor,
+    font:{size:8,weight:'600'},
+    rotation:0,
+    padding:{bottom:2}
+  };
+  const datalabelsLine={
+    id:'datalabels',
+    formatter:(v)=>v>0?rpFmtShort(v):'',
+    anchor:'top',align:'top',
+    color:labelColor,
+    font:{size:8,weight:'600'},
+    padding:{bottom:2}
+  };
+  const datalabelsAct={
+    id:'datalabels',
+    formatter:(v)=>v>0?fmtNum(Math.round(v)):'',
+    anchor:'end',align:'top',
+    color:labelColor,
+    font:{size:8,weight:'600'},
+    padding:{bottom:1}
+  };
+
+  const tooltipRp={callbacks:{label:ctx=>{const v=ctx.parsed.x??ctx.parsed.y;return fmtRpFull(v);}}};
+  const tooltipRpY={callbacks:{label:ctx=>fmtRpFull(ctx.parsed.y)}};
   const tooltipAct={callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmtNum(Math.round(ctx.parsed.y))}`}};
 
   const makeBarH=(id,labels,data,colors)=>{
@@ -2527,27 +2572,34 @@ function initPresCharts(slideIdx){
     const ch=new Chart(el,{type:'bar',
       data:{labels,datasets:[{data,backgroundColor:colors||'rgba(29,96,200,0.75)',borderRadius:3}]},
       options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:false},tooltip:tooltipRp},
+        layout:{padding:{right:70}},
+        plugins:{legend:{display:false},tooltip:tooltipRp,datalabels:datalabelsBarH},
         scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:9},callback:rpFmt}},
                 y:{grid:{display:false},ticks:{color:tc,font:{size:9}}}}}
     });presCharts.push(ch);
   };
+
   const makeLineMulti=(id,labels,datasets)=>{
     const el=document.getElementById(id);if(!el)return;
     const ch=new Chart(el,{type:'line',
-      data:{labels,datasets:datasets.map(d=>({...d,tension:0.3,borderWidth:2,pointRadius:3,fill:false}))},
+      data:{labels,datasets:datasets.map(d=>({...d,tension:0.3,borderWidth:2,pointRadius:4,fill:false}))},
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:true,labels:{color:tc,font:{size:9},boxWidth:10}},tooltip:tooltipRpY},
+        layout:{padding:{top:20}},
+        plugins:{legend:{display:true,labels:{color:tc,font:{size:9},boxWidth:10}},tooltip:tooltipRpY,datalabels:datalabelsLine},
         scales:{x:{grid:{color:gc},ticks:{color:tc,font:{size:9}}},
                 y:{grid:{color:gc},ticks:{color:tc,font:{size:9},callback:rpFmt}}}}
     });presCharts.push(ch);
   };
-  const makeBarMulti=(id,labels,datasets,tooltipCb)=>{
+
+  const makeBarMulti=(id,labels,datasets,tooltipCb,isAct)=>{
     const el=document.getElementById(id);if(!el)return;
     const ch=new Chart(el,{type:'bar',
       data:{labels,datasets:datasets.map(d=>({...d,borderRadius:3,borderWidth:0}))},
       options:{responsive:true,maintainAspectRatio:false,
-        plugins:{legend:{display:true,labels:{color:tc,font:{size:9},boxWidth:10}},tooltip:tooltipCb||tooltipRpY},
+        layout:{padding:{top:20}},
+        plugins:{legend:{display:true,labels:{color:tc,font:{size:9},boxWidth:10}},
+          tooltip:tooltipCb||tooltipRpY,
+          datalabels:isAct?datalabelsAct:datalabelsBarV},
         scales:{x:{grid:{display:false},ticks:{color:tc,font:{size:9}}},
                 y:{grid:{color:gc},ticks:{color:tc,font:{size:9},callback:rpFmt}}}}
     });presCharts.push(ch);
@@ -2569,15 +2621,9 @@ function initPresCharts(slideIdx){
 
   // ── Slide Bucket ──────────────────────────────────────────────
   if(slide.id.startsWith('bkt-')){
-    // id format: bkt-{ap}-{bk}
-    const rest=slide.id.replace(/^bkt-/,'');
-    // Cari ap dari presSlides — cari parent group
-    let ap='',bk='';
-    // Cara aman: cari aplikasi yang cocok dari allRows
-    // slide.navGroup sudah menyimpan ap
     ap=slide.navGroup||'';
-    bk=rest.replace(ap+'-','');
-    // fallback: parse dari rest berdasarkan ap yang diketahui
+    const rest=slide.id.replace(/^bkt-/,'');
+    let bk=rest.replace(ap+'-','');
     if(!bk&&ap)bk=rest.slice(ap.length+1);
     if(!bk)bk=rest;
 
@@ -2587,41 +2633,22 @@ function initPresCharts(slideIdx){
 
     const byAgent={};
     bkRows.forEach(r=>{const ag=r.agent||'?';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
-    const agRanked=Object.keys(byAgent).map(ag=>({ag,pay:summarizeRows(byAgent[ag]).dailyPayment,wPays:weeklyPayments(byAgent[ag]),
-      wa:summarizeRows(byAgent[ag]).sentuhWA,call:summarizeRows(byAgent[ag]).callManual,
-      gojek:summarizeRows(byAgent[ag]).sentuhGojek
-    })).sort((a,b)=>b.pay-a.pay);
+    const agRanked=Object.keys(byAgent).map(ag=>{
+      const s=summarizeRows(byAgent[ag]);
+      return{ag,pay:s.dailyPayment,wPays:weeklyPayments(byAgent[ag]),wa:s.sentuhWA,call:s.callManual,gojek:s.sentuhGojek};
+    }).sort((a,b)=>b.pay-a.pay);
     const top5=agRanked.slice(0,5);
 
-    // Chart 1: Tren payment mingguan bucket (batang)
-    makeBarMulti('presChart-bkwk-'+sid,wkLabels,[{
-      label:bk,data:weeklyPayments(bkRows),backgroundColor:color+'AA'
-    }]);
-
-    // Chart 2: Payment per agent akumulasi (horizontal)
-    makeBarH('presChart-bkag-'+sid,
-      agRanked.slice(0,10).map(x=>x.ag.split(' ')[0]),
-      agRanked.slice(0,10).map(x=>x.pay),
-      PALETTE.concat(PALETTE).slice(0,agRanked.slice(0,10).length)
-    );
-
-    // Chart 3: Tren mingguan per agent - top 5 (line)
+    makeBarMulti('presChart-bkwk-'+sid,wkLabels,[{label:bk,data:weeklyPayments(bkRows),backgroundColor:color+'AA'}]);
+    makeBarH('presChart-bkag-'+sid,agRanked.slice(0,10).map(x=>x.ag.split(' ')[0]),agRanked.slice(0,10).map(x=>x.pay),PALETTE.concat(PALETTE).slice(0,10));
     makeLineMulti('presChart-bkagw-'+sid,wkLabels,
-      top5.map((a,i)=>({
-        label:a.ag.split(' ')[0],data:a.wPays,
-        borderColor:PALETTE[i%PALETTE.length],
-        backgroundColor:PALETTE[i%PALETTE.length].replace('0.85','0.15')
-      }))
+      top5.map((a,i)=>({label:a.ag.split(' ')[0],data:a.wPays,borderColor:PALETTE[i%PALETTE.length],backgroundColor:PALETTE[i%PALETTE.length].replace('0.85','0.15')}))
     );
-
-    // Chart 4: Aktivitas rata-rata per agent (grouped bar - WA, Call, Gojek)
-    const n=Math.max(agRanked.length,1);
-    const actLabels=top5.map(a=>a.ag.split(' ')[0]);
-    makeBarMulti('presChart-bkact-'+sid,actLabels,[
+    makeBarMulti('presChart-bkact-'+sid,top5.map(a=>a.ag.split(' ')[0]),[
       {label:'Sentuh WA',data:top5.map(a=>a.wa),backgroundColor:'rgba(29,96,200,0.8)'},
       {label:'Call Manual',data:top5.map(a=>a.call),backgroundColor:'rgba(16,185,129,0.8)'},
       {label:'Sentuh Gojek',data:top5.map(a=>a.gojek),backgroundColor:'rgba(245,158,11,0.8)'},
-    ],tooltipAct);
+    ],tooltipAct,true);
     return;
   }
 
