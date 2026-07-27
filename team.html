@@ -142,7 +142,9 @@ select:focus{border-color:var(--accent);}
 .agent-detail.open{display:block;}
 .agent-detail-inner{overflow-x:auto;}
 .agent-table{width:100%;border-collapse:collapse;font-size:12px;white-space:nowrap;}
-.agent-table th{text-align:left;padding:8px 14px;color:var(--text3);font-weight:500;border-bottom:1px solid var(--border);background:var(--surface2);position:sticky;top:0;}
+.agent-table th{text-align:left;padding:8px 14px;color:var(--text3);font-weight:500;border-bottom:1px solid var(--border);background:var(--surface2);position:sticky;top:0;white-space:normal;word-break:break-word;min-width:52px;max-width:100px;vertical-align:bottom;}
+.agent-table th:first-child{min-width:140px;max-width:none;white-space:nowrap;}
+.agent-table th:nth-child(2),.agent-table th:nth-child(3){min-width:60px;max-width:none;white-space:nowrap;}
 .agent-table td{padding:8px 14px;border-bottom:1px solid var(--border);color:var(--text2);}
 .agent-table tr:last-child td{border-bottom:none;}
 .agent-table tr.agent-row:hover td{background:var(--surface2);}
@@ -169,7 +171,8 @@ select:focus{border-color:var(--accent);}
 .preview-stat .val{font-size:14px;font-weight:700;color:var(--text);}
 .preview-daily{overflow-x:auto;margin-top:8px;}
 .preview-daily-table{width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap;}
-.preview-daily-table th{padding:5px 10px;color:var(--text3);font-weight:500;border-bottom:1px solid var(--border);background:var(--surface2);text-align:left;}
+.preview-daily-table th{padding:5px 10px;color:var(--text3);font-weight:500;border-bottom:1px solid var(--border);background:var(--surface2);text-align:left;white-space:normal;word-break:break-word;min-width:48px;max-width:90px;vertical-align:bottom;}
+.preview-daily-table th:first-child,.preview-daily-table th:nth-child(2),.preview-daily-table th:nth-child(3),.preview-daily-table th:nth-child(4){min-width:unset;max-width:none;white-space:nowrap;}
 .preview-daily-table td{padding:5px 10px;border-bottom:1px solid var(--border);color:var(--text2);}
 .preview-daily-table tr:last-child td{border-bottom:none;}
 .preview-link{display:inline-block;margin-top:10px;font-size:12px;color:var(--accent);text-decoration:none;font-weight:500;}
@@ -1636,7 +1639,7 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
     const dailyRows=a.rows.sort((x,y)=>(x.tanggal||'').localeCompare(y.tanggal||'')).map(r=>`<tr>
       <td>${r.tanggal||'—'}</td>
       <td>${r.absensi||'—'}</td>
-      <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis;color:var(--text2)">${r.catatanSPV||'—'}</td>
+      <td style="max-width:160px;white-space:normal;word-break:break-word;color:var(--text2);line-height:1.4">${r.catatanSPV||'—'}</td>
       <td>${fmtRp(r.dailyPayment)}</td>
       ${previewSetupCols.map(m=>`<td>${fmtMetric(m,r[m.key]||0)}</td>`).join('')}
     </tr>`).join('');
@@ -1824,7 +1827,7 @@ function switchSetup(spv,idx){
       pTbody.innerHTML=sorted.map(r=>`<tr>
         <td>${r.tanggal||'—'}</td>
         <td>${r.absensi||'—'}</td>
-        <td style="max-width:140px;overflow:hidden;text-overflow:ellipsis">${r.catatanSPV||'—'}</td>
+        <td style="max-width:160px;white-space:normal;word-break:break-word;line-height:1.4">${r.catatanSPV||'—'}</td>
         <td>${fmtRp(r.dailyPayment)}</td>
         ${previewCols.map(m=>`<td>${fmtMetric(m,r[m.key]||0)}</td>`).join('')}
       </tr>`).join('');
