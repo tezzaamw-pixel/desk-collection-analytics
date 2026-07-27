@@ -2658,10 +2658,12 @@ function initPresCharts(slideIdx){
   const rpFmt=v=>v>=1e9?(v/1e9).toFixed(2)+'M':v>=1e6?(v/1e6).toFixed(1)+'jt':v>=1e3?(v/1e3).toFixed(0)+'rb':v>0?String(Math.round(v)):'0';
   const rpFmtShort=v=>v>=1e9?'Rp '+(v/1e9).toFixed(2)+'M':v>=1e6?'Rp '+(v/1e6).toFixed(1)+'jt':v>=1e3?'Rp '+(v/1e3).toFixed(0)+'rb':v>0?'Rp '+Math.round(v):'Rp 0';
 
+  const DL=(typeof ChartDataLabels!=='undefined')?ChartDataLabels:null;
+  const showDL=presShowLabels!==false;
+
   // Datalabels plugin — tampilkan angka di tiap bar/point
   const datalabelsBarH={
-    id:'datalabels',
-    display: showDL,
+    display:showDL,
     formatter:(v)=>rpFmtShort(v),
     anchor:'end',align:'end',
     color:labelColor,
@@ -2669,8 +2671,7 @@ function initPresCharts(slideIdx){
     padding:{left:2}
   };
   const datalabelsBarV={
-    id:'datalabels',
-    display: showDL,
+    display:showDL,
     formatter:(v)=>rpFmtShort(v),
     anchor:'end',align:'top',
     color:labelColor,
@@ -2679,8 +2680,7 @@ function initPresCharts(slideIdx){
     padding:{bottom:2}
   };
   const datalabelsLine={
-    id:'datalabels',
-    display: showDL,
+    display:showDL,
     formatter:(v)=>v>0?rpFmtShort(v):'',
     anchor:'top',align:'top',
     color:labelColor,
@@ -2688,8 +2688,7 @@ function initPresCharts(slideIdx){
     padding:{bottom:2}
   };
   const datalabelsAct={
-    id:'datalabels',
-    display: showDL,
+    display:showDL,
     formatter:(v)=>v>0?fmtNum(Math.round(v)):'',
     anchor:'end',align:'top',
     color:labelColor,
@@ -2701,9 +2700,6 @@ function initPresCharts(slideIdx){
   const tooltipRpY={callbacks:{label:ctx=>fmtRpFull(ctx.parsed.y)}};
   const tooltipAct={callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmtNum(Math.round(ctx.parsed.y))}`}};
 
-  const DL=(typeof ChartDataLabels!=='undefined')?ChartDataLabels:null;
-  // Gunakan state presShowLabels untuk semua chart di slide ini
-  const showDL = presShowLabels !== false;
 
   const makeBarH=(id,labels,data,colors)=>{
     const el=document.getElementById(id);if(!el)return;

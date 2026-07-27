@@ -650,12 +650,24 @@ function buildRotasiMapApp(rows){
     rows.filter(r=>r.namaAkun===akun&&r.tanggal).forEach(r=>{
       if(!lastRow[r.agent]||r.tanggal>lastRow[r.agent])lastRow[r.agent]=r.tanggal;
     });
+    const firstRow={};
+    rows.filter(r=>r.namaAkun===akun&&r.tanggal).forEach(r=>{
+      if(!firstRow[r.agent]||r.tanggal<firstRow[r.agent])firstRow[r.agent]=r.tanggal;
+    });
     const sorted=agList.sort((a,b)=>(lastRow[b]||'')>(lastRow[a]||'')?1:-1);
     const agBaru=sorted[0];
+    // Format tanggal: "7 Jul"
+    const fmtTgl=t=>{
+      if(!t)return'';
+      const parts=t.split('-');
+      if(parts.length<3)return t;
+      const bulanNama=['','Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+      return parseInt(parts[2])+' '+(bulanNama[parseInt(parts[1])]||parts[1]);
+    };
     sorted.slice(1).forEach(agLama=>{
-      rotasiMap[agLama]={status:'lama',lawan:agBaru};
+      rotasiMap[agLama]={status:'lama',lawan:agBaru,lawanFirstName:agBaru.split(' ')[0],changeDate:fmtTgl(lastRow[agLama])};
     });
-    if(!rotasiMap[agBaru])rotasiMap[agBaru]={status:'baru',lawan:sorted[1]||''};
+    if(!rotasiMap[agBaru])rotasiMap[agBaru]={status:'baru',lawan:sorted[1]||'',lawanFirstName:(sorted[1]||'').split(' ')[0],changeDate:fmtTgl(firstRow[agBaru])};
   });
   return rotasiMap;
 }
@@ -663,8 +675,15 @@ function buildRotasiMapApp(rows){
 function getAgentLabelHtml(ag, rotasiMap){
   const r=rotasiMap[ag];
   if(!r)return'';
-  if(r.status==='lama')return`<span class="label-nonaktif">Nonaktif</span>`;
-  if(r.status==='baru')return`<span class="label-pengganti">Pengganti</span>`;
+  if(r.status==='lama'){
+    const tgl=r.changeDate?` ${r.changeDate}`:'';
+    return`<span class="label-nonaktif">Nonaktif${tgl}</span>`;
+  }
+  if(r.status==='baru'){
+    const nama=r.lawanFirstName?` (${r.lawanFirstName})`:'';
+    const tgl=r.changeDate?` ${r.changeDate}`:'';
+    return`<span class="label-pengganti">Pengganti${nama}${tgl}</span>`;
+  }
   return'';
 }
 
@@ -735,7 +754,7 @@ function renderACR(){
           <div class="acr-akun-name">${a.namaAkun}</div>
           <div class="acr-agent-name">
             <a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">${a.ag}</a>
-            ${a.rot&&a.rot.status==='baru'?'<span class="label-pengganti">Pengganti</span>':''}</div>
+            ${a.rot&&a.rot.status==='baru'?`<span class="label-pengganti">Pengganti${a.rot.lawanFirstName?' ('+a.rot.lawanFirstName+')':''}${a.rot.changeDate?' '+a.rot.changeDate:''}</span>`:''}</div>
         </div>
         <div class="acr-agent-val">${valStr(a)}</div>
       </div>`).join('')
@@ -786,8 +805,8 @@ function renderWeeklySummaryTable(agents, totalPayment, bulan, tahun, rotasiMap)
     // Label badge
     const labelHtml=a.rot
       ?a.rot.status==='lama'
-        ?'<span class="label-nonaktif">Nonaktif</span>'
-        :'<span class="label-pengganti">Pengganti</span>'
+        ?`<span class="label-nonaktif">Nonaktif${a.rot.changeDate?' '+a.rot.changeDate:''}</span>`
+        :`<span class="label-pengganti">Pengganti${a.rot.lawanFirstName?' ('+a.rot.lawanFirstName+')':''}${a.rot.changeDate?' '+a.rot.changeDate:''}</span>`
       :'';
     return`<tr style="opacity:${isNonaktif?0.45:1}">
       <td class="bold">${a.namaAkun}</td>
