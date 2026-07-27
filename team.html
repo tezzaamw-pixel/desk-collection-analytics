@@ -1898,6 +1898,17 @@ let presMode = 'akumulasi';
 let presCompareWeeks = [1, 2];
 
 // Filter rows sesuai mode aktif
+// Kembalikan nomor minggu (1-5) dari string tanggal 'YYYY-MM-DD'
+function getWeekNum(tanggal){
+  if(!tanggal)return 0;
+  const d=parseInt((tanggal.split('-')[2])||0);
+  if(d<=7) return 1;
+  if(d<=14) return 2;
+  if(d<=21) return 3;
+  if(d<=28) return 4;
+  return 5;
+}
+
 function getRowsForMode(rows){
   if(presMode==='akumulasi') return rows;
   if(presMode==='compare'){
