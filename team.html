@@ -290,8 +290,26 @@ select:focus{border-color:var(--accent);}
 .btn-pres-nav:hover{background:var(--accent-bg);border-color:var(--accent);color:var(--accent);}
 .btn-pres-nav:disabled{opacity:.4;cursor:not-allowed;}
 .pres-slide-counter{font-size:12px;color:var(--text3);}
-/* Tombol presentasi di sidebar utama */
-.pres-trigger-btn{display:flex;align-items:center;gap:8px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;transition:all .15s;text-decoration:none;margin-bottom:2px;border:1px solid var(--border);background:var(--surface2);width:100%;}
+/* MODE PANEL SIDEBAR */
+.pres-mode-panel{padding:12px;border-bottom:1px solid rgba(255,255,255,0.1);flex-shrink:0;}
+.pres-mode-label{font-size:10px;font-weight:700;color:rgba(255,255,255,0.35);letter-spacing:.08em;text-transform:uppercase;margin-bottom:8px;}
+.pres-mode-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;margin-bottom:8px;}
+.pres-mode-tab{padding:5px 4px;font-size:11px;font-weight:600;border:1px solid rgba(255,255,255,0.12);border-radius:6px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.55);cursor:pointer;text-align:center;transition:all .15s;}
+.pres-mode-tab:hover{background:rgba(255,255,255,0.12);color:#fff;}
+.pres-mode-tab.active{background:var(--accent);border-color:var(--accent);color:#fff;}
+.pres-compare-row{display:none;align-items:center;gap:6px;margin-top:6px;}
+.pres-compare-row.visible{display:flex;}
+.pres-compare-row label{font-size:10px;color:rgba(255,255,255,0.45);}
+.pres-compare-sel{flex:1;padding:4px 6px;font-size:11px;border-radius:5px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:#fff;cursor:pointer;}
+.pres-compare-sel option{background:#1e293b;color:#fff;}
+.pres-compare-vs{font-size:10px;color:rgba(255,255,255,0.4);font-weight:700;}
+.pres-mode-apply{width:100%;margin-top:6px;padding:5px;font-size:11px;font-weight:600;border-radius:5px;border:none;background:var(--accent);color:#fff;cursor:pointer;display:none;}
+.pres-mode-apply.visible{display:block;}
+/* Toggle angka di sidebar bawah */
+.pres-sidebar-bottom{padding:10px 12px;border-top:1px solid rgba(255,255,255,0.1);flex-shrink:0;}
+.pres-toggle-labels{width:100%;padding:7px;font-size:12px;font-weight:600;border-radius:6px;border:1px solid rgba(255,255,255,0.15);background:rgba(255,255,255,0.08);color:rgba(255,255,255,0.7);cursor:pointer;text-align:center;transition:all .15s;}
+.pres-toggle-labels:hover{background:rgba(255,255,255,0.15);color:#fff;}
+.pres-toggle-labels.active{background:rgba(29,96,200,0.3);border-color:var(--accent);color:var(--accent);}
 .pres-trigger-btn:hover{background:var(--accent-bg);color:var(--accent);border-color:var(--accent);}
 .pres-nav-group-header{border-top:1px solid rgba(255,255,255,0.08);margin-top:4px;padding-top:4px;}
 .attention-list{display:flex;flex-direction:column;gap:6px;}
@@ -431,16 +449,47 @@ select:focus{border-color:var(--accent);}
       </div>
       <button class="btn-pres-close" onclick="closePresentation()">✕ Tutup</button>
     </div>
+    <!-- MODE PANEL -->
+    <div class="pres-mode-panel">
+      <div class="pres-mode-label">Mode Data</div>
+      <div class="pres-mode-tabs">
+        <div class="pres-mode-tab active" id="presMode-akumulasi" onclick="setPresMode('akumulasi')">Akumulasi</div>
+        <div class="pres-mode-tab" id="presMode-w1" onclick="setPresMode('w1')">Week 1</div>
+        <div class="pres-mode-tab" id="presMode-w2" onclick="setPresMode('w2')">Week 2</div>
+        <div class="pres-mode-tab" id="presMode-w3" onclick="setPresMode('w3')">Week 3</div>
+        <div class="pres-mode-tab" id="presMode-w4" onclick="setPresMode('w4')">Week 4</div>
+        <div class="pres-mode-tab" id="presMode-compare" onclick="setPresMode('compare')">Compare</div>
+      </div>
+      <div class="pres-compare-row" id="presCompareRow">
+        <select class="pres-compare-sel" id="presCompareA">
+          <option value="1">Week 1</option>
+          <option value="2">Week 2</option>
+          <option value="3">Week 3</option>
+          <option value="4">Week 4</option>
+        </select>
+        <span class="pres-compare-vs">vs</span>
+        <select class="pres-compare-sel" id="presCompareB">
+          <option value="1">Week 1</option>
+          <option value="2" selected>Week 2</option>
+          <option value="3">Week 3</option>
+          <option value="4">Week 4</option>
+        </select>
+      </div>
+      <button class="pres-mode-apply" id="presCompareApply" onclick="applyCompare()">Terapkan Compare</button>
+    </div>
     <div class="pres-nav" id="presNav"></div>
+    <!-- TOGGLE ANGKA -->
+    <div class="pres-sidebar-bottom">
+      <button class="pres-toggle-labels active" id="btnToggleLabels2" onclick="toggleChartLabels()">
+        🔢 Angka di Grafik: <span id="labelState2">ON</span>
+      </button>
+    </div>
   </div>
   <div class="pres-main">
     <div class="pres-content" id="presContent"></div>
     <div class="pres-footer">
       <div class="pres-slide-counter" id="presCounter">Slide 1 / 1</div>
       <div class="pres-footer-nav">
-        <button class="btn-pres-nav" id="btnToggleLabels" onclick="toggleChartLabels()" title="Tampilkan/Sembunyikan angka di grafik">
-          🔢 Angka: <span id="labelState">ON</span>
-        </button>
         <button class="btn-pres-nav" id="btnPresPrev" onclick="presNavigate(-1)">← Sebelumnya</button>
         <button class="btn-pres-nav" id="btnPresNext" onclick="presNavigate(1)">Berikutnya →</button>
       </div>
@@ -1843,28 +1892,81 @@ let presSlides=[];
 let presCurrentIdx=0;
 let presCharts=[];
 
-// ── State label toggle ────────────────────────────────────────
+// ── State presentasi ──────────────────────────────────────────
 let presShowLabels = true;
+let presMode = 'akumulasi';
+let presCompareWeeks = [1, 2];
+
+// Filter rows sesuai mode aktif
+function getRowsForMode(rows){
+  if(presMode==='akumulasi') return rows;
+  if(presMode==='compare'){
+    const [wA,wB]=presCompareWeeks;
+    return rows.filter(r=>getWeekNum(r.tanggal)===wA||getWeekNum(r.tanggal)===wB);
+  }
+  const wk=parseInt(presMode.replace('w',''));
+  return rows.filter(r=>getWeekNum(r.tanggal)===wk);
+}
+
+function setPresMode(mode){
+  presMode=mode;
+  ['akumulasi','w1','w2','w3','w4','compare'].forEach(m=>{
+    const el=document.getElementById('presMode-'+m);
+    if(el)el.classList.toggle('active',m===mode);
+  });
+  const cr=document.getElementById('presCompareRow');
+  const ca=document.getElementById('presCompareApply');
+  if(cr)cr.classList.toggle('visible',mode==='compare');
+  if(ca)ca.classList.toggle('visible',mode==='compare');
+  if(mode!=='compare') rebuildPresSlides();
+}
+
+function applyCompare(){
+  const wA=parseInt(document.getElementById('presCompareA').value)||1;
+  const wB=parseInt(document.getElementById('presCompareB').value)||2;
+  presCompareWeeks=[wA,wB];
+  rebuildPresSlides();
+}
+
+function rebuildPresSlides(){
+  const curIdx=presCurrentIdx;
+  const modeLabel={akumulasi:'Akumulasi',w1:'Week 1',w2:'Week 2',w3:'Week 3',w4:'Week 4',
+    compare:`W${presCompareWeeks[0]} vs W${presCompareWeeks[1]}`};
+  const metaEl=document.getElementById('presMeta');
+  if(metaEl){const parts=metaEl.textContent.split('·');metaEl.textContent=parts[0].trim()+' · '+modeLabel[presMode];}
+  buildPresentation();
+  presNavigateTo(Math.min(curIdx,presSlides.length-1));
+}
 
 function toggleChartLabels(){
-  presShowLabels = !presShowLabels;
-  const stateEl = document.getElementById('labelState');
-  if(stateEl) stateEl.textContent = presShowLabels ? 'ON' : 'OFF';
-  const btn = document.getElementById('btnToggleLabels');
-  if(btn) btn.style.opacity = presShowLabels ? '1' : '0.55';
-  // Rebuild charts di slide aktif dengan state baru
-  presCharts.forEach(ch => {
-    try {
-      if(ch.options.plugins && ch.options.plugins.datalabels){
-        ch.options.plugins.datalabels.display = presShowLabels;
+  presShowLabels=!presShowLabels;
+  const s2=document.getElementById('labelState2');
+  if(s2)s2.textContent=presShowLabels?'ON':'OFF';
+  const b2=document.getElementById('btnToggleLabels2');
+  if(b2)b2.classList.toggle('active',presShowLabels);
+  presCharts.forEach(ch=>{
+    try{
+      if(ch.options.plugins&&ch.options.plugins.datalabels){
+        ch.options.plugins.datalabels.display=presShowLabels;
         ch.update('none');
       }
-    } catch(e){}
+    }catch(e){}
   });
 }
 
 function openPresentation(){
   if(!allRows||!allRows.length){alert('Tampilkan data dulu sebelum membuka mode presentasi.');return;}
+  // Reset mode ke akumulasi
+  presMode='akumulasi';
+  presCompareWeeks=[1,2];
+  ['akumulasi','w1','w2','w3','w4','compare'].forEach(m=>{
+    const el=document.getElementById('presMode-'+m);
+    if(el)el.classList.toggle('active',m==='akumulasi');
+  });
+  const cr=document.getElementById('presCompareRow');
+  const ca=document.getElementById('presCompareApply');
+  if(cr)cr.classList.remove('visible');
+  if(ca)ca.classList.remove('visible');
   buildPresentation();
   document.getElementById('presOverlay').classList.add('open');
   document.body.style.overflow='hidden';
@@ -1881,13 +1983,20 @@ function buildPresentation(){
   const bulan=document.getElementById('selBulan').value;
   const tahun=document.getElementById('selTahun').value;
 
+  // Filter rows sesuai mode yang dipilih
+  const modeRows=getRowsForMode(allRows);
+
   const byApp={};
-  allRows.forEach(r=>{const ap=r.aplikasi||'(Tidak Diketahui)';if(!byApp[ap])byApp[ap]=[];byApp[ap].push(r);});
+  modeRows.forEach(r=>{const ap=r.aplikasi||'(Tidak Diketahui)';if(!byApp[ap])byApp[ap]=[];byApp[ap].push(r);});
   const apps=Object.keys(byApp).sort();
-  const globalS=summarizeRows(allRows);
-  const globalAgents=new Set(allRows.map(r=>r.agent)).size;
+  const globalS=summarizeRows(modeRows);
+  const globalAgents=new Set(modeRows.map(r=>r.agent)).size;
 
   presSlides=[];
+
+  // Label mode untuk ditampilkan di slide
+  const modeLabel={akumulasi:'Akumulasi',w1:'Week 1',w2:'Week 2',w3:'Week 3',w4:'Week 4',
+    compare:`W${presCompareWeeks[0]} vs W${presCompareWeeks[1]}`}[presMode]||'';
 
   // Slide 0: Ringkasan Global
   presSlides.push({
@@ -1918,7 +2027,7 @@ function buildPresentation(){
       navLabel:ap.charAt(0)+ap.slice(1).toLowerCase(),
       navSub:`${agentCnt} agent · ${fmtRp(apS.dailyPayment)}`,
       appColor:color,navGroup:ap,isGroupHeader:true,
-      buildFn:()=>buildAppSlide(ap,apRows,apS,color,bulan,tahun)
+      buildFn:()=>buildAppSlide(ap,apRows,apS,color,bulan+' '+modeLabel,tahun)
     });
 
     // 1 slide per bucket
@@ -1930,7 +2039,7 @@ function buildPresentation(){
         navLabel:'  └ '+bk,
         navSub:`${bkAgents} agent · ${fmtRp(bkS.dailyPayment)}`,
         appColor:color,navGroup:ap,isGroupChild:true,
-        buildFn:()=>buildBucketSlide(ap,bk,bkRows,bkS,bkTrend,color,bulan,tahun,apRows)
+        buildFn:()=>buildBucketSlide(ap,bk,bkRows,bkS,bkTrend,color,bulan,tahun+' · '+modeLabel,apRows)
       });
     });
   });
