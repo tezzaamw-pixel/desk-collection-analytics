@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Aplikasi — System TZ Analytics</title>
+<title>Aplikasi — Desk Collection Analytics</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
 :root{
@@ -179,6 +179,10 @@ select:focus{border-color:var(--accent);}
 
 /* Smooth transitions */
 .spv-block,.project-card,.sum-card,.stat-card,.acr-week-card{transition:box-shadow .15s,border-color .15s;}
+.label-pengganti{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#dbeafe;color:#1d4ed8;margin-left:4px;vertical-align:middle;white-space:nowrap;}
+.label-pindah{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e;margin-left:4px;vertical-align:middle;white-space:nowrap;}
+.label-nonaktif{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;background:#f3f4f6;color:#6b7280;margin-left:4px;vertical-align:middle;white-space:nowrap;}
+.acr-agent-row.is-nonaktif{opacity:0.45;}
 .agent-detail{transition:none;}
 .tl-header{transition:background .1s;}
 .setup-tab,.tl-setup-tab,.sort-tab,.chart-tab,.rank-switch-btn{transition:all .15s;}
@@ -190,7 +194,7 @@ select:focus{border-color:var(--accent);}
 
 <nav class="navbar">
   <div style="display:flex;align-items:center;gap:12px;">
-    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">TZ</span> System TZ Analytics</a>
+    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">DC</span> DeskCollection Analytics</a>
     <span class="nav-page-title" id="navPageTitle">Aplikasi</span>
   </div>
   <div class="nav-right">
@@ -631,19 +635,58 @@ function getWeekNum(tanggal){
 }
 
 /* ACR */
+// ── Helper: deteksi rotasi agent ────────────────────────────
+function buildRotasiMapApp(rows){
+  const akunToAgents={};
+  rows.forEach(r=>{
+    if(!r.namaAkun||!r.agent)return;
+    if(!akunToAgents[r.namaAkun])akunToAgents[r.namaAkun]=new Set();
+    akunToAgents[r.namaAkun].add(r.agent);
+  });
+  const rotasiMap={};
+  Object.keys(akunToAgents).filter(akun=>akunToAgents[akun].size>1).forEach(akun=>{
+    const agList=[...akunToAgents[akun]];
+    const lastRow={};
+    rows.filter(r=>r.namaAkun===akun&&r.tanggal).forEach(r=>{
+      if(!lastRow[r.agent]||r.tanggal>lastRow[r.agent])lastRow[r.agent]=r.tanggal;
+    });
+    const sorted=agList.sort((a,b)=>(lastRow[b]||'')>(lastRow[a]||'')?1:-1);
+    const agBaru=sorted[0];
+    sorted.slice(1).forEach(agLama=>{
+      rotasiMap[agLama]={status:'lama',lawan:agBaru};
+    });
+    if(!rotasiMap[agBaru])rotasiMap[agBaru]={status:'baru',lawan:sorted[1]||''};
+  });
+  return rotasiMap;
+}
+
+function getAgentLabelHtml(ag, rotasiMap){
+  const r=rotasiMap[ag];
+  if(!r)return'';
+  if(r.status==='lama')return`<span class="label-nonaktif">Nonaktif</span>`;
+  if(r.status==='baru')return`<span class="label-pengganti">Pengganti</span>`;
+  return'';
+}
+
 function renderACR(){
+  // [FIX 3] Bangun rotasi map dari filteredRows
+  const rotasiMap=buildRotasiMapApp(filteredRows);
+
   const agents=Object.keys(weeklyByAgent);
+  // [FIX 3] Agent aktif = exclude yang nonaktif (status lama)
+  const activeAgents=agents.filter(ag=>!rotasiMap[ag]||rotasiMap[ag].status!=='lama');
+
   const s=summarizeRows(filteredRows);
   const totalPayment=s.dailyPayment;
 
-  // ACR SUMMARY
-  const bestAgent=agents.reduce((best,ag)=>rankVal(ag,currentRank)>rankVal(best,currentRank)?ag:best,agents[0]||'—');
-  const avgPerAgent=agents.length>0?totalPayment/agents.length:0;
+  // ACR SUMMARY (pakai activeAgents untuk avg)
+  const bestAgent=activeAgents.reduce((best,ag)=>rankVal(ag,currentRank)>rankVal(best,currentRank)?ag:best,activeAgents[0]||'—');
+  const avgPerAgent=activeAgents.length>0?totalPayment/activeAgents.length:0;
   document.getElementById('acrSummary').innerHTML=`
-    <div class="acr-sum-card c-default"><div class="acr-sum-lbl">Total Agent</div><div class="acr-sum-val">${agents.length}</div><div class="acr-sum-sub">agent aktif</div></div>
+    <div class="acr-sum-card c-default"><div class="acr-sum-lbl">Total Agent</div><div class="acr-sum-val">${activeAgents.length}</div><div class="acr-sum-sub">${agents.length-activeAgents.length>0?`+${agents.length-activeAgents.length} nonaktif`:'agent aktif'}</div></div>
     <div class="acr-sum-card c-green"><div class="acr-sum-lbl">Total Payment</div><div class="acr-sum-val c-green">${fmtRp(totalPayment)}</div><div class="acr-sum-sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
     <div class="acr-sum-card c-orange"><div class="acr-sum-lbl">Best Agent</div><div class="acr-sum-val c-orange" style="font-size:15px">${bestAgent}</div><div class="acr-sum-sub">${fmtRp(rankVal(bestAgent,'payment'))}</div></div>
-    <div class="acr-sum-card c-blue"><div class="acr-sum-lbl">Rata-rata/Agent</div><div class="acr-sum-val c-blue">${fmtRp(avgPerAgent)}</div><div class="acr-sum-sub">per agent</div></div>`;
+    <div class="acr-sum-card c-blue"><div class="acr-sum-lbl">Rata-rata/Agent</div><div class="acr-sum-val c-blue">${fmtRp(avgPerAgent)}</div><div class="acr-sum-sub">per agent aktif</div></div>`;
 
   // WEEK COLUMNS
   const bulan=document.getElementById('selBulan').value;
@@ -656,21 +699,26 @@ function renderACR(){
       if(!weekByAgent[ag]) weekByAgent[ag]=[];
       weekByAgent[ag].push(r);
     });
-    // sort by currentRank
-    const sortedRanked=Object.keys(weekByAgent).map(ag=>{
-      const rows=weekByAgent[ag];
-      const payment=rows.reduce((a,r)=>a+(r.dailyPayment||0),0);
-      const rate=rows.reduce((a,r)=>a+(r.jmlDataBayar||0),0)>0?rows.reduce((a,r)=>a+(r.rate*(r.jmlDataBayar||0)),0)/rows.reduce((a,r)=>a+(r.jmlDataBayar||0),0):0;
-      const ptp=rows.reduce((a,r)=>a+(r.ptp||0),0);
-      const call=rows.reduce((a,r)=>a+(r.callManual||0),0);
-      const namaAkun=rows[0]&&rows[0].namaAkun?rows[0].namaAkun:'—';
-      return{ag,payment,rate,ptp,call,namaAkun};
-    }).sort((a,b)=>{
-      if(currentRank==='rate') return b.rate-a.rate;
-      if(currentRank==='ptp') return b.ptp-a.ptp;
-      if(currentRank==='call') return b.call-a.call;
-      return b.payment-a.payment;
-    });
+    // [FIX 3] Filter: exclude agent nonaktif dari ranking per minggu
+    const sortedRanked=Object.keys(weekByAgent)
+      .filter(ag=>!rotasiMap[ag]||rotasiMap[ag].status!=='lama')
+      .map(ag=>{
+        const rows=weekByAgent[ag];
+        const payment=rows.reduce((a,r)=>a+(r.dailyPayment||0),0);
+        const jmlBayar=rows.reduce((a,r)=>a+(r.jmlDataBayar||0),0);
+        const rawRate=rows.reduce((a,r)=>a+(r.rate||0),0);
+        const rate=jmlBayar>0?rows.reduce((a,r)=>a+(r.rate*(r.jmlDataBayar||0)),0)/jmlBayar:rawRate>0?rawRate/rows.length:0;
+        const ptp=rows.reduce((a,r)=>a+(r.ptp||0),0);
+        const call=rows.reduce((a,r)=>a+(r.callManual||0),0);
+        const namaAkun=rows[0]&&rows[0].namaAkun?rows[0].namaAkun:'—';
+        const rot=rotasiMap[ag];
+        return{ag,payment,rate,ptp,call,namaAkun,rot};
+      }).sort((a,b)=>{
+        if(currentRank==='rate') return b.rate-a.rate;
+        if(currentRank==='ptp') return b.ptp-a.ptp;
+        if(currentRank==='call') return b.call-a.call;
+        return b.payment-a.payment;
+      });
 
     const rankClass=(i)=>i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
     const valStr=(a)=>{
@@ -685,10 +733,13 @@ function renderACR(){
         <div class="acr-rank-num ${rankClass(i)}">${i+1}</div>
         <div class="acr-agent-info">
           <div class="acr-akun-name">${a.namaAkun}</div>
-          <div class="acr-agent-name"><a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">${a.ag}</a></div>
+          <div class="acr-agent-name">
+            <a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">${a.ag}</a>
+            ${a.rot&&a.rot.status==='baru'?'<span class="label-pengganti">Pengganti</span>':''}</div>
         </div>
         <div class="acr-agent-val">${valStr(a)}</div>
-      </div>`).join(''):'<div class="acr-week-empty">Belum ada data</div>';
+      </div>`).join('')
+    :'<div class="acr-week-empty">Belum ada data</div>';
 
     return`<div class="acr-week-card">
       <div class="acr-week-header"><div class="acr-week-title">WEEK ${wk}</div></div>
@@ -697,8 +748,8 @@ function renderACR(){
   }).join('');
   document.getElementById('acrWeeks').innerHTML=weekCols;
 
-  // WEEKLY SUMMARY TABLE
-  renderWeeklySummaryTable(agents,totalPayment,bulan,tahun);
+  // WEEKLY SUMMARY TABLE — [FIX 3] pass rotasiMap
+  renderWeeklySummaryTable(activeAgents, totalPayment, bulan, tahun, rotasiMap);
 }
 
 function switchRank(type){
@@ -710,29 +761,46 @@ function switchRank(type){
   renderACR();
 }
 
-function renderWeeklySummaryTable(agents,totalPayment,bulan,tahun){
+function renderWeeklySummaryTable(agents, totalPayment, bulan, tahun, rotasiMap){
+  rotasiMap = rotasiMap || {};
   const agentData=agents.map(ag=>{
-    const rows=weeklyByAgent[ag];
+    const rows=weeklyByAgent[ag]||[];
     const namaAkun=rows[0]&&rows[0].namaAkun?rows[0].namaAkun:'—';
     const wkPayment=[1,2,3,4,5].map(wk=>rows.filter(r=>getWeekNum(r.tanggal)===wk).reduce((a,r)=>a+(r.dailyPayment||0),0));
     const total=wkPayment.reduce((a,v)=>a+v,0);
-    return{ag,namaAkun,wkPayment,total};
+    const rot=rotasiMap[ag]||null;
+    return{ag,namaAkun,wkPayment,total,rot};
   }).sort((a,b)=>b.total-a.total);
 
+  // [FIX 3] Hanya agent aktif yang dapat nomor rank
   const grandTotal=agentData.reduce((a,x)=>a+x.total,0);
   const wkTotals=[0,1,2,3,4].map(i=>agentData.reduce((a,x)=>a+x.wkPayment[i],0));
 
+  let rankCounter=0;
   const rankClass=(i)=>i===0?'rank-1':i===1?'rank-2':i===2?'rank-3':'rank-other';
 
-  document.getElementById('weeklyTableBody').innerHTML=agentData.map((a,i)=>`
-    <tr>
+  document.getElementById('weeklyTableBody').innerHTML=agentData.map((a)=>{
+    const isNonaktif=a.rot&&a.rot.status==='lama';
+    const rankNum=isNonaktif?'—':(++rankCounter);
+    const rankCls=isNonaktif?'rank-other':rankClass(rankCounter-1);
+    // Label badge
+    const labelHtml=a.rot
+      ?a.rot.status==='lama'
+        ?'<span class="label-nonaktif">Nonaktif</span>'
+        :'<span class="label-pengganti">Pengganti</span>'
+      :'';
+    return`<tr style="opacity:${isNonaktif?0.45:1}">
       <td class="bold">${a.namaAkun}</td>
-      <td><a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">${a.ag}</a></td>
-      <td class="green">${fmtRp(a.total)}</td>
+      <td>
+        <a class="agent-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}">${a.ag}</a>
+        ${labelHtml}
+      </td>
+      <td class="${isNonaktif?'num':'green'}">${fmtRp(a.total)}</td>
       ${a.wkPayment.map(v=>`<td class="num">${v>0?fmtRp(v):'Rp 0'}</td>`).join('')}
       <td class="num">${grandTotal>0?(a.total/grandTotal*100).toFixed(1)+'%':'0%'}</td>
-      <td><span class="acr-rank-num ${rankClass(i)}" style="display:inline-flex">${i+1}</span></td>
-    </tr>`).join('');
+      <td><span class="acr-rank-num ${rankCls}" style="display:inline-flex">${rankNum}</span></td>
+    </tr>`;
+  }).join('');
 
   document.getElementById('weeklyTableFoot').innerHTML=`
     <tr>

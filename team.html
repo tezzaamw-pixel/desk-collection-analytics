@@ -438,6 +438,9 @@ select:focus{border-color:var(--accent);}
     <div class="pres-footer">
       <div class="pres-slide-counter" id="presCounter">Slide 1 / 1</div>
       <div class="pres-footer-nav">
+        <button class="btn-pres-nav" id="btnToggleLabels" onclick="toggleChartLabels()" title="Tampilkan/Sembunyikan angka di grafik">
+          🔢 Angka: <span id="labelState">ON</span>
+        </button>
         <button class="btn-pres-nav" id="btnPresPrev" onclick="presNavigate(-1)">← Sebelumnya</button>
         <button class="btn-pres-nav" id="btnPresNext" onclick="presNavigate(1)">Berikutnya →</button>
       </div>
@@ -593,10 +596,29 @@ function renderSidebar(rows,bulan,tahun){
 }
 
 function summarizeRows(rows){
-  if(!rows||!rows.length)return{totalData:0,dataBaru:0,osDataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,sentuhGojek:0,responWA:0,responGojek:0,waBlokir:0,ptp:0,ptpBayar:0,sentuhWABA:0,responWABA:0,smsManual:0,responSMSManual:0,autocall:0};
+  if(!rows||!rows.length)return{totalData:0,dataBaru:0,osDataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,sentuhGojek:0,responWA:0,responGojek:0,waBlokir:0,ptp:0,ptpBayar:0,sentuhWABA:0,responWABA:0,smsManual:0,responSMSManual:0,autocall:0,rateResponWA:0,rateCallTerhubung:0,ratePTPBayar:0,rateWABlokir:0,rateResponGojek:0,rateResponWABA:0};
   const keys=['totalData','dataBaru','osDataBaru','dailyPayment','jmlDataBayar','autocall','callManual','callTerhubung','sentuhWA','sentuhGojek','responWA','responGojek','waBlokir','ptp','ptpBayar','sentuhWABA','responWABA','smsManual','responSMSManual','paymentOvertime'];
-  const r={};keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
-  const tb=r.jmlDataBayar;r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*x.jmlDataBayar),0)/tb:rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length;
+  const r={};
+  keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
+
+  // [FIX RATE AUTO] Jika kolom rate di sheet kosong/nol semua, derive otomatis dari jmlDataBayar/totalData
+  const rawRateSum=rows.reduce((a,x)=>a+(x.rate||0),0);
+  const tb=r.jmlDataBayar;
+  if(rawRateSum===0&&r.totalData>0){
+    // Derive: jumlah akun bayar dibagi total akun dihandle
+    r.avgRate=r.jmlDataBayar>0?r.jmlDataBayar/r.totalData:0;
+  } else {
+    r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*(x.jmlDataBayar||0)),0)/tb:rows.length>0?rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length:0;
+  }
+
+  // [DERIVED METRICS] Rasio penyentuhan — dihitung otomatis dari data yang ada
+  r.rateResponWA      = r.sentuhWA>0    ? r.responWA/r.sentuhWA      : 0;
+  r.rateCallTerhubung = r.callManual>0  ? r.callTerhubung/r.callManual: 0;
+  r.ratePTPBayar      = r.ptp>0         ? r.ptpBayar/r.ptp            : 0;
+  r.rateWABlokir      = r.sentuhWA>0    ? r.waBlokir/r.sentuhWA       : 0;
+  r.rateResponGojek   = r.sentuhGojek>0 ? r.responGojek/r.sentuhGojek : 0;
+  r.rateResponWABA    = r.sentuhWABA>0  ? r.responWABA/r.sentuhWABA   : 0;
+
   return r;
 }
 
@@ -990,8 +1012,11 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
   }
 
   // C2. Rate bayar
-  if(s.avgRate<0.005){score+=20;issues.push({type:'rate',group:'Hasil',level:'kritis',label:'Rate bayar sangat rendah',detail:`${fmtRate(s.avgRate)} dari ${fmtNum(s.jmlDataBayar)} data bayar`,pct:Math.round(s.avgRate*10000)/100});}
-  else if(s.avgRate<0.015){score+=10;issues.push({type:'rate',group:'Hasil',level:'waspada',label:'Rate bayar rendah',detail:`${fmtRate(s.avgRate)} dari ${fmtNum(s.jmlDataBayar)} data bayar`,pct:Math.round(s.avgRate*10000)/100});}
+  // Rate check — hanya flag jika jmlDataBayar > 0 (ada transaksi) tapi rate tetap rendah
+  if(s.jmlDataBayar>0){
+    if(s.avgRate<0.005){score+=20;issues.push({type:'rate',group:'Hasil',level:'kritis',label:'Rate bayar sangat rendah',detail:`${fmtRate(s.avgRate)} dari ${fmtNum(s.jmlDataBayar)} data bayar (${fmtNum(s.totalData)} total akun)`,pct:Math.round(s.avgRate*10000)/100});}
+    else if(s.avgRate<0.015){score+=10;issues.push({type:'rate',group:'Hasil',level:'waspada',label:'Rate bayar rendah',detail:`${fmtRate(s.avgRate)} dari ${fmtNum(s.jmlDataBayar)} data bayar`,pct:Math.round(s.avgRate*10000)/100});}
+  }
 
   // C3. PTP tapi realisasi bayar rendah
   if(s.ptp>5&&ptpBayarRatio<0.3){
@@ -1818,6 +1843,26 @@ let presSlides=[];
 let presCurrentIdx=0;
 let presCharts=[];
 
+// ── State label toggle ────────────────────────────────────────
+let presShowLabels = true;
+
+function toggleChartLabels(){
+  presShowLabels = !presShowLabels;
+  const stateEl = document.getElementById('labelState');
+  if(stateEl) stateEl.textContent = presShowLabels ? 'ON' : 'OFF';
+  const btn = document.getElementById('btnToggleLabels');
+  if(btn) btn.style.opacity = presShowLabels ? '1' : '0.55';
+  // Rebuild charts di slide aktif dengan state baru
+  presCharts.forEach(ch => {
+    try {
+      if(ch.options.plugins && ch.options.plugins.datalabels){
+        ch.options.plugins.datalabels.display = presShowLabels;
+        ch.update('none');
+      }
+    } catch(e){}
+  });
+}
+
 function openPresentation(){
   if(!allRows||!allRows.length){alert('Tampilkan data dulu sebelum membuka mode presentasi.');return;}
   buildPresentation();
@@ -2381,8 +2426,15 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
   const positif=[];
   if(hadirR<0.75)kendala.push({dot:'dot-red',text:`Kehadiran rata-rata rendah (${Math.round(hadirR*100)}%) — evaluasi disiplin hadir`});
   else if(hadirR>=0.9)positif.push({dot:'dot-green',text:`Kehadiran sangat baik (${Math.round(hadirR*100)}%) — konsistensi tim terjaga`});
-  if(bkS.avgRate<0.01)kendala.push({dot:'dot-red',text:`Rate bayar sangat rendah (${fmtRate(bkS.avgRate)}) — kualitas akun atau strategi perlu dievaluasi`});
+  if(bkS.jmlDataBayar>0&&bkS.avgRate<0.01)kendala.push({dot:'dot-red',text:`Rate bayar sangat rendah (${fmtRate(bkS.avgRate)}) — kualitas akun atau strategi perlu dievaluasi`});
   else if(bkS.avgRate>=0.03)positif.push({dot:'dot-green',text:`Rate bayar baik (${fmtRate(bkS.avgRate)}) — strategi penagihan efektif`});
+  // Derived: respon WA
+  if(bkS.sentuhWA>50){
+    if(bkS.rateResponWA<0.05)kendala.push({dot:'dot-warn',text:`Respon WA sangat rendah (${Math.round(bkS.rateResponWA*100)}%) dari ${fmtNum(bkS.sentuhWA)} sentuhan — pesan perlu diperbaiki`});
+    else if(bkS.rateResponWA>=0.15)positif.push({dot:'dot-green',text:`Respon WA baik (${Math.round(bkS.rateResponWA*100)}%) — pendekatan efektif`});
+  }
+  // Derived: PTP realisasi
+  if(bkS.ptp>5&&bkS.ratePTPBayar<0.3)kendala.push({dot:'dot-warn',text:`Realisasi PTP rendah (${Math.round(bkS.ratePTPBayar*100)}% dari ${fmtNum(bkS.ptp)} PTP) — follow-up sebelum jatuh tempo perlu ditingkatkan`});
   if(blokR>0.08)kendala.push({dot:'dot-red',text:`Rasio WA diblokir tinggi (${Math.round(blokR*100)}%) — cara penghubungan perlu diperbaiki`});
   if(connR<0.3&&bkS.callManual>50)kendala.push({dot:'dot-warn',text:`Koneksi call rendah (${Math.round(connR*100)}%) — banyak nomor tidak aktif, perlu pembaruan data`});
   if(ptpReal<0.3&&bkS.ptp>5)kendala.push({dot:'dot-warn',text:`Realisasi PTP rendah (${Math.round(ptpReal*100)}%) — follow-up sebelum jatuh tempo perlu ditingkatkan`});
@@ -2440,6 +2492,27 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
       <div class="pres-kpi"><div class="lbl">SMS Manual</div><div class="val">${fmtNum(bkS.smsManual)}</div><div class="sub">${fmtNum(bkS.responSMSManual||0)} respon</div></div>
       <div class="pres-kpi"><div class="lbl">Payment Overtime</div><div class="val">${fmtRp(bkS.paymentOvertime)}</div><div class="sub">${bkS.dailyPayment>0?Math.round(bkS.paymentOvertime/bkS.dailyPayment*100):0}% dari total</div></div>
       <div class="pres-kpi"><div class="lbl">Total Data</div><div class="val">${fmtNum(bkS.totalData)}</div><div class="sub">${fmtNum(bkS.dataBaru)} data baru · OS ${fmtRp(bkS.osDataBaru)}</div></div>
+    </div>
+    <!-- [DERIVED] Rasio penyentuhan otomatis -->
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+      ${[
+        {lbl:'Respon WA',val:bkS.rateResponWA,base:bkS.sentuhWA,baseLabel:'sentuh'},
+        {lbl:'Call Terhubung',val:bkS.rateCallTerhubung,base:bkS.callManual,baseLabel:'call'},
+        {lbl:'Realisasi PTP',val:bkS.ratePTPBayar,base:bkS.ptp,baseLabel:'PTP'},
+        {lbl:'WA Diblokir',val:bkS.rateWABlokir,base:bkS.sentuhWA,baseLabel:'sentuh',invert:true},
+        {lbl:'Respon Gojek',val:bkS.rateResponGojek,base:bkS.sentuhGojek,baseLabel:'sentuh'},
+        {lbl:'Respon WABA',val:bkS.rateResponWABA,base:bkS.sentuhWABA,baseLabel:'sentuh'},
+      ].filter(x=>x.base>0).map(x=>{
+        const pct=Math.round(x.val*100);
+        const isGood=x.invert?pct<8:pct>=30;
+        const isBad=x.invert?pct>15:pct<10;
+        const clr=isGood?'var(--success)':isBad?'var(--danger)':'var(--warning)';
+        return`<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 12px;min-width:110px">
+          <div style="font-size:10px;color:var(--text3);font-weight:500;text-transform:uppercase;margin-bottom:3px">${x.lbl}</div>
+          <div style="font-size:16px;font-weight:700;color:${clr}">${pct}%</div>
+          <div style="font-size:10px;color:var(--text3)">${fmtNum(Math.round(x.val*x.base))} / ${fmtNum(x.base)} ${x.baseLabel}</div>
+        </div>`;
+      }).join('')}
     </div>
 
     <!-- B. GRAFIK TREN -->
@@ -2588,6 +2661,7 @@ function initPresCharts(slideIdx){
   // Datalabels plugin — tampilkan angka di tiap bar/point
   const datalabelsBarH={
     id:'datalabels',
+    display: showDL,
     formatter:(v)=>rpFmtShort(v),
     anchor:'end',align:'end',
     color:labelColor,
@@ -2596,6 +2670,7 @@ function initPresCharts(slideIdx){
   };
   const datalabelsBarV={
     id:'datalabels',
+    display: showDL,
     formatter:(v)=>rpFmtShort(v),
     anchor:'end',align:'top',
     color:labelColor,
@@ -2605,6 +2680,7 @@ function initPresCharts(slideIdx){
   };
   const datalabelsLine={
     id:'datalabels',
+    display: showDL,
     formatter:(v)=>v>0?rpFmtShort(v):'',
     anchor:'top',align:'top',
     color:labelColor,
@@ -2613,6 +2689,7 @@ function initPresCharts(slideIdx){
   };
   const datalabelsAct={
     id:'datalabels',
+    display: showDL,
     formatter:(v)=>v>0?fmtNum(Math.round(v)):'',
     anchor:'end',align:'top',
     color:labelColor,
@@ -2625,6 +2702,8 @@ function initPresCharts(slideIdx){
   const tooltipAct={callbacks:{label:ctx=>`${ctx.dataset.label}: ${fmtNum(Math.round(ctx.parsed.y))}`}};
 
   const DL=(typeof ChartDataLabels!=='undefined')?ChartDataLabels:null;
+  // Gunakan state presShowLabels untuk semua chart di slide ini
+  const showDL = presShowLabels !== false;
 
   const makeBarH=(id,labels,data,colors)=>{
     const el=document.getElementById(id);if(!el)return;
