@@ -66,6 +66,29 @@ body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:
 /* FILTER */
 .filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;box-shadow:var(--shadow);}
 .filter-bar label{font-size:12px;color:var(--text3);font-weight:500;}
+/* ── Custom Multi-Select Bulan ── */
+.ms-wrap{position:relative;display:inline-block;}
+.ms-trigger{display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;cursor:pointer;min-width:140px;user-select:none;white-space:nowrap;}
+.ms-trigger:hover{border-color:var(--accent);}
+.ms-trigger.active{border-color:var(--accent);background:var(--accent-bg);}
+.ms-trigger .ms-arrow{margin-left:auto;font-size:10px;color:var(--text3);transition:transform .2s;}
+.ms-trigger.open .ms-arrow{transform:rotate(180deg);}
+.ms-badge{background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center;}
+.ms-dropdown{position:absolute;top:calc(100% + 4px);left:0;z-index:300;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);min-width:180px;display:none;overflow:hidden;}
+.ms-dropdown.open{display:block;}
+.ms-dropdown-head{padding:8px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:8px;}
+.ms-select-all{font-size:11px;color:var(--accent);cursor:pointer;font-weight:500;}
+.ms-select-all:hover{text-decoration:underline;}
+.ms-dropdown-list{max-height:220px;overflow-y:auto;}
+.ms-item{display:flex;align-items:center;gap:9px;padding:8px 12px;cursor:pointer;transition:background .1s;font-size:13px;color:var(--text2);}
+.ms-item:hover{background:var(--surface2);}
+.ms-item input[type=checkbox]{accent-color:var(--accent);width:14px;height:14px;cursor:pointer;flex-shrink:0;}
+.ms-item.checked{color:var(--accent);font-weight:500;background:var(--accent-bg);}
+.ms-dropdown-foot{padding:8px 10px;border-top:1px solid var(--border);display:flex;gap:6px;}
+.ms-btn-apply{flex:1;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:6px;font-size:12px;font-weight:600;cursor:pointer;}
+.ms-btn-apply:hover{opacity:.9;}
+.ms-btn-clear{background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;font-size:12px;cursor:pointer;}
+.ms-btn-clear:hover{border-color:var(--danger);color:var(--danger);}
 select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;cursor:pointer;outline:none;}
 select:focus{border-color:var(--accent);}
 .btn-load{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
@@ -237,15 +260,26 @@ select:focus{border-color:var(--accent);}
   <!-- FILTER BAR -->
   <div class="filter-bar">
     <label>Bulan</label>
-    <select id="selBulan">
-      <option value="">Semua Bulan</option>
-      <option value="Januari">Januari</option><option value="Februari">Februari</option>
-      <option value="Maret">Maret</option><option value="April">April</option>
-      <option value="Mei">Mei</option><option value="Juni">Juni</option>
-      <option value="Juli">Juli</option><option value="Agustus">Agustus</option>
-      <option value="September">September</option><option value="Oktober">Oktober</option>
-      <option value="November">November</option><option value="Desember">Desember</option>
-    </select>
+    <div class="ms-wrap" id="msWrap">
+      <div class="ms-trigger" id="msTrigger" onclick="toggleMsDropdown()">
+        <span id="msLabel">Semua Bulan</span>
+        <span class="ms-badge" id="msBadge" style="display:none">0</span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-dropdown" id="msDropdown">
+        <div class="ms-dropdown-head">
+          <span style="font-size:11px;color:var(--text3);font-weight:500">Pilih Bulan</span>
+          <span class="ms-select-all" onclick="msSelectAll()">Pilih Semua</span>
+        </div>
+        <div class="ms-dropdown-list" id="msDropdownList">
+          <!-- diisi JS -->
+        </div>
+        <div class="ms-dropdown-foot">
+          <button class="ms-btn-clear" onclick="msClear()">Hapus</button>
+          <button class="ms-btn-apply" onclick="msApply()">Terapkan</button>
+        </div>
+      </div>
+    </div>
     <label>Tahun</label>
     <select id="selTahun">
       <option value="2026">2026</option>
@@ -503,13 +537,14 @@ function populateAplikasiFilter(){
 
 /* ===== FILTER ===== */
 function applyFilter(){
-  const bulan=document.getElementById('selBulan').value;
   const tahun=document.getElementById('selTahun').value;
   const aplikasi=document.getElementById('selAplikasi').value;
   const kanal=document.getElementById('selKanal').value;
   const statusExt=document.getElementById('selStatusExt').value;
+  // Multi-select bulan: pakai Set selectedBulans
+  const hasBulanFilter=selectedBulans.size>0;
   filteredData=allData.filter(r=>{
-    if(bulan&&r.bulanMasuk!==bulan)return false;
+    if(hasBulanFilter&&!selectedBulans.has(r.bulanMasuk))return false;
     if(tahun&&r.tahunMasuk!==tahun)return false;
     if(aplikasi&&r.aplikasi!==aplikasi)return false;
     if(kanal&&r.kanalPengaduan!==kanal)return false;
@@ -517,25 +552,26 @@ function applyFilter(){
     return true;
   });
   currentPage=1;
-  renderAll();
+  renderTable(filteredData);
 }
 
 function resetFilter(){
-  document.getElementById('selBulan').value='';
+  selectedBulans.clear();
+  updateMsDisplay();
   document.getElementById('selTahun').value='2026';
   document.getElementById('selAplikasi').value='';
   document.getElementById('selKanal').value='';
   document.getElementById('selStatusExt').value='';
   filteredData=[...allData];
   currentPage=1;
-  renderAll();
+  renderTable(filteredData);
 }
 
 function renderAll(){
-  filteredData=[...allData];
-  applyFilter();
+  // [FIX] renderAll hanya tampilkan konten lalu jalankan applyFilter SEKALI — tidak ada loop
   document.getElementById('loadingWrap').style.display='none';
   document.getElementById('contentWrap').style.display='block';
+  applyFilter();
 }
 
 /* ===== FORMAT ===== */
@@ -866,17 +902,26 @@ function renderInsight(data){
 /* ===== TABLE ===== */
 let searchQuery='';
 function searchTable(){
+  // [FIX] Search hanya update tampilan tabel — summary & chart tetap dari filteredData penuh
   searchQuery=document.getElementById('tblSearch').value.toLowerCase();
   currentPage=1;
-  renderTable(filteredData);
+  renderTableOnly(filteredData);
 }
 
 function renderTable(data){
+  // [FIX] Guard: pastikan data adalah array valid
+  if(!Array.isArray(data))data=[];
   renderSummary(data);
   renderKanalGrid(data);
-  buildCharts(data);
+  if(data.length>0)buildCharts(data);
   renderInsight(data);
 
+  // [FIX] Delegasikan render tabel ke renderTableOnly (tidak duplikat kode)
+  renderTableOnly(data);
+}
+
+// Render tabel saja (tanpa rebuild chart/summary) — untuk search & pagination
+function renderTableOnly(data){
   let rows=data;
   if(searchQuery){
     rows=data.filter(r=>{
@@ -887,7 +932,6 @@ function renderTable(data){
              (r.leader||'').toLowerCase().includes(searchQuery);
     });
   }
-
   const total=rows.length;
   const totalPages=Math.ceil(total/PAGE_SIZE)||1;
   if(currentPage>totalPages)currentPage=1;
@@ -919,7 +963,6 @@ function renderTable(data){
       </tr>`).join('');
   }
 
-  // Pagination
   let pgHtml='';
   if(totalPages>1){
     pgHtml+=`<button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹ Prev</button>`;
@@ -942,7 +985,7 @@ function goPage(p){
   const totalPages=Math.ceil((filteredData.length||1)/PAGE_SIZE);
   if(p<1||p>totalPages)return;
   currentPage=p;
-  renderTable(filteredData);
+  renderTableOnly(filteredData); // [FIX] ganti halaman tidak rebuild chart
   document.querySelector('.table-card').scrollIntoView({behavior:'smooth'});
 }
 
@@ -1016,7 +1059,118 @@ function openModal(idx){
 }
 function closeModal(e){if(e.target===document.getElementById('modalOverlay'))closeModalDirect();}
 function closeModalDirect(){document.getElementById('modalOverlay').classList.remove('open');}
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModalDirect();});
+document.addEventListener('keydown',e=>{
+  if(e.key==='Escape'){
+    closeModalDirect();
+    closeMsDropdown();
+  }
+});
+
+/* ================================================================
+   MULTI-SELECT BULAN
+================================================================ */
+const BULAN_LIST=['Januari','Februari','Maret','April','Mei','Juni',
+  'Juli','Agustus','September','Oktober','November','Desember'];
+
+let selectedBulans=new Set(); // Set bulan yang dipilih
+
+// Init dropdown list
+(function initMs(){
+  const list=document.getElementById('msDropdownList');
+  if(!list)return;
+  list.innerHTML=BULAN_LIST.map(b=>`
+    <label class="ms-item" id="msItem-${b}">
+      <input type="checkbox" id="msChk-${b}" value="${b}" onchange="msOnChange('${b}')">
+      ${b}
+    </label>`).join('');
+})();
+
+function toggleMsDropdown(){
+  const dd=document.getElementById('msDropdown');
+  const trigger=document.getElementById('msTrigger');
+  const isOpen=dd.classList.contains('open');
+  if(isOpen){closeMsDropdown();}
+  else{dd.classList.add('open');trigger.classList.add('open');}
+}
+
+function closeMsDropdown(){
+  document.getElementById('msDropdown').classList.remove('open');
+  document.getElementById('msTrigger').classList.remove('open');
+}
+
+function msOnChange(bulan){
+  const chk=document.getElementById('msChk-'+bulan);
+  const item=document.getElementById('msItem-'+bulan);
+  if(chk.checked){selectedBulans.add(bulan);item.classList.add('checked');}
+  else{selectedBulans.delete(bulan);item.classList.remove('checked');}
+  updateMsDisplay();
+}
+
+function msSelectAll(){
+  const allChecked=selectedBulans.size===BULAN_LIST.length;
+  if(allChecked){
+    // Uncheck all
+    selectedBulans.clear();
+    BULAN_LIST.forEach(b=>{
+      document.getElementById('msChk-'+b).checked=false;
+      document.getElementById('msItem-'+b).classList.remove('checked');
+    });
+    document.querySelector('.ms-select-all').textContent='Pilih Semua';
+  } else {
+    // Check all
+    BULAN_LIST.forEach(b=>{
+      selectedBulans.add(b);
+      document.getElementById('msChk-'+b).checked=true;
+      document.getElementById('msItem-'+b).classList.add('checked');
+    });
+    document.querySelector('.ms-select-all').textContent='Hapus Semua';
+  }
+  updateMsDisplay();
+}
+
+function msClear(){
+  selectedBulans.clear();
+  BULAN_LIST.forEach(b=>{
+    document.getElementById('msChk-'+b).checked=false;
+    document.getElementById('msItem-'+b).classList.remove('checked');
+  });
+  document.querySelector('.ms-select-all').textContent='Pilih Semua';
+  updateMsDisplay();
+}
+
+function updateMsDisplay(){
+  const label=document.getElementById('msLabel');
+  const badge=document.getElementById('msBadge');
+  const trigger=document.getElementById('msTrigger');
+  const n=selectedBulans.size;
+  if(n===0){
+    label.textContent='Semua Bulan';
+    badge.style.display='none';
+    trigger.classList.remove('active');
+  } else if(n===1){
+    label.textContent=[...selectedBulans][0];
+    badge.style.display='none';
+    trigger.classList.add('active');
+  } else {
+    label.textContent=n+' Bulan';
+    badge.textContent=n;
+    badge.style.display='';
+    trigger.classList.add('active');
+  }
+  const selectAllBtn=document.querySelector('.ms-select-all');
+  if(selectAllBtn)selectAllBtn.textContent=n===BULAN_LIST.length?'Hapus Semua':'Pilih Semua';
+}
+
+function msApply(){
+  closeMsDropdown();
+  applyFilter();
+}
+
+// Klik di luar dropdown → tutup
+document.addEventListener('click',function(e){
+  const wrap=document.getElementById('msWrap');
+  if(wrap&&!wrap.contains(e.target))closeMsDropdown();
+});
 </script>
 </body>
 </html>
