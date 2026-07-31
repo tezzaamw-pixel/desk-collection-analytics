@@ -1,0 +1,1022 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Violation Analytics — System TZ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
+  --border:#e4e7ec;--text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --accent:#1d60c8;--accent-bg:#eef3fd;
+  --success:#059669;--success-bg:#ecfdf5;
+  --warning:#d97706;--warning-bg:#fffbeb;
+  --danger:#dc2626;--danger-bg:#fef2f2;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.07);--shadow-md:0 4px 12px rgba(0,0,0,0.1);
+  --sidebar-w:220px;
+}
+[data-theme="dark"]{
+  --navy:#0f1523;--bg:#0a0d14;--surface:#131825;--surface2:#1a2035;
+  --border:#252d42;--text:#f1f3f9;--text2:#9aa5be;--text3:#4a5568;
+  --accent:#4a8cf7;--accent-bg:#1a2540;
+  --success:#34d399;--success-bg:#0d2e22;
+  --warning:#fbbf24;--warning-bg:#2d200a;
+  --danger:#f87171;--danger-bg:#2d0f0f;
+  --shadow:0 1px 3px rgba(0,0,0,0.4);--shadow-md:0 4px 12px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+/* NAVBAR */
+.navbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 calc(var(--sidebar-w)+20px);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.nav-logo{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;text-decoration:none;}
+.nav-logo-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.nav-page-title{font-size:13px;color:rgba(255,255,255,0.5);border-left:1px solid rgba(255,255,255,0.15);padding-left:12px;margin-left:4px;}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.nav-timestamp{font-size:11px;color:rgba(255,255,255,0.5);}
+.theme-toggle{display:flex;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-sm);overflow:hidden;}
+.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;}
+.theme-btn.active{background:rgba(255,255,255,0.2);color:#fff;}
+.btn-nav{background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);border-radius:var(--radius-sm);padding:5px 12px;color:rgba(255,255,255,0.85);font-size:12px;cursor:pointer;}
+.btn-nav:hover{background:rgba(255,255,255,0.18);}
+/* SIDEBAR */
+.sidebar{position:fixed;top:52px;left:0;width:var(--sidebar-w);height:calc(100vh - 52px);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;z-index:100;padding:14px 10px;}
+.sidebar-section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:0 6px;margin:10px 0 6px;}
+.sidebar-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;transition:all .15s;text-decoration:none;margin-bottom:2px;}
+.sidebar-item:hover{background:var(--surface2);color:var(--text);}
+.sidebar-item.active{background:var(--accent-bg);color:var(--accent);}
+.sidebar-item .icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.sidebar-item .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+/* MAIN */
+.main{margin-left:var(--sidebar-w);margin-top:52px;padding:24px;min-height:calc(100vh - 52px);}
+/* LOCK SCREEN */
+.lock-screen{display:flex;align-items:center;justify-content:center;min-height:calc(100vh - 52px);}
+.lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
+.lock-icon{font-size:48px;margin-bottom:16px;}
+.lock-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.lock-sub{font-size:13px;color:var(--text3);margin-bottom:24px;}
+.lock-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:14px;text-align:center;letter-spacing:2px;outline:none;margin-bottom:12px;}
+.lock-input:focus{border-color:var(--accent);}
+.lock-btn{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;}
+.lock-btn:hover{opacity:.9;}
+.lock-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
+/* FILTER */
+.filter-bar{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px 18px;display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap;box-shadow:var(--shadow);}
+.filter-bar label{font-size:12px;color:var(--text3);font-weight:500;}
+select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;cursor:pointer;outline:none;}
+select:focus{border-color:var(--accent);}
+.btn-load{background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);padding:7px 16px;font-size:13px;font-weight:500;cursor:pointer;}
+.btn-load:hover{opacity:.9;}
+/* SUMMARY CARDS */
+.summary-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin-bottom:20px;}
+.sum-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:16px 18px;}
+.sum-card .lbl{font-size:11px;color:var(--text3);font-weight:500;text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+.sum-card .val{font-size:22px;font-weight:700;color:var(--text);}
+.sum-card .sub{font-size:11px;color:var(--text3);margin-top:3px;}
+.sum-card.danger{border-color:var(--danger);background:var(--danger-bg);}
+.sum-card.danger .val{color:var(--danger);}
+.sum-card.warn{border-color:var(--warning);background:var(--warning-bg);}
+.sum-card.warn .val{color:var(--warning);}
+.sum-card.success{border-color:var(--success);background:var(--success-bg);}
+.sum-card.success .val{color:var(--success);}
+/* CHARTS */
+.charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:20px;}
+.chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
+.chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.chart-title{font-size:13px;font-weight:600;color:var(--text);}
+.chart-type-toggle{display:flex;gap:4px;}
+.chart-type-btn{padding:3px 8px;font-size:11px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text3);cursor:pointer;font-weight:500;}
+.chart-type-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.chart-wrap{position:relative;height:220px;}
+/* INSIGHT */
+.insight-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;margin-bottom:20px;}
+.insight-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.insight-list{display:flex;flex-direction:column;gap:8px;}
+.insight-item{display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);background:var(--surface2);font-size:12px;color:var(--text2);line-height:1.5;}
+.ins-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:4px;}
+.dot-red{background:var(--danger);}
+.dot-warn{background:var(--warning);}
+.dot-blue{background:var(--accent);}
+.dot-green{background:var(--success);}
+/* TABLE */
+.table-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;margin-bottom:20px;}
+.table-header{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;}
+.table-title{font-size:14px;font-weight:700;color:var(--text);}
+.tbl-search{padding:6px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:12px;outline:none;min-width:200px;}
+.tbl-search:focus{border-color:var(--accent);}
+.tbl-wrap{overflow-x:auto;}
+.viol-table{width:100%;border-collapse:collapse;font-size:12px;}
+.viol-table th{padding:9px 12px;color:var(--text3);font-weight:600;border-bottom:1px solid var(--border);background:var(--surface2);text-align:left;white-space:nowrap;position:sticky;top:0;}
+.viol-table td{padding:9px 12px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top;}
+.viol-table tr:last-child td{border-bottom:none;}
+.viol-table tr:hover td{background:var(--surface2);cursor:pointer;}
+.kasus-cell{max-width:220px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.4;}
+/* BADGES */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;letter-spacing:.02em;}
+.badge-valid{background:var(--success-bg);color:var(--success);}
+.badge-invalid{background:var(--danger-bg);color:var(--danger);}
+.badge-pending{background:var(--warning-bg);color:var(--warning);}
+.badge-acc{background:var(--success-bg);color:var(--success);}
+.badge-proses{background:var(--accent-bg);color:var(--accent);}
+.badge-ojk{background:#fce7f3;color:#be185d;}
+.badge-afpi{background:#ede9fe;color:#6d28d9;}
+.badge-cs{background:#dbeafe;color:#1d4ed8;}
+.badge-terminate{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger);}
+.badge-sp3{background:#fef3c7;color:#92400e;}
+.badge-sp2{background:#ffedd5;color:#c2410c;}
+.badge-sp1{background:#fff7ed;color:#d97706;}
+.badge-coaching{background:#f0fdf4;color:#15803d;}
+.badge-warning-l{background:#f0f9ff;color:#0369a1;}
+.badge-default{background:var(--surface2);color:var(--text2);}
+/* MODAL */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:500;display:none;align-items:center;justify-content:center;padding:20px;}
+.modal-overlay.open{display:flex;}
+.modal-box{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-md);width:100%;max-width:720px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-head-title{font-size:15px;font-weight:700;color:var(--text);}
+.modal-close{background:none;border:none;font-size:20px;cursor:pointer;color:var(--text3);padding:2px 6px;border-radius:4px;}
+.modal-close:hover{background:var(--surface2);color:var(--text);}
+.modal-body{padding:20px;overflow-y:auto;flex:1;}
+.modal-section{margin-bottom:18px;}
+.modal-section-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--border);}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.modal-field{display:flex;flex-direction:column;gap:3px;}
+.modal-field .mf-label{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;}
+.modal-field .mf-val{font-size:13px;color:var(--text);font-weight:500;line-height:1.4;}
+.modal-field.full{grid-column:1/-1;}
+.kasus-full{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;color:var(--text);line-height:1.6;}
+.riwayat-box{background:var(--surface2);border-radius:var(--radius-sm);padding:10px 12px;font-size:12px;color:var(--text2);line-height:1.6;white-space:pre-wrap;word-break:break-word;}
+.alvin-box{background:var(--warning-bg);border:1px solid var(--warning);border-radius:var(--radius-sm);padding:10px 12px;font-size:13px;color:var(--text);line-height:1.6;}
+/* LOADING */
+.loading-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:14px;}
+.spinner{width:36px;height:36px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
+.empty-state{text-align:center;padding:50px 20px;color:var(--text3);}
+.empty-state .ei{font-size:40px;margin-bottom:10px;}
+/* PAGINATION */
+.pagination{display:flex;align-items:center;gap:6px;padding:12px 18px;border-top:1px solid var(--border);}
+.pg-btn{padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text2);font-size:12px;cursor:pointer;}
+.pg-btn:hover{border-color:var(--accent);color:var(--accent);}
+.pg-btn.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pg-btn:disabled{opacity:.4;cursor:not-allowed;}
+.pg-info{font-size:12px;color:var(--text3);margin-left:auto;}
+/* KANAL BREAKDOWN */
+.kanal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:20px;}
+.kanal-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:14px 16px;text-align:center;}
+.kanal-card .kn-icon{font-size:24px;margin-bottom:6px;}
+.kanal-card .kn-name{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:4px;}
+.kanal-card .kn-val{font-size:22px;font-weight:700;color:var(--text);}
+.kanal-card .kn-pct{font-size:11px;color:var(--text3);}
+.kanal-card.ojk{border-color:#f9a8d4;}
+.kanal-card.afpi{border-color:#c4b5fd;}
+.kanal-card.cs{border-color:#93c5fd;}
+/* SECTION TITLE */
+.section-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:14px;display:flex;align-items:center;gap:8px;}
+.section-title .st-badge{font-size:11px;font-weight:500;color:var(--text3);background:var(--surface2);padding:2px 8px;border-radius:20px;}
+/* NAV LIVE */
+.nav-live{display:flex;align-items:center;gap:5px;font-size:11px;color:#34d399;}
+.nav-live-dot{width:7px;height:7px;border-radius:50%;background:#34d399;animation:pulse 2s infinite;}
+@media(max-width:768px){
+  .navbar{padding-left:20px;}
+  .sidebar{display:none;}
+  .main{margin-left:0;}
+  .kanal-grid{grid-template-columns:1fr;}
+  .modal-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:10px;">
+    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">TZ</span> System TZ Analytics</a>
+    <span class="nav-page-title">⚠️ Violation</span>
+  </div>
+  <div class="nav-right">
+    <span class="nav-timestamp" id="navTimestamp">—</span>
+    <button class="btn-nav" id="btnRefresh" onclick="reloadData()" style="display:none">↻ Refresh</button>
+    <div class="nav-live"><div class="nav-live-dot"></div>Live</div>
+    <div class="theme-toggle">
+      <button class="theme-btn active" id="btnLight" onclick="setTheme('light')">☀ Terang</button>
+      <button class="theme-btn" id="btnDark" onclick="setTheme('dark')">🌙 Gelap</button>
+    </div>
+  </div>
+</nav>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-section-label">Navigasi</div>
+  <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
+  <a class="sidebar-item" href="team.html"><span class="icon">👥</span> Tim</a>
+  <a class="sidebar-item" href="agent.html"><span class="icon">👤</span> Agent</a>
+  <a class="sidebar-item active" href="violation.html"><span class="icon">⚠️</span> Violation</a>
+  <div class="sidebar-section-label" style="margin-top:14px">Aplikasi</div>
+  <div id="sidebarApps"></div>
+</aside>
+
+<!-- LOCK SCREEN -->
+<div class="lock-screen" id="lockScreen">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">Halaman Terproteksi</div>
+    <div class="lock-sub">Masukkan kata kunci untuk mengakses data pelanggaran</div>
+    <input class="lock-input" type="password" id="lockInput" placeholder="••••••" onkeydown="if(event.key==='Enter')doUnlock()"/>
+    <button class="lock-btn" onclick="doUnlock()">Masuk</button>
+    <div class="lock-error" id="lockError">Kata kunci salah. Coba lagi.</div>
+  </div>
+</div>
+
+<!-- MAIN CONTENT -->
+<div class="main" id="mainContent" style="display:none">
+
+  <!-- FILTER BAR -->
+  <div class="filter-bar">
+    <label>Bulan</label>
+    <select id="selBulan">
+      <option value="">Semua Bulan</option>
+      <option value="Januari">Januari</option><option value="Februari">Februari</option>
+      <option value="Maret">Maret</option><option value="April">April</option>
+      <option value="Mei">Mei</option><option value="Juni">Juni</option>
+      <option value="Juli">Juli</option><option value="Agustus">Agustus</option>
+      <option value="September">September</option><option value="Oktober">Oktober</option>
+      <option value="November">November</option><option value="Desember">Desember</option>
+    </select>
+    <label>Tahun</label>
+    <select id="selTahun">
+      <option value="2026">2026</option>
+      <option value="2025">2025</option>
+    </select>
+    <label>Aplikasi</label>
+    <select id="selAplikasi"><option value="">Semua Aplikasi</option></select>
+    <label>Kanal</label>
+    <select id="selKanal">
+      <option value="">Semua Kanal</option>
+      <option value="OJK">OJK</option>
+      <option value="AFPI">AFPI</option>
+      <option value="CS">CS</option>
+    </select>
+    <label>Status Ext.</label>
+    <select id="selStatusExt">
+      <option value="">Semua Status</option>
+      <option value="VALID">Valid</option>
+      <option value="INVALID">Invalid</option>
+      <option value="PENDING">Pending</option>
+    </select>
+    <button class="btn-load" onclick="applyFilter()">🔍 Filter</button>
+    <button class="btn-load" style="background:var(--surface2);color:var(--text2);border:1px solid var(--border);" onclick="resetFilter()">↺ Reset</button>
+  </div>
+
+  <!-- LOADING -->
+  <div id="loadingWrap" class="loading-wrap">
+    <div class="spinner"></div>
+    <div style="font-size:13px;color:var(--text3)">Memuat data pelanggaran…</div>
+  </div>
+
+  <!-- CONTENT (hidden until loaded) -->
+  <div id="contentWrap" style="display:none">
+
+    <!-- SUMMARY CARDS -->
+    <div class="summary-grid" id="summaryGrid"></div>
+
+    <!-- KANAL BREAKDOWN -->
+    <div class="section-title">📡 Breakdown Kanal Pengaduan</div>
+    <div class="kanal-grid" id="kanalGrid"></div>
+
+    <!-- CHARTS -->
+    <div class="section-title">📊 Grafik Analitik</div>
+    <div class="charts-grid">
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Tren Kasus per Bulan</div>
+          <div class="chart-type-toggle">
+            <button class="chart-type-btn active" onclick="switchChart('tren','bar',this)">Bar</button>
+            <button class="chart-type-btn" onclick="switchChart('tren','line',this)">Line</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartTren"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Distribusi Kanal Pengaduan</div>
+          <div class="chart-type-toggle">
+            <button class="chart-type-btn active" onclick="switchChart('kanal','doughnut',this)">Donut</button>
+            <button class="chart-type-btn" onclick="switchChart('kanal','bar',this)">Bar</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartKanal"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Top Agent Pelanggar</div>
+          <div class="chart-type-toggle">
+            <button class="chart-type-btn active" onclick="switchChart('agent','bar',this)">Bar</button>
+            <button class="chart-type-btn" onclick="switchChart('agent','horizontalBar',this)">H-Bar</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartAgent"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Kasus per Aplikasi</div>
+          <div class="chart-type-toggle">
+            <button class="chart-type-btn active" onclick="switchChart('aplikasi','bar',this)">Bar</button>
+            <button class="chart-type-btn" onclick="switchChart('aplikasi','doughnut',this)">Donut</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartAplikasi"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Distribusi Punishment Internal</div>
+          <div class="chart-type-toggle">
+            <button class="chart-type-btn active" onclick="switchChart('punishment','bar',this)">Bar</button>
+            <button class="chart-type-btn" onclick="switchChart('punishment','doughnut',this)">Donut</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartPunishment"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Rata-rata Durasi Penyelesaian (hari)</div>
+          <div class="chart-type-toggle">
+            <button class="chart-type-btn active" onclick="switchChart('durasi','bar',this)">Bar</button>
+            <button class="chart-type-btn" onclick="switchChart('durasi','line',this)">Line</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartDurasi"></canvas></div>
+      </div>
+    </div>
+
+    <!-- INSIGHT / ANALISA OTOMATIS -->
+    <div class="insight-card">
+      <div class="insight-title">🔍 Analisa & Perhatian Khusus <span style="font-size:11px;font-weight:400;color:var(--text3)">— otomatis berdasarkan data</span></div>
+      <div class="insight-list" id="insightList"><div style="color:var(--text3);font-size:12px">Memuat analisa…</div></div>
+    </div>
+
+    <!-- TABLE -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="table-title">📋 Daftar Kasus Pelanggaran <span id="tblCount" style="font-size:12px;font-weight:400;color:var(--text3)"></span></div>
+        <input class="tbl-search" id="tblSearch" placeholder="🔍 Cari agent, kasus, borrower…" oninput="searchTable()"/>
+      </div>
+      <div class="tbl-wrap">
+        <table class="viol-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Tgl Masuk</th>
+              <th>Nama Agent</th>
+              <th>Aplikasi</th>
+              <th>Bucket</th>
+              <th>Leader</th>
+              <th>Kanal</th>
+              <th>Kasus</th>
+              <th>QC Handle</th>
+              <th>Status Ext.</th>
+              <th>Status Int.</th>
+              <th>Punishment Int.</th>
+              <th>Durasi (hr)</th>
+              <th>Validasi</th>
+              <th>Denda</th>
+            </tr>
+          </thead>
+          <tbody id="tblBody"></tbody>
+        </table>
+      </div>
+      <div class="pagination" id="paginationWrap"></div>
+    </div>
+
+  </div><!-- /contentWrap -->
+</div><!-- /main -->
+
+<!-- MODAL DETAIL -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal-box">
+    <div class="modal-head">
+      <div class="modal-head-title" id="modalTitle">Detail Kasus</div>
+      <button class="modal-close" onclick="closeModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<script>
+const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
+const PASSWORD='Masuk';
+const PAGE_SIZE=25;
+
+let allData=[];
+let filteredData=[];
+let currentPage=1;
+let charts={};
+let chartTypes={tren:'bar',kanal:'doughnut',agent:'bar',aplikasi:'bar',punishment:'bar',durasi:'bar'};
+
+/* ===== THEME ===== */
+function setTheme(t){
+  document.documentElement.setAttribute('data-theme',t);
+  document.getElementById('btnLight').classList.toggle('active',t==='light');
+  document.getElementById('btnDark').classList.toggle('active',t==='dark');
+  localStorage.setItem('tz_theme',t);
+  rebuildAllCharts();
+}
+(function(){const t=localStorage.getItem('tz_theme')||'light';setTheme(t);})();
+
+/* ===== LOCK ===== */
+function doUnlock(){
+  const v=document.getElementById('lockInput').value;
+  if(v===PASSWORD){
+    document.getElementById('lockScreen').style.display='none';
+    document.getElementById('mainContent').style.display='block';
+    document.getElementById('btnRefresh').style.display='';
+    sessionStorage.setItem('viol_auth','1');
+    initPage();
+  } else {
+    document.getElementById('lockError').style.display='block';
+    document.getElementById('lockInput').value='';
+    document.getElementById('lockInput').focus();
+  }
+}
+(function(){
+  if(sessionStorage.getItem('viol_auth')==='1'){
+    document.getElementById('lockScreen').style.display='none';
+    document.getElementById('mainContent').style.display='block';
+    document.getElementById('btnRefresh').style.display='';
+    initPage();
+  }
+})();
+
+/* ===== CACHE ===== */
+const CACHE_KEY='tz_violation_cache';
+const CACHE_TTL=5*60*1000;
+function getCache(){try{const c=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'null');if(c&&Date.now()-c.ts<CACHE_TTL)return c.data;}catch(e){}return null;}
+function setCache(d){try{sessionStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),data:d}));}catch(e){}}
+function clearCache(){sessionStorage.removeItem(CACHE_KEY);}
+
+/* ===== FETCH ===== */
+async function fetchJSON(url){
+  let data;
+  try{
+    const res=await fetch(url);
+    const text=await res.text();
+    if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));data=await(await fetch(url)).json();}
+    else data=JSON.parse(text);
+  }catch(e){throw e;}
+  return data;
+}
+
+async function initPage(){
+  document.getElementById('navTimestamp').textContent='Update: '+new Date().toLocaleDateString('id-ID')+', '+new Date().toLocaleTimeString('id-ID');
+  const cached=getCache();
+  if(cached){allData=cached;renderAll();}
+  else await loadData();
+}
+
+async function loadData(){
+  document.getElementById('loadingWrap').style.display='flex';
+  document.getElementById('contentWrap').style.display='none';
+  try{
+    const data=await fetchJSON(API_URL+'?action=violation');
+    if(!data.success)throw new Error(data.message||'Gagal memuat data');
+    allData=data.rows||[];
+    setCache(allData);
+    populateAplikasiFilter();
+    renderAll();
+  }catch(e){
+    document.getElementById('loadingWrap').innerHTML='<div style="color:var(--danger);font-size:13px">⚠ Gagal memuat: '+e.message+'</div>';
+  }
+}
+
+function reloadData(){clearCache();loadData();}
+
+function populateAplikasiFilter(){
+  const apps=[...new Set(allData.map(r=>r.aplikasi).filter(Boolean))].sort();
+  const sel=document.getElementById('selAplikasi');
+  sel.innerHTML='<option value="">Semua Aplikasi</option>'+apps.map(a=>`<option value="${a}">${a}</option>`).join('');
+  // Sidebar apps
+  document.getElementById('sidebarApps').innerHTML=apps.map(a=>`<a class="sidebar-item" href="app.html?ap=${encodeURIComponent(a)}"><span class="dot" style="background:#1d60c8"></span>${a}</a>`).join('');
+}
+
+/* ===== FILTER ===== */
+function applyFilter(){
+  const bulan=document.getElementById('selBulan').value;
+  const tahun=document.getElementById('selTahun').value;
+  const aplikasi=document.getElementById('selAplikasi').value;
+  const kanal=document.getElementById('selKanal').value;
+  const statusExt=document.getElementById('selStatusExt').value;
+  filteredData=allData.filter(r=>{
+    if(bulan&&r.bulanMasuk!==bulan)return false;
+    if(tahun&&r.tahunMasuk!==tahun)return false;
+    if(aplikasi&&r.aplikasi!==aplikasi)return false;
+    if(kanal&&r.kanalPengaduan!==kanal)return false;
+    if(statusExt&&r.statusEksternal!==statusExt)return false;
+    return true;
+  });
+  currentPage=1;
+  renderAll();
+}
+
+function resetFilter(){
+  document.getElementById('selBulan').value='';
+  document.getElementById('selTahun').value='2026';
+  document.getElementById('selAplikasi').value='';
+  document.getElementById('selKanal').value='';
+  document.getElementById('selStatusExt').value='';
+  filteredData=[...allData];
+  currentPage=1;
+  renderAll();
+}
+
+function renderAll(){
+  filteredData=[...allData];
+  applyFilter();
+  document.getElementById('loadingWrap').style.display='none';
+  document.getElementById('contentWrap').style.display='block';
+}
+
+/* ===== FORMAT ===== */
+function fmtDate(d){if(!d)return'—';return d;}
+function fmtRp(v){if(!v||v===0)return'—';return'Rp '+Number(v).toLocaleString('id-ID');}
+function fmtNum(v){return Number(v||0).toLocaleString('id-ID');}
+
+function badgeStatus(s){
+  if(!s||s==='—')return'<span class="badge badge-default">—</span>';
+  const u=s.toUpperCase();
+  if(u==='VALID')return`<span class="badge badge-valid">✓ Valid</span>`;
+  if(u==='INVALID')return`<span class="badge badge-invalid">✗ Invalid</span>`;
+  if(u==='PENDING')return`<span class="badge badge-pending">⏳ Pending</span>`;
+  return`<span class="badge badge-default">${s}</span>`;
+}
+
+function badgePunishment(s){
+  if(!s||s==='—')return'<span class="badge badge-default">—</span>';
+  const u=s.toUpperCase();
+  if(u.includes('TERMINAT')||u.includes('ELIMINASI'))return`<span class="badge badge-terminate">⛔ ${s}</span>`;
+  if(u.includes('SP3'))return`<span class="badge badge-sp3">🔴 ${s}</span>`;
+  if(u.includes('SP2'))return`<span class="badge badge-sp2">🟠 ${s}</span>`;
+  if(u.includes('SP1'))return`<span class="badge badge-sp1">🟡 ${s}</span>`;
+  if(u.includes('COACHING'))return`<span class="badge badge-coaching">📝 ${s}</span>`;
+  if(u.includes('WARNING'))return`<span class="badge badge-warning-l">⚠️ ${s}</span>`;
+  return`<span class="badge badge-default">${s}</span>`;
+}
+
+function badgeKanal(k){
+  if(!k)return'<span class="badge badge-default">—</span>';
+  const u=k.toUpperCase();
+  if(u==='OJK')return`<span class="badge badge-ojk">🏛 OJK</span>`;
+  if(u==='AFPI')return`<span class="badge badge-afpi">🤝 AFPI</span>`;
+  if(u==='CS')return`<span class="badge badge-cs">💬 CS</span>`;
+  return`<span class="badge badge-default">${k}</span>`;
+}
+
+function badgeValidasi(s){
+  if(!s||s==='—')return'<span class="badge badge-default">—</span>';
+  const u=s.toUpperCase();
+  if(u==='ACC')return`<span class="badge badge-acc">✅ ACC</span>`;
+  if(u.includes('PROSES')||u.includes('ON PROSES'))return`<span class="badge badge-proses">🔄 ${s}</span>`;
+  return`<span class="badge badge-pending">${s}</span>`;
+}
+
+/* ===== SUMMARY ===== */
+function renderSummary(data){
+  const total=data.length;
+  const pending=data.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length;
+  const selesai=data.filter(r=>r.tanggalKeluar&&r.tanggalKeluar!=='—').length;
+  const totalDenda=data.reduce((a,r)=>a+(parseFloat(String(r.denda||0).replace(/[^0-9.-]/g,''))||0),0);
+  const denganDurasi=data.filter(r=>r.durasiHari>0);
+  const avgDurasi=denganDurasi.length?Math.round(denganDurasi.reduce((a,r)=>a+r.durasiHari,0)/denganDurasi.length):0;
+  const terminate=data.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length;
+
+  document.getElementById('summaryGrid').innerHTML=`
+    <div class="sum-card danger"><div class="lbl">Total Kasus</div><div class="val">${fmtNum(total)}</div><div class="sub">Periode terpilih</div></div>
+    <div class="sum-card warn"><div class="lbl">Masih Pending</div><div class="val">${fmtNum(pending)}</div><div class="sub">${total?Math.round(pending/total*100):0}% dari total</div></div>
+    <div class="sum-card success"><div class="lbl">Selesai</div><div class="val">${fmtNum(selesai)}</div><div class="sub">${total?Math.round(selesai/total*100):0}% dari total</div></div>
+    <div class="sum-card"><div class="lbl">Total Denda</div><div class="val" style="font-size:16px">${totalDenda>0?fmtRp(totalDenda):'Rp 0'}</div><div class="sub">Akumulasi periode</div></div>
+    <div class="sum-card"><div class="lbl">Avg Durasi</div><div class="val">${avgDurasi}</div><div class="sub">hari penyelesaian</div></div>
+    <div class="sum-card danger"><div class="lbl">Terminate/Eliminasi</div><div class="val">${fmtNum(terminate)}</div><div class="sub">Punishment terberat</div></div>
+  `;
+}
+
+/* ===== KANAL GRID ===== */
+function renderKanalGrid(data){
+  const total=data.length||1;
+  const byKanal={OJK:0,AFPI:0,CS:0};
+  data.forEach(r=>{const k=(r.kanalPengaduan||'').toUpperCase();if(byKanal.hasOwnProperty(k))byKanal[k]++;});
+  document.getElementById('kanalGrid').innerHTML=`
+    <div class="kanal-card ojk"><div class="kn-icon">🏛️</div><div class="kn-name">OJK</div><div class="kn-val">${byKanal.OJK}</div><div class="kn-pct">${Math.round(byKanal.OJK/total*100)}% dari total</div></div>
+    <div class="kanal-card afpi"><div class="kn-icon">🤝</div><div class="kn-name">AFPI</div><div class="kn-val">${byKanal.AFPI}</div><div class="kn-pct">${Math.round(byKanal.AFPI/total*100)}% dari total</div></div>
+    <div class="kanal-card cs"><div class="kn-icon">💬</div><div class="kn-name">CS</div><div class="kn-val">${byKanal.CS}</div><div class="kn-pct">${Math.round(byKanal.CS/total*100)}% dari total</div></div>
+  `;
+}
+
+/* ===== CHARTS ===== */
+function getCssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim();}
+
+function chartColors(){
+  return{
+    text:getCssVar('--text'),text2:getCssVar('--text2'),text3:getCssVar('--text3'),
+    border:getCssVar('--border'),surface2:getCssVar('--surface2'),
+    accent:getCssVar('--accent'),danger:getCssVar('--danger'),
+    warning:getCssVar('--warning'),success:getCssVar('--success')
+  };
+}
+
+const PALETTE=['#1d60c8','#dc2626','#d97706','#059669','#7c3aed','#0891b2','#c2410c','#15803d'];
+
+function baseChartOpts(cc){
+  return{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:cc.text2,font:{size:11}}},tooltip:{callbacks:{label:(ctx)=>` ${ctx.label||ctx.dataset.label}: ${fmtNum(ctx.parsed.y??ctx.parsed)}`}}},
+    scales:{x:{ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border}},y:{ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border}}}
+  };
+}
+
+function makeDoughnutOpts(cc){
+  return{
+    responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{position:'right',labels:{color:cc.text2,font:{size:11}}},tooltip:{callbacks:{label:(ctx)=>` ${ctx.label}: ${fmtNum(ctx.parsed)} (${Math.round(ctx.parsed/(ctx.dataset.data.reduce((a,b)=>a+b,0)||1)*100)}%)`}}}
+  };
+}
+
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+
+function buildCharts(data){
+  const cc=chartColors();
+  buildTrenChart(data,cc);
+  buildKanalChart(data,cc);
+  buildAgentChart(data,cc);
+  buildAplikasiChart(data,cc);
+  buildPunishmentChart(data,cc);
+  buildDurasiChart(data,cc);
+}
+
+function rebuildAllCharts(){if(filteredData.length>0)buildCharts(filteredData);}
+
+function switchChart(key,type,btn){
+  chartTypes[key]=type;
+  btn.closest('.chart-type-toggle').querySelectorAll('.chart-type-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  rebuildAllCharts();
+}
+
+const BULAN_ORDER=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+function buildTrenChart(data,cc){
+  destroyChart('tren');
+  const byBulan={};
+  BULAN_ORDER.forEach(b=>byBulan[b]=0);
+  data.forEach(r=>{if(r.bulanMasuk&&byBulan.hasOwnProperty(r.bulanMasuk))byBulan[r.bulanMasuk]++;});
+  const labels=BULAN_ORDER.filter(b=>byBulan[b]>0);
+  const vals=labels.map(b=>byBulan[b]);
+  const type=chartTypes.tren;
+  const ctx=document.getElementById('chartTren').getContext('2d');
+  const opts=baseChartOpts(cc);
+  opts.plugins.datalabels={display:false};
+  charts.tren=new Chart(ctx,{type,data:{labels,datasets:[{label:'Jumlah Kasus',data:vals,backgroundColor:type==='line'?cc.accent+'33':cc.danger,borderColor:cc.danger,borderWidth:type==='line'?2:0,fill:type==='line',tension:.3,pointRadius:4}]},options:opts});
+}
+
+function buildKanalChart(data,cc){
+  destroyChart('kanal');
+  const counts={OJK:0,AFPI:0,CS:0};
+  data.forEach(r=>{const k=(r.kanalPengaduan||'').toUpperCase();if(counts.hasOwnProperty(k))counts[k]++;});
+  const labels=Object.keys(counts);
+  const vals=Object.values(counts);
+  const ctx=document.getElementById('chartKanal').getContext('2d');
+  const type=chartTypes.kanal;
+  if(type==='doughnut'){
+    charts.kanal=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:['#f9a8d4','#c4b5fd','#93c5fd'],borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc)});
+  } else {
+    const opts=baseChartOpts(cc);
+    charts.kanal=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:['#f9a8d4','#c4b5fd','#93c5fd']}]},options:opts});
+  }
+}
+
+function buildAgentChart(data,cc){
+  destroyChart('agent');
+  const byAgent={};
+  data.forEach(r=>{if(r.namaAgen)byAgent[r.namaAgen]=(byAgent[r.namaAgen]||0)+1;});
+  const sorted=Object.entries(byAgent).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const labels=sorted.map(x=>x[0].split(' ')[0]);
+  const vals=sorted.map(x=>x[1]);
+  const ctx=document.getElementById('chartAgent').getContext('2d');
+  const type=chartTypes.agent==='horizontalBar'?'bar':'bar';
+  const isH=chartTypes.agent==='horizontalBar';
+  const opts=baseChartOpts(cc);
+  if(isH)opts.indexAxis='y';
+  charts.agent=new Chart(ctx,{type,data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:cc.danger+'cc'}]},options:opts});
+}
+
+function buildAplikasiChart(data,cc){
+  destroyChart('aplikasi');
+  const byApp={};
+  data.forEach(r=>{if(r.aplikasi)byApp[r.aplikasi]=(byApp[r.aplikasi]||0)+1;});
+  const sorted=Object.entries(byApp).sort((a,b)=>b[1]-a[1]);
+  const labels=sorted.map(x=>x[0]);
+  const vals=sorted.map(x=>x[1]);
+  const ctx=document.getElementById('chartAplikasi').getContext('2d');
+  const type=chartTypes.aplikasi;
+  if(type==='doughnut'){
+    charts.aplikasi=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:PALETTE,borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc)});
+  } else {
+    charts.aplikasi=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:PALETTE}]},options:baseChartOpts(cc)});
+  }
+}
+
+function buildPunishmentChart(data,cc){
+  destroyChart('punishment');
+  const byP={};
+  data.forEach(r=>{
+    let p=(r.punishmentInternal||'—');
+    if(!p||p.trim()==='')p='—';
+    byP[p]=(byP[p]||0)+1;
+  });
+  const sorted=Object.entries(byP).sort((a,b)=>b[1]-a[1]);
+  const labels=sorted.map(x=>x[0]);
+  const vals=sorted.map(x=>x[1]);
+  const bgs=labels.map(l=>{
+    const u=l.toUpperCase();
+    if(u.includes('TERMINAT')||u.includes('ELIMINASI'))return cc.danger;
+    if(u.includes('SP3'))return'#92400e';
+    if(u.includes('SP2'))return'#c2410c';
+    if(u.includes('SP1'))return cc.warning;
+    if(u.includes('COACHING'))return cc.success;
+    if(u.includes('WARNING'))return cc.accent;
+    return cc.text3;
+  });
+  const ctx=document.getElementById('chartPunishment').getContext('2d');
+  const type=chartTypes.punishment;
+  if(type==='doughnut'){
+    charts.punishment=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:bgs,borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc)});
+  } else {
+    charts.punishment=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Jumlah',data:vals,backgroundColor:bgs}]},options:baseChartOpts(cc)});
+  }
+}
+
+function buildDurasiChart(data,cc){
+  destroyChart('durasi');
+  const byBulan={};
+  const cntBulan={};
+  data.filter(r=>r.durasiHari>0&&r.bulanMasuk).forEach(r=>{
+    byBulan[r.bulanMasuk]=(byBulan[r.bulanMasuk]||0)+r.durasiHari;
+    cntBulan[r.bulanMasuk]=(cntBulan[r.bulanMasuk]||0)+1;
+  });
+  const labels=BULAN_ORDER.filter(b=>byBulan[b]);
+  const vals=labels.map(b=>Math.round(byBulan[b]/cntBulan[b]));
+  const ctx=document.getElementById('chartDurasi').getContext('2d');
+  const type=chartTypes.durasi;
+  const opts=baseChartOpts(cc);
+  charts.durasi=new Chart(ctx,{type,data:{labels,datasets:[{label:'Avg Hari',data:vals,backgroundColor:type==='line'?cc.warning+'33':cc.warning,borderColor:cc.warning,borderWidth:type==='line'?2:0,fill:type==='line',tension:.3,pointRadius:4}]},options:opts});
+}
+
+/* ===== INSIGHT OTOMATIS ===== */
+function renderInsight(data){
+  const insights=[];
+  const total=data.length;
+  if(total===0){document.getElementById('insightList').innerHTML='<div style="color:var(--text3);font-size:12px">Tidak ada data untuk dianalisa.</div>';return;}
+
+  // 1. Kanal dominan
+  const byKanal={};
+  data.forEach(r=>{const k=r.kanalPengaduan||'Tidak Diketahui';byKanal[k]=(byKanal[k]||0)+1;});
+  const topKanal=Object.entries(byKanal).sort((a,b)=>b[1]-a[1])[0];
+  if(topKanal&&topKanal[1]>0){
+    const pct=Math.round(topKanal[1]/total*100);
+    const dot=pct>=50?'dot-red':pct>=30?'dot-warn':'dot-blue';
+    insights.push({dot,text:`Kanal pengaduan terbanyak: <b>${topKanal[0]}</b> dengan <b>${topKanal[1]} kasus</b> (${pct}% dari total). ${pct>=50?'Perlu koordinasi serius dengan pihak '+topKanal[0]+'.':''}`});
+  }
+
+  // 2. Aplikasi dengan kasus terbanyak
+  const byApp={};
+  data.forEach(r=>{if(r.aplikasi)byApp[r.aplikasi]=(byApp[r.aplikasi]||0)+1;});
+  const topApp=Object.entries(byApp).sort((a,b)=>b[1]-a[1]);
+  if(topApp.length>0){
+    const t=topApp[0];
+    const pct=Math.round(t[1]/total*100);
+    insights.push({dot:pct>=40?'dot-red':'dot-warn',text:`Aplikasi <b>${t[0]}</b> memiliki kasus pelanggaran terbanyak: <b>${t[1]} kasus</b> (${pct}%). Perlu evaluasi SOP penagihan di aplikasi ini.`});
+  }
+
+  // 3. Agent dengan kasus terbanyak (repeat offender)
+  const byAgent={};
+  data.forEach(r=>{if(r.namaAgen)byAgent[r.namaAgen]=(byAgent[r.namaAgen]||0)+1;});
+  const topAgents=Object.entries(byAgent).sort((a,b)=>b[1]-a[1]).filter(a=>a[1]>=2);
+  if(topAgents.length>0){
+    const names=topAgents.slice(0,3).map(a=>`${a[0].split(' ')[0]} (${a[1]}x)`).join(', ');
+    insights.push({dot:'dot-red',text:`<b>${topAgents.length} agent</b> memiliki riwayat pelanggaran berulang (≥2 kasus): ${names}${topAgents.length>3?'…':''}. Rekomendasikan pembinaan intensif.`});
+  }
+
+  // 4. Kasus pending lama
+  const pendingLama=data.filter(r=>(r.statusEksternal==='PENDING'||r.statusInternal==='PENDING')&&r.durasiHari>14);
+  if(pendingLama.length>0){
+    insights.push({dot:'dot-red',text:`<b>${pendingLama.length} kasus</b> masih berstatus PENDING lebih dari 14 hari. Segera eskalasi ke tim QC dan atasan.`});
+  }
+
+  // 5. Rata-rata durasi tinggi
+  const denganDurasi=data.filter(r=>r.durasiHari>0);
+  if(denganDurasi.length>0){
+    const avg=Math.round(denganDurasi.reduce((a,r)=>a+r.durasiHari,0)/denganDurasi.length);
+    if(avg>7)insights.push({dot:'dot-warn',text:`Rata-rata durasi penyelesaian kasus <b>${avg} hari</b>. ${avg>14?'Sangat lambat — perlu SLA yang lebih ketat.':'Perlu ditingkatkan, target ideal ≤7 hari.'}`});
+    else insights.push({dot:'dot-green',text:`Rata-rata durasi penyelesaian kasus <b>${avg} hari</b> — dalam batas wajar (≤7 hari). Pertahankan!`});
+  }
+
+  // 6. Punishment Terminate tinggi
+  const terminate=data.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');});
+  if(terminate.length>0){
+    const pct=Math.round(terminate.length/total*100);
+    insights.push({dot:pct>=20?'dot-red':'dot-warn',text:`<b>${terminate.length} kasus</b> (${pct}%) berakhir dengan Terminate/Eliminasi. ${pct>=20?'Tingkat terminate sangat tinggi — evaluasi proses rekrutmen dan orientasi agent.':'Waspadai eskalasi lebih lanjut.'}`});
+  }
+
+  // 7. Leader dengan kasus terbanyak
+  const byLeader={};
+  data.forEach(r=>{if(r.leader)byLeader[r.leader]=(byLeader[r.leader]||0)+1;});
+  const topLeader=Object.entries(byLeader).sort((a,b)=>b[1]-a[1]);
+  if(topLeader.length>0&&topLeader[0][1]>=3){
+    insights.push({dot:'dot-warn',text:`Tim Leader <b>${topLeader[0][0]}</b> memiliki kasus pelanggaran terbanyak di timnya: <b>${topLeader[0][1]} kasus</b>. Perlu evaluasi pengawasan dan coaching dari leader ini.`});
+  }
+
+  // 8. Total denda
+  const totalDenda=data.reduce((a,r)=>a+(parseFloat(String(r.denda||0).replace(/[^0-9.-]/g,''))||0),0);
+  if(totalDenda>0){
+    insights.push({dot:totalDenda>10000000?'dot-red':'dot-warn',text:`Total akumulasi denda periode ini: <b>${fmtRp(totalDenda)}</b>. ${totalDenda>10000000?'Nominal signifikan — perlu laporan ke manajemen.':'Pantau terus agar tidak meningkat.'}`});
+  }
+
+  // 9. Kasus tanpa validasi
+  const belumValidasi=data.filter(r=>!r.statusValidasi||r.statusValidasi==='—'||r.statusValidasi.trim()==='');
+  if(belumValidasi.length>0){
+    insights.push({dot:'dot-warn',text:`<b>${belumValidasi.length} kasus</b> belum memiliki status validasi. Segera minta konfirmasi atasan/Mr. Alvin.`});
+  }
+
+  // 10. OJK sebagai kanal — warning khusus
+  const ojkCount=data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length;
+  if(ojkCount>0){
+    insights.push({dot:ojkCount>=5?'dot-red':'dot-warn',text:`<b>${ojkCount} pengaduan</b> masuk melalui OJK. ${ojkCount>=5?'Jumlah tinggi — dapat berdampak pada reputasi perusahaan dan lisensi operasional.':'Pantau progres penyelesaian agar tidak eskalasi.'}`});
+  }
+
+  if(insights.length===0)insights.push({dot:'dot-green',text:'Tidak ada temuan khusus pada periode ini. Data pelanggaran dalam kondisi terkendali.'});
+
+  document.getElementById('insightList').innerHTML=insights.map(i=>`
+    <div class="insight-item">
+      <div class="ins-dot ${i.dot}"></div>
+      <div>${i.text}</div>
+    </div>`).join('');
+}
+
+/* ===== TABLE ===== */
+let searchQuery='';
+function searchTable(){
+  searchQuery=document.getElementById('tblSearch').value.toLowerCase();
+  currentPage=1;
+  renderTable(filteredData);
+}
+
+function renderTable(data){
+  renderSummary(data);
+  renderKanalGrid(data);
+  buildCharts(data);
+  renderInsight(data);
+
+  let rows=data;
+  if(searchQuery){
+    rows=data.filter(r=>{
+      return (r.namaAgen||'').toLowerCase().includes(searchQuery)||
+             (r.kasus||'').toLowerCase().includes(searchQuery)||
+             (r.namaBorrower||'').toLowerCase().includes(searchQuery)||
+             (r.aplikasi||'').toLowerCase().includes(searchQuery)||
+             (r.leader||'').toLowerCase().includes(searchQuery);
+    });
+  }
+
+  const total=rows.length;
+  const totalPages=Math.ceil(total/PAGE_SIZE)||1;
+  if(currentPage>totalPages)currentPage=1;
+  const start=(currentPage-1)*PAGE_SIZE;
+  const pageRows=rows.slice(start,start+PAGE_SIZE);
+
+  document.getElementById('tblCount').textContent=`— ${fmtNum(total)} kasus`;
+
+  if(pageRows.length===0){
+    document.getElementById('tblBody').innerHTML='<tr><td colspan="15"><div class="empty-state"><div class="ei">📂</div><div>Tidak ada data ditemukan</div></div></td></tr>';
+  } else {
+    document.getElementById('tblBody').innerHTML=pageRows.map((r,i)=>`
+      <tr onclick="openModal(${r._idx})">
+        <td style="color:var(--text3);font-size:11px">${start+i+1}</td>
+        <td style="white-space:nowrap">${fmtDate(r.tanggalMasuk)}</td>
+        <td style="font-weight:600;color:var(--text);white-space:nowrap">${r.namaAgen||'—'}</td>
+        <td style="white-space:nowrap">${r.aplikasi||'—'}</td>
+        <td style="white-space:nowrap">${r.bucket||'—'}</td>
+        <td style="white-space:nowrap">${r.leader||'—'}</td>
+        <td>${badgeKanal(r.kanalPengaduan)}</td>
+        <td><div class="kasus-cell" title="${(r.kasus||'').replace(/"/g,"'")}">${r.kasus||'—'}</div></td>
+        <td style="white-space:nowrap">${r.namaQC||'—'}</td>
+        <td>${badgeStatus(r.statusEksternal)}</td>
+        <td>${badgeStatus(r.statusInternal)}</td>
+        <td>${badgePunishment(r.punishmentInternal)}</td>
+        <td style="text-align:center">${r.durasiHari>0?r.durasiHari:'—'}</td>
+        <td>${badgeValidasi(r.statusValidasi)}</td>
+        <td style="white-space:nowrap;font-weight:600;color:${r.denda&&r.denda!=='—'?'var(--danger)':'var(--text3)'}">${r.denda&&r.denda!=='—'?fmtRp(parseFloat(String(r.denda).replace(/[^0-9.-]/g,''))||0):'—'}</td>
+      </tr>`).join('');
+  }
+
+  // Pagination
+  let pgHtml='';
+  if(totalPages>1){
+    pgHtml+=`<button class="pg-btn" onclick="goPage(${currentPage-1})" ${currentPage===1?'disabled':''}>‹ Prev</button>`;
+    const range=[];
+    for(let p=1;p<=totalPages;p++){
+      if(p===1||p===totalPages||Math.abs(p-currentPage)<=2)range.push(p);
+      else if(range[range.length-1]!=='…')range.push('…');
+    }
+    range.forEach(p=>{
+      if(p==='…')pgHtml+=`<span style="color:var(--text3);padding:0 4px">…</span>`;
+      else pgHtml+=`<button class="pg-btn ${p===currentPage?'active':''}" onclick="goPage(${p})">${p}</button>`;
+    });
+    pgHtml+=`<button class="pg-btn" onclick="goPage(${currentPage+1})" ${currentPage===totalPages?'disabled':''}>Next ›</button>`;
+  }
+  pgHtml+=`<span class="pg-info">${fmtNum(start+1)}–${fmtNum(Math.min(start+PAGE_SIZE,total))} dari ${fmtNum(total)}</span>`;
+  document.getElementById('paginationWrap').innerHTML=pgHtml;
+}
+
+function goPage(p){
+  const totalPages=Math.ceil((filteredData.length||1)/PAGE_SIZE);
+  if(p<1||p>totalPages)return;
+  currentPage=p;
+  renderTable(filteredData);
+  document.querySelector('.table-card').scrollIntoView({behavior:'smooth'});
+}
+
+/* ===== MODAL ===== */
+function openModal(idx){
+  const r=allData[idx];
+  if(!r)return;
+  document.getElementById('modalTitle').textContent=`Kasus #${r.no||idx+1} — ${r.namaAgen||'—'}`;
+  document.getElementById('modalBody').innerHTML=`
+    <div class="modal-section">
+      <div class="modal-section-title">📋 Identitas Kasus</div>
+      <div class="modal-grid">
+        <div class="modal-field"><div class="mf-label">No</div><div class="mf-val">${r.no||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Tanggal Masuk</div><div class="mf-val">${r.tanggalMasuk||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Tanggal Keluar</div><div class="mf-val">${r.tanggalKeluar||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Durasi Penyelesaian</div><div class="mf-val">${r.durasiHari>0?r.durasiHari+' hari':'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Tanggal Komplain</div><div class="mf-val">${r.tanggalKomplain||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Kanal Pengaduan</div><div class="mf-val">${badgeKanal(r.kanalPengaduan)}</div></div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">👤 Agent & Tim</div>
+      <div class="modal-grid">
+        <div class="modal-field"><div class="mf-label">Nama Agent</div><div class="mf-val" style="font-weight:700">${r.namaAgen||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Leader</div><div class="mf-val">${r.leader||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Aplikasi</div><div class="mf-val">${r.aplikasi||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Bucket</div><div class="mf-val">${r.bucket||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Akun</div><div class="mf-val">${r.akun||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">Nama Borrower</div><div class="mf-val">${r.namaBorrower||'—'}</div></div>
+        <div class="modal-field"><div class="mf-label">QC Handle</div><div class="mf-val">${r.namaQC||'—'}</div></div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">⚖️ Kasus & Pelanggaran</div>
+      <div class="modal-grid">
+        <div class="modal-field full"><div class="mf-label">Kasus / Deskripsi</div><div class="kasus-full">${r.kasus||'—'}</div></div>
+        <div class="modal-field full"><div class="mf-label">Keterangan Tambahan</div><div class="kasus-full">${r.keteranganTambahan||'—'}</div></div>
+      </div>
+    </div>
+    <div class="modal-section">
+      <div class="modal-section-title">📊 Status & Punishment</div>
+      <div class="modal-grid">
+        <div class="modal-field"><div class="mf-label">Status Eksternal</div><div class="mf-val">${badgeStatus(r.statusEksternal)}</div></div>
+        <div class="modal-field"><div class="mf-label">Punishment Eksternal</div><div class="mf-val">${badgePunishment(r.punishmentEksternal)}</div></div>
+        <div class="modal-field"><div class="mf-label">Status Internal</div><div class="mf-val">${badgeStatus(r.statusInternal)}</div></div>
+        <div class="modal-field"><div class="mf-label">Punishment Internal</div><div class="mf-val">${badgePunishment(r.punishmentInternal)}</div></div>
+        <div class="modal-field"><div class="mf-label">Status Validasi</div><div class="mf-val">${badgeValidasi(r.statusValidasi)}</div></div>
+        <div class="modal-field"><div class="mf-label">Denda</div><div class="mf-val" style="font-weight:700;color:var(--danger)">${r.denda&&r.denda!=='—'?fmtRp(parseFloat(String(r.denda).replace(/[^0-9.-]/g,''))||0):'—'}</div></div>
+      </div>
+    </div>
+    ${r.riwayatHandleCase&&r.riwayatHandleCase!=='—'?`
+    <div class="modal-section">
+      <div class="modal-section-title">🕐 Riwayat Handle Case</div>
+      <div class="riwayat-box">${r.riwayatHandleCase}</div>
+    </div>`:''}
+    ${r.keteranganAlvin&&r.keteranganAlvin!=='—'?`
+    <div class="modal-section">
+      <div class="modal-section-title">👔 Keterangan Mr. Alvin</div>
+      <div class="alvin-box">${r.keteranganAlvin}</div>
+    </div>`:''}
+    ${r.buktiFeedback||r.buktiFeedbackMandarin||r.buktiLaporan||r.buktiLaporanMandarin?`
+    <div class="modal-section">
+      <div class="modal-section-title">📎 Dokumen & Bukti</div>
+      <div class="modal-grid">
+        ${r.buktiLaporan&&r.buktiLaporan!=='—'?`<div class="modal-field"><div class="mf-label">Bukti Laporan</div><div class="mf-val"><a href="${r.buktiLaporan}" target="_blank" style="color:var(--accent)">🔗 Lihat Dokumen</a></div></div>`:''}
+        ${r.buktiFeedback&&r.buktiFeedback!=='—'?`<div class="modal-field"><div class="mf-label">File Feedback</div><div class="mf-val"><a href="${r.buktiFeedback}" target="_blank" style="color:var(--accent)">🔗 Lihat Feedback</a></div></div>`:''}
+      </div>
+    </div>`:''}
+  `;
+  document.getElementById('modalOverlay').classList.add('open');
+}
+function closeModal(e){if(e.target===document.getElementById('modalOverlay'))closeModalDirect();}
+function closeModalDirect(){document.getElementById('modalOverlay').classList.remove('open');}
+document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModalDirect();});
+</script>
+</body>
+</html>
