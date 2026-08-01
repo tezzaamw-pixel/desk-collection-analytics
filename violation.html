@@ -1728,7 +1728,6 @@ function openLbModal(type, name){
     if(type==='tl')return(r.leader||r.teamLeader||r.tl||'').trim()===name;
     return false;
   });
-  const BULAN_ORDER=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
   const total=rows.length;
   const ojk=rows.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length;
   const afpi=rows.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='AFPI').length;
@@ -1736,7 +1735,13 @@ function openLbModal(type, name){
   const terminate=rows.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length;
   const pending=rows.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length;
 
-  // Top kasus berulang
+  // Riwayat Aplikasi
+  const appCnt={};
+  rows.forEach(r=>{if(r.aplikasi)appCnt[r.aplikasi]=(appCnt[r.aplikasi]||0)+1;});
+  const appList=Object.entries(appCnt).sort((a,b)=>b[1]-a[1]);
+  const appNames=appList.map(([a])=>a);
+
+  // Top kasus
   const kasusCnt={};
   rows.forEach(r=>{
     const k=(r.kasus||'').trim();
@@ -1746,12 +1751,27 @@ function openLbModal(type, name){
   });
   const topKasus=Object.entries(kasusCnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
-  // Punishment terberat
+  // Punishment
   const punCnt={};
   rows.forEach(r=>{const p=(r.punishmentInternal||'—').trim();if(p&&p!=='—')punCnt[p]=(punCnt[p]||0)+1;});
   const topPun=Object.entries(punCnt).sort((a,b)=>b[1]-a[1]);
 
-  // Untuk TL: tampilkan agent yang terlibat
+  // Badge aplikasi untuk header (poin 2)
+  const APP_COLORS=['#dbeafe','#d1fae5','#fce7f3','#ede9fe','#fff7ed','#f0fdf4','#fef3c7'];
+  const APP_TEXT=['#1d4ed8','#065f46','#be185d','#5b21b6','#c2410c','#15803d','#92400e'];
+  const appBadgesHeader=appNames.slice(0,5).map((a,i)=>`<span style="display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:700;background:${APP_COLORS[i%APP_COLORS.length]};color:${APP_TEXT[i%APP_TEXT.length]}">${a}</span>`).join(' ')+(appNames.length>5?`<span style="font-size:10px;color:var(--text3)"> +${appNames.length-5} lagi</span>`:'');
+
+  // Section: Riwayat Aplikasi (poin 1)
+  const appSection=`
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">📱 Riwayat Aplikasi Terlibat</div>
+    <div class="app-kasus-list" style="margin-bottom:14px">${appList.map(([ap,cnt],i)=>`
+      <div class="app-agent-row">
+        <div class="app-agent-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</div>
+        <div style="flex:1;font-size:12px;font-weight:600;color:var(--text)">${ap}</div>
+        <div style="font-size:12px;font-weight:700;color:var(--danger)">${cnt} kasus</div>
+      </div>`).join('')}</div>`;
+
+  // Section: Agent (untuk TL)
   let agentSection='';
   if(type==='tl'){
     const agCnt={};
@@ -1768,7 +1788,7 @@ function openLbModal(type, name){
         </div>`).join('')}</div>`:'';
   }
 
-  // Untuk Agent: tampilkan riwayat timeline kasus
+  // Section: Timeline (untuk Agent)
   let timelineSection='';
   if(type==='agent'){
     const sorted=[...rows].sort((a,b)=>(a.tanggalMasuk||'').localeCompare(b.tanggalMasuk||''));
@@ -1778,31 +1798,36 @@ function openLbModal(type, name){
         <div class="prev-tl-row">
           <div class="prev-tl-date">${r.tanggalMasuk||'—'}</div>
           <div class="prev-tl-kanal">${badgeKanal(r.kanalPengaduan)}</div>
-          <div class="prev-tl-kasus">${(r.kasus||'—').substring(0,80)}${(r.kasus||'').length>80?'…':''}</div>
+          <div class="prev-tl-kasus">
+            <span style="font-size:10px;font-weight:700;color:var(--accent);margin-right:4px">[${r.aplikasi||'—'}]</span>
+            ${(r.kasus||'—').substring(0,65)}${(r.kasus||'').length>65?'…':''}
+          </div>
         </div>`).join('')}</div>`;
   }
 
+  // Render modal
   const icon=type==='agent'?'👤':'👥';
   const label=type==='agent'?'Agent':'Team Leader';
-  document.getElementById('modalLbTitle').innerHTML=`${icon} ${label}: ${name}`;
+  document.getElementById('modalLbTitle').innerHTML=`
+    <div style="display:flex;flex-direction:column;gap:4px">
+      <div>${icon} ${label}: <strong>${name}</strong></div>
+      <div style="font-weight:400">${appBadgesHeader}</div>
+    </div>`;
   document.getElementById('modalLbBody').innerHTML=`
-    <!-- Stats -->
     <div class="prev-stat-row">
       <div class="prev-stat"><div class="ps-lbl">Total Kasus</div><div class="ps-val" style="color:var(--danger)">${fmtNum(total)}</div></div>
       <div class="prev-stat"><div class="ps-lbl">Pending</div><div class="ps-val" style="color:var(--warning)">${fmtNum(pending)}</div></div>
       <div class="prev-stat"><div class="ps-lbl">Terminate</div><div class="ps-val" style="color:var(--danger)">${fmtNum(terminate)}</div></div>
     </div>
-    <!-- Kanal breakdown -->
     <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
       ${ojk>0?`<span class="badge badge-ojk">🏛 OJK: ${ojk}</span>`:''}
       ${afpi>0?`<span class="badge badge-afpi">🤝 AFPI: ${afpi}</span>`:''}
       ${cs>0?`<span class="badge badge-cs">💬 CS: ${cs}</span>`:''}
     </div>
-    <!-- Punishment -->
-    ${topPun.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${topPun.map(([p,c])=>`${badgePunishment(p)} <span style="font-size:10px;color:var(--text3);margin-left:-4px;margin-right:4px">${c}x</span>`).join('')}</div>`:''}
+    ${topPun.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${topPun.map(([p,c])=>`${badgePunishment(p)}<span style="font-size:10px;color:var(--text3);margin-left:-2px;margin-right:6px">${c}x</span>`).join('')}</div>`:''}
+    ${appSection}
     ${agentSection}
     ${timelineSection}
-    <!-- Top Kasus -->
     <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">📋 Kalimat/Kasus Paling Sering Dilaporkan</div>
     <div class="prev-kasus-scroll">${topKasus.length?topKasus.map(([k,c],i)=>`
       <div class="prev-kasus-row">
@@ -1813,6 +1838,7 @@ function openLbModal(type, name){
   `;
   document.getElementById('modalLbOverlay').classList.add('open');
 }
+
 function closeLbModal(e){if(e.target===document.getElementById('modalLbOverlay'))closeLbModalDirect();}
 function closeLbModalDirect(){document.getElementById('modalLbOverlay').classList.remove('open');}
 

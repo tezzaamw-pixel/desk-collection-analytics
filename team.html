@@ -404,6 +404,19 @@ select:focus{border-color:var(--accent);}
 .range-mode-tab:hover{background:var(--accent-bg);color:var(--accent);}
 .range-mode-tab.active{background:var(--accent);color:#fff;}
 .filter-range-sep{font-size:11px;color:var(--text3);white-space:nowrap;}
+
+/* ── LOCK SCREEN ── */
+.lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
+.lock-icon{font-size:48px;margin-bottom:16px;}
+.lock-title{font-size:18px;font-weight:700;color:var(--text);margin-bottom:6px;}
+.lock-sub{font-size:13px;color:var(--text3);margin-bottom:24px;}
+.lock-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:14px;text-align:center;letter-spacing:2px;outline:none;margin-bottom:12px;}
+.lock-input:focus{border-color:var(--accent);}
+.lock-btn{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;}
+.lock-btn:hover{opacity:.9;}
+.lock-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
+
 </style>
 </head>
 <body>
@@ -419,6 +432,18 @@ select:focus{border-color:var(--accent);}
     </div>
   </div>
 </nav>
+
+<!-- LOCK SCREEN TIM -->
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">Halaman Tim</div>
+    <div class="lock-sub">Masukkan kata kunci untuk mengakses halaman Tim</div>
+    <input class="lock-input" type="password" id="lockInput" placeholder="••••••" onkeydown="if(event.key==='Enter')doUnlockPage()"/>
+    <button class="lock-btn" onclick="doUnlockPage()">Masuk</button>
+    <div class="lock-error" id="lockError">Kata kunci salah. Coba lagi.</div>
+  </div>
+</div>
 
 <aside class="sidebar">
   <div class="sidebar-section">
@@ -2961,6 +2986,33 @@ document.addEventListener('keydown',function(e){
     if(e.key==='ArrowLeft')presNavigate(-1);
   }
 });
+
+
+/* ── LOCK PAGE ── */
+const PAGE_PASSWORD='Marki';
+const PAGE_SESSION_KEY='tz_page_auth_'+window.location.pathname.split('/').pop().replace('.html','');
+(function(){
+  if(sessionStorage.getItem(PAGE_SESSION_KEY)==='1'){
+    const ol=document.getElementById('lockOverlay');
+    if(ol)ol.remove();
+  } else {
+    // Blokir scroll
+    document.body.style.overflow='hidden';
+  }
+})();
+function doUnlockPage(){
+  const v=document.getElementById('lockInput').value;
+  if(v===PAGE_PASSWORD){
+    sessionStorage.setItem(PAGE_SESSION_KEY,'1');
+    const ol=document.getElementById('lockOverlay');
+    if(ol)ol.remove();
+    document.body.style.overflow='';
+  } else {
+    document.getElementById('lockError').style.display='block';
+    document.getElementById('lockInput').value='';
+    document.getElementById('lockInput').focus();
+  }
+}
 
 </script>
 </body>
