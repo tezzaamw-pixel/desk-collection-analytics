@@ -545,11 +545,11 @@ select:focus{border-color:var(--accent);}
       </div>
       <div class="chart-card">
         <div class="chart-header">
-          <div class="chart-title">Top Agent Pelanggar</div>
+          <div class="chart-title">Valid Ext. vs Valid Int.</div>
           <button class="chart-label-btn" id="lblBtn-agent" onclick="toggleLabels('agent')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
             <button class="chart-type-btn active" onclick="switchChart('agent','bar',this)">Bar</button>
-            <button class="chart-type-btn" onclick="switchChart('agent','horizontalBar',this)">H-Bar</button>
+            <button class="chart-type-btn" onclick="switchChart('agent','line',this)">Line</button>
           </div>
         </div>
         <div class="chart-wrap"><canvas id="chartAgent"></canvas></div>
@@ -1132,18 +1132,44 @@ function buildKanalChart(data,cc){
 
 function buildAgentChart(data,cc){
   destroyChart('agent');
-  const byAgent={};
-  data.forEach(r=>{if(r.namaAgen)byAgent[r.namaAgen]=(byAgent[r.namaAgen]||0)+1;});
-  const sorted=Object.entries(byAgent).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  const labels=sorted.map(x=>x[0].split(' ')[0]);
-  const vals=sorted.map(x=>x[1]);
+  // Compare: Valid External vs Valid Internal per Bulan
+  const extCount={}, intCount={};
+  BULAN_ORDER.forEach(b=>{extCount[b]=0;intCount[b]=0;});
+  data.forEach(r=>{
+    const b=r.bulanMasuk;
+    if(!b||!extCount.hasOwnProperty(b))return;
+    const ext=(r.statusEksternal||'').toUpperCase();
+    const int=(r.statusInternal||'').toUpperCase();
+    if(ext==='VALID')extCount[b]++;
+    if(int==='VALID')intCount[b]++;
+  });
+  // Hanya bulan yang ada data
+  const labels=BULAN_ORDER.filter(b=>extCount[b]>0||intCount[b]>0);
+  const extVals=labels.map(b=>extCount[b]);
+  const intVals=labels.map(b=>intCount[b]);
   const ctx=document.getElementById('chartAgent').getContext('2d');
-  const type=chartTypes.agent==='horizontalBar'?'bar':'bar';
-  const isH=chartTypes.agent==='horizontalBar';
-  const dlCfg=isH?dlBarH(cc,showLabels.agent):dlBar(cc,showLabels.agent);
-  const opts=baseChartOpts(cc, dlCfg);
-  if(isH)opts.indexAxis='y';
-  charts.agent=new Chart(ctx,{type,data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:cc.danger+'cc'}]},options:opts});
+  const type=chartTypes.agent==='line'?'line':'bar';
+  const dlCfg=type==='line'?dlLine(cc,showLabels.agent):dlBar(cc,showLabels.agent);
+  const opts=baseChartOpts(cc,dlCfg);
+  opts.plugins.tooltip={callbacks:{label:ctx=>` ${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)}`}};
+  if(type==='bar')opts.scales={
+    x:{ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border}},
+    y:{ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border},beginAtZero:true}
+  };
+  charts.agent=new Chart(ctx,{
+    type,
+    data:{labels,datasets:[
+      {label:'Valid Eksternal',data:extVals,
+        backgroundColor:type==='line'?cc.success+'33':cc.success+'cc',
+        borderColor:cc.success,borderWidth:type==='line'?2:0,
+        fill:type==='line',tension:.3,pointRadius:4,borderRadius:3},
+      {label:'Valid Internal',data:intVals,
+        backgroundColor:type==='line'?cc.accent+'33':cc.accent+'cc',
+        borderColor:cc.accent,borderWidth:type==='line'?2:0,
+        fill:type==='line',tension:.3,pointRadius:4,borderRadius:3}
+    ]},
+    options:opts
+  });
 }
 
 function buildAplikasiChart(data,cc){
@@ -2218,6 +2244,8 @@ function msSelectAll(){msSelectAllFor('Bulan');}
 function msClear(){msClearFor('Bulan');}
 
 function updateMsDisplayFor(key){
+  // Tanggal bukan Set — punya handler sendiri (updateTanggalDisplay)
+  if(key==='Tanggal'){updateTanggalDisplay();return;}
   const cfg=MS_CFG[key];
   const n=msState[key].size;
   const label=document.getElementById(cfg.labelId);
