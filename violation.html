@@ -211,6 +211,55 @@ select:focus{border-color:var(--accent);}
   .kanal-grid{grid-template-columns:1fr;}
   .modal-grid{grid-template-columns:1fr;}
 }
+/* ══════════════════════════════════════════
+   LEADERBOARD TOP 10
+══════════════════════════════════════════ */
+.lb-section-label{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.lb-section-label::after{content:'';flex:1;height:1px;background:var(--border);}
+.leaderboard-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px;align-items:start;}
+@media(max-width:1200px){.leaderboard-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:720px){.leaderboard-grid{grid-template-columns:1fr;}}
+.lb-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.lb-card-head{padding:14px 16px 12px;border-bottom:1px solid var(--border);}
+.lb-card-head-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;}
+.lb-card-icon{width:34px;height:34px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;}
+.lb-count-badge{font-size:11px;font-weight:600;padding:3px 10px;border-radius:20px;}
+.lb-count-app{background:#dbeafe;color:#1e40af;}
+.lb-count-tl{background:#d1fae5;color:#065f46;}
+.lb-count-ag{background:#fce7f3;color:#9d174d;}
+.lb-card-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.lb-card-sub{font-size:11px;color:var(--text3);}
+.lb-kanal-summary{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
+.lb-ks-pill{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;}
+.lb-ks-ojk{background:#fce7f3;color:#9d174d;}
+.lb-ks-afpi{background:#ede9fe;color:#4c1d95;}
+.lb-ks-cs{background:#dbeafe;color:#1e40af;}
+.lb-ks-other{background:var(--surface2);color:var(--text3);}
+/* List rows */
+.lb-row{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--border);transition:background .1s;position:relative;}
+.lb-row:last-child{border-bottom:none;}
+.lb-row:hover{background:var(--surface2);}
+/* Progress bar di bg row */
+.lb-row-bar{position:absolute;left:0;top:0;bottom:0;border-radius:0;opacity:.06;pointer-events:none;transition:width .5s;}
+.lb-rank{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0;position:relative;z-index:1;}
+.lb-r1{background:#fef3c7;color:#92400e;}
+.lb-r2{background:#e2e8f0;color:#475569;}
+.lb-r3{background:#fee2e2;color:#7f1d1d;}
+.lb-rn{background:var(--surface2);color:var(--text3);}
+.lb-info{flex:1;min-width:0;position:relative;z-index:1;}
+.lb-name{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px;}
+.lb-pills{display:flex;gap:3px;flex-wrap:nowrap;overflow:hidden;}
+.lb-pill{font-size:10px;padding:1px 6px;border-radius:8px;font-weight:500;white-space:nowrap;flex-shrink:0;}
+.lb-pill-ojk{background:#fce7f3;color:#9d174d;}
+.lb-pill-afpi{background:#ede9fe;color:#4c1d95;}
+.lb-pill-cs{background:#dbeafe;color:#1e40af;}
+.lb-pill-other{background:var(--surface2);color:var(--text3);}
+.lb-right{flex-shrink:0;text-align:right;position:relative;z-index:1;}
+.lb-total-num{font-size:15px;font-weight:800;color:var(--danger);line-height:1;}
+.lb-total-lbl{font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-top:1px;}
+.lb-badge-repeat{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--danger-bg);color:var(--danger);font-weight:700;margin-left:4px;vertical-align:middle;}
+.lb-badge-warn{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-weight:700;margin-left:4px;vertical-align:middle;}
+
 </style>
 </head>
 <body>
@@ -989,122 +1038,139 @@ function buildDurasiChart(data,cc){
 function renderLeaderboard(data){
   const el=document.getElementById('leaderboardGrid');
   if(!el)return;
-  if(!data||data.length===0){el.innerHTML='';return;}
+  if(!data||!data.length){el.innerHTML='';return;}
 
-  const KANALS=['OJK','AFPI','CS'];
-
-  function buildMap(data, keyFn){
+  /* ── Build aggregation map ── */
+  function buildMap(rows, keyFn){
     const map={};
-    data.forEach(r=>{
-      const k=keyFn(r);
-      if(!k||k==='—'||k.trim()==='')return;
+    rows.forEach(r=>{
+      const k=(keyFn(r)||'').trim();
+      if(!k||k==='—')return;
       if(!map[k])map[k]={total:0,OJK:0,AFPI:0,CS:0,other:0};
       map[k].total++;
-      const kanal=(r.kanalPengaduan||'').toUpperCase();
+      const kanal=(r.kanalPengaduan||'').toUpperCase().trim();
       if(kanal==='OJK')map[k].OJK++;
       else if(kanal==='AFPI')map[k].AFPI++;
       else if(kanal==='CS')map[k].CS++;
       else map[k].other++;
     });
-    return map;
+    return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
   }
 
-  function buildRows(map, top=10){
-    return Object.entries(map)
-      .sort((a,b)=>b[1].total-a[1].total)
-      .slice(0,top);
+  const appEntries = buildMap(data, r=>r.aplikasi||'');
+  const tlEntries  = buildMap(data, r=>r.leader||r.teamLeader||r.tl||'');
+  const agEntries  = buildMap(data, r=>r.namaAgen||'');
+
+  /* ── Rank badge ── */
+  const rankCls = i => i===0?'lb-r1':i===1?'lb-r2':i===2?'lb-r3':'lb-rn';
+
+  /* ── Pills ── */
+  function pills(d){
+    return [
+      d.OJK  >0?`<span class="lb-pill lb-pill-ojk">OJK ${d.OJK}</span>`:'',
+      d.AFPI >0?`<span class="lb-pill lb-pill-afpi">AFPI ${d.AFPI}</span>`:'',
+      d.CS   >0?`<span class="lb-pill lb-pill-cs">CS ${d.CS}</span>`:'',
+      d.other>0?`<span class="lb-pill lb-pill-other">+${d.other}</span>`:'',
+    ].filter(Boolean).join('');
   }
 
-  function rankCls(i){return i===0?'lb-r1':i===1?'lb-r2':i===2?'lb-r3':'lb-rn';}
+  /* ── Kanal summary (untuk header kartu) ── */
+  function kanalSummary(entries){
+    const tot={OJK:0,AFPI:0,CS:0,other:0};
+    entries.forEach(([,d])=>{tot.OJK+=d.OJK;tot.AFPI+=d.AFPI;tot.CS+=d.CS;tot.other+=d.other;});
+    return [
+      tot.OJK  >0?`<span class="lb-ks-pill lb-ks-ojk">OJK: ${tot.OJK}</span>`:'',
+      tot.AFPI >0?`<span class="lb-ks-pill lb-ks-afpi">AFPI: ${tot.AFPI}</span>`:'',
+      tot.CS   >0?`<span class="lb-ks-pill lb-ks-cs">CS: ${tot.CS}</span>`:'',
+      tot.other>0?`<span class="lb-ks-pill lb-ks-other">Lain: ${tot.other}</span>`:'',
+    ].filter(Boolean).join('');
+  }
 
-  function rowsHtml(entries){
+  /* ── Row builder (standard) ── */
+  function buildRows(entries, maxTotal, extraFn){
+    if(!entries.length) return '<div style="padding:20px 16px;text-align:center;color:var(--text3);font-size:12px">Tidak ada data</div>';
     return entries.map(([name,d],i)=>{
-      const pills=[
-        d.OJK>0?`<span class="lb-pill lb-pill-ojk">OJK ${d.OJK}</span>`:'',
-        d.AFPI>0?`<span class="lb-pill lb-pill-afpi">AFPI ${d.AFPI}</span>`:'',
-        d.CS>0?`<span class="lb-pill lb-pill-cs">CS ${d.CS}</span>`:'',
-        d.other>0?`<span class="lb-pill lb-pill-other">Lain ${d.other}</span>`:'',
-      ].filter(Boolean).join('');
+      const barW = maxTotal>0 ? Math.round(d.total/maxTotal*100) : 0;
+      const extra = extraFn ? extraFn(name,d,i) : '';
       return `<div class="lb-row">
+        <div class="lb-row-bar" style="width:${barW}%;background:var(--accent)"></div>
         <div class="lb-rank ${rankCls(i)}">${i+1}</div>
-        <div class="lb-name" title="${name}">${name}</div>
-        <div class="lb-breakdown">${pills}</div>
-        <div class="lb-total">${d.total}</div>
-      </div>`;
-    }).join('');
-  }
-
-  // --- CARD 1: Top Aplikasi ---
-  const appMap=buildMap(data, r=>r.aplikasi||'');
-  const appRows=buildRows(appMap);
-
-  // --- CARD 2: Top Team Leader ---
-  const tlMap=buildMap(data, r=>r.leader||r.teamLeader||r.tl||'');
-  const tlRows=buildRows(tlMap);
-
-  // --- CARD 3: Top Agent (repeat offender) ---
-  const agMap=buildMap(data, r=>r.namaAgen||'');
-  const agRows=buildRows(agMap);
-  // Hitung badge repeat: agent dengan ≥2 kasus = repeat offender
-  function agRowsHtml(entries){
-    return entries.map(([name,d],i)=>{
-      const isRepeat=d.total>=3;
-      const isWarn=d.total>=2&&d.total<3;
-      const pills=[
-        d.OJK>0?`<span class="lb-pill lb-pill-ojk">OJK ${d.OJK}</span>`:'',
-        d.AFPI>0?`<span class="lb-pill lb-pill-afpi">AFPI ${d.AFPI}</span>`:'',
-        d.CS>0?`<span class="lb-pill lb-pill-cs">CS ${d.CS}</span>`:'',
-        d.other>0?`<span class="lb-pill lb-pill-other">Lain ${d.other}</span>`:'',
-      ].filter(Boolean).join('');
-      const badge=isRepeat
-        ?`<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--danger-bg);color:var(--danger);font-weight:600;margin-left:4px">Berulang</span>`
-        :isWarn?`<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--warning-bg);color:var(--warning);font-weight:600;margin-left:4px">Waspada</span>`
-        :'';
-      return `<div class="lb-row">
-        <div class="lb-rank ${rankCls(i)}">${i+1}</div>
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:0">
-            <div class="lb-name" title="${name}">${name}</div>${badge}
-          </div>
-          <div class="lb-breakdown" style="margin-top:3px">${pills}</div>
+        <div class="lb-info">
+          <div class="lb-name">${name}${extra}</div>
+          <div class="lb-pills">${pills(d)}</div>
         </div>
-        <div class="lb-total">${d.total}</div>
+        <div class="lb-right">
+          <div class="lb-total-num">${d.total}</div>
+          <div class="lb-total-lbl">kasus</div>
+        </div>
       </div>`;
     }).join('');
+  }
+
+  const appMax = appEntries[0]?.[1]?.total||1;
+  const tlMax  = tlEntries[0]?.[1]?.total||1;
+  const agMax  = agEntries[0]?.[1]?.total||1;
+
+  /* ── Agent extra: badge repeat / waspada ── */
+  function agExtra(name,d,i){
+    if(d.total>=3) return '<span class="lb-badge-repeat">Berulang</span>';
+    if(d.total>=2) return '<span class="lb-badge-warn">Waspada</span>';
+    return '';
   }
 
   el.innerHTML=`
+    <!-- KARTU 1: APLIKASI -->
     <div class="lb-card">
-      <div class="lb-card-header">
-        <div>
-          <div class="lb-card-title">📱 Top Aplikasi</div>
-          <div class="lb-card-sub">Aplikasi dengan pelanggaran terbanyak</div>
+      <div class="lb-card-head">
+        <div class="lb-card-head-row">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="lb-card-icon" style="background:#dbeafe">📱</div>
+            <div>
+              <div class="lb-card-title">Top Aplikasi</div>
+              <div class="lb-card-sub">Berdasarkan jumlah kasus pelanggaran</div>
+            </div>
+          </div>
+          <span class="lb-count-badge lb-count-app">${appEntries.length} aplikasi</span>
         </div>
-        <div class="lb-total" style="font-size:11px;color:var(--text3)">${appRows.length} aplikasi</div>
+        <div class="lb-kanal-summary">${kanalSummary(appEntries)}</div>
       </div>
-      ${appRows.length?rowsHtml(appRows):'<div style="padding:16px;color:var(--text3);font-size:12px">Tidak ada data</div>'}
+      <div class="lb-list">${buildRows(appEntries, appMax)}</div>
     </div>
 
+    <!-- KARTU 2: TEAM LEADER -->
     <div class="lb-card">
-      <div class="lb-card-header">
-        <div>
-          <div class="lb-card-title">👥 Top Team Leader</div>
-          <div class="lb-card-sub">TL dengan agent pelanggar terbanyak</div>
+      <div class="lb-card-head">
+        <div class="lb-card-head-row">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="lb-card-icon" style="background:#d1fae5">👥</div>
+            <div>
+              <div class="lb-card-title">Top Team Leader</div>
+              <div class="lb-card-sub">TL dengan agent pelanggar terbanyak</div>
+            </div>
+          </div>
+          <span class="lb-count-badge lb-count-tl">${tlEntries.length} TL</span>
         </div>
-        <div class="lb-total" style="font-size:11px;color:var(--text3)">${tlRows.length} TL</div>
+        <div class="lb-kanal-summary">${kanalSummary(tlEntries)||'<span style="font-size:11px;color:var(--text3)">—</span>'}</div>
       </div>
-      ${tlRows.length?rowsHtml(tlRows):'<div style="padding:16px;color:var(--text3);font-size:12px">Tidak ada data — pastikan kolom Leader terisi</div>'}
+      <div class="lb-list">${buildRows(tlEntries, tlMax)||'<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center">Pastikan kolom Leader terisi di sheet</div>'}</div>
     </div>
 
+    <!-- KARTU 3: AGENT -->
     <div class="lb-card">
-      <div class="lb-card-header">
-        <div>
-          <div class="lb-card-title">👤 Top Agent Pelanggar</div>
-          <div class="lb-card-sub">Agent dengan pelanggaran berulang terbanyak</div>
+      <div class="lb-card-head">
+        <div class="lb-card-head-row">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="lb-card-icon" style="background:#fce7f3">👤</div>
+            <div>
+              <div class="lb-card-title">Top Agent Pelanggar</div>
+              <div class="lb-card-sub">Termasuk pelanggaran berulang</div>
+            </div>
+          </div>
+          <span class="lb-count-badge lb-count-ag">${agEntries.length} agent</span>
         </div>
-        <div class="lb-total" style="font-size:11px;color:var(--text3)">${agRows.length} agent</div>
+        <div class="lb-kanal-summary">${kanalSummary(agEntries)}</div>
       </div>
-      ${agRows.length?agRowsHtml(agRows):'<div style="padding:16px;color:var(--text3);font-size:12px">Tidak ada data</div>'}
+      <div class="lb-list">${buildRows(agEntries, agMax, agExtra)}</div>
     </div>`;
 }
 
