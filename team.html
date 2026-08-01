@@ -62,7 +62,8 @@ select:focus{border-color:var(--accent);}
 .spv-card:hover{box-shadow:var(--shadow-md);border-color:var(--accent);transform:translateY(-2px);}
 .spv-card-header{padding:16px 18px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);}
 .spv-card-avatar{width:44px;height:44px;border-radius:50%;background:var(--accent-bg);display:flex;align-items:center;justify-content:center;font-size:16px;font-weight:700;color:var(--accent);flex-shrink:0;}
-.spv-card-name{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;}
+.spv-card-name{font-size:15px;font-weight:700;color:var(--text);margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:180px;}
+.spv-card-spv{font-size:11px;color:var(--text3);margin-bottom:1px;}
 .spv-card-meta{font-size:11px;color:var(--text3);}
 .spv-card-body{padding:14px 18px;display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
 .spv-card-stat{text-align:center;}
@@ -426,6 +427,7 @@ select:focus{border-color:var(--accent);}
     <span class="nav-page-title">Tim</span>
   </div>
   <div class="nav-right">
+    <button class="btn-nav" id="btnRefresh" onclick="clearCache();loadData()" style="display:none">↻ Refresh</button>
     <div class="theme-toggle">
       <button class="theme-btn active" id="btnTerang" onclick="setTheme('light')">☀ Terang</button>
       <button class="theme-btn" id="btnGelap" onclick="setTheme('dark')">🌙 Gelap</button>
@@ -588,6 +590,8 @@ const ALL_METRICS=[
   {key:'smsManual',label:'SMS Manual',fmt:'num'},
   {key:'autocall',label:'Autocall',fmt:'num'},
   {key:'waBlokir',label:'WA Blokir',fmt:'num'},
+  {key:'jumlahAlatWA',label:'Alat WA',fmt:'num'},
+  {key:'jumlahAlatGojek',label:'Alat Gojek',fmt:'num'},
   {key:'ptp',label:'PTP',fmt:'num'},
   {key:'ptpBayar',label:'PTP Bayar',fmt:'num'},
   {key:'paymentOvertime',label:'Payment Overtime',fmt:'rp'},
@@ -673,7 +677,7 @@ function renderSidebar(rows,bulan,tahun){
 }
 
 function summarizeRows(rows){
-  if(!rows||!rows.length)return{totalData:0,dataBaru:0,osDataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,sentuhGojek:0,responWA:0,responGojek:0,waBlokir:0,ptp:0,ptpBayar:0,sentuhWABA:0,responWABA:0,smsManual:0,responSMSManual:0,autocall:0,rateResponWA:0,rateCallTerhubung:0,ratePTPBayar:0,rateWABlokir:0,rateResponGojek:0,rateResponWABA:0};
+  if(!rows||!rows.length)return{totalData:0,dataBaru:0,osDataBaru:0,dailyPayment:0,jmlDataBayar:0,avgRate:0,paymentOvertime:0,callManual:0,callTerhubung:0,sentuhWA:0,sentuhGojek:0,responWA:0,responGojek:0,waBlokir:0,ptp:0,ptpBayar:0,sentuhWABA:0,responWABA:0,smsManual:0,responSMSManual:0,autocall:0,rateResponWA:0,rateCallTerhubung:0,ratePTPBayar:0,rateWABlokir:0,rateResponGojek:0,rateResponWABA:0,jumlahAlatWA:0,jumlahAlatGojek:0};
   const keys=['totalData','dataBaru','osDataBaru','dailyPayment','jmlDataBayar','autocall','callManual','callTerhubung','sentuhWA','sentuhGojek','responWA','responGojek','waBlokir','ptp','ptpBayar','sentuhWABA','responWABA','smsManual','responSMSManual','paymentOvertime'];
   const r={};
   keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
@@ -687,6 +691,10 @@ function summarizeRows(rows){
   } else {
     r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*(x.jmlDataBayar||0)),0)/tb:rows.length>0?rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length:0;
   }
+
+  // [ALAT] Count alat unik aktif (non-empty string)
+  r.jumlahAlatWA    = new Set(rows.map(x=>x.alatWA).filter(Boolean)).size;
+  r.jumlahAlatGojek = new Set(rows.map(x=>x.alatGojek).filter(Boolean)).size;
 
   // [DERIVED METRICS] Rasio penyentuhan — dihitung otomatis dari data yang ada
   r.rateResponWA      = r.sentuhWA>0    ? r.responWA/r.sentuhWA      : 0;
@@ -736,13 +744,20 @@ function renderSpvCards(bySPV){
     const bucketCount=new Set(rows.map(r=>r.bucket).filter(Boolean)).size;
     const tlCount=new Set(rows.map(r=>r.teamLeader).filter(Boolean)).size;
     const appList=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))];
-    const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
     const avatarColor=appList.length===1?getColor(appList[0]):'var(--accent)';
+    const appLabel=appList.length===1
+      ? appList[0].charAt(0)+appList[0].slice(1).toLowerCase()
+      : appList.length===0 ? '(Tanpa Aplikasi)'
+      : appList.map(a=>a.charAt(0)+a.slice(1).toLowerCase()).join(' · ');
+    const initials=appList.length===1
+      ? appList[0].slice(0,2).toUpperCase()
+      : spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
     return `<div class="spv-card" onclick="openSpvDetail('${escA(spv)}')">
       <div class="spv-card-header">
         <div class="spv-card-avatar" style="background:${avatarColor}22;color:${avatarColor}">${escH(initials)}</div>
-        <div>
-          <div class="spv-card-name">${escH(spv)}</div>
+        <div style="min-width:0">
+          <div class="spv-card-name">${escH(appLabel)}</div>
+          <div class="spv-card-spv">SPV: ${escH(spv)}</div>
           <div class="spv-card-meta">${bucketCount} bucket · ${tlCount} TL · ${agentCount} agent</div>
         </div>
       </div>
@@ -761,7 +776,7 @@ function renderSpvCards(bySPV){
         </div>
       </div>
       <div class="spv-card-footer">
-        <span class="spv-card-apps">${appList.map(a=>a.charAt(0)+a.slice(1).toLowerCase()).join(', ')}</span>
+        <span class="spv-card-apps" style="color:var(--accent);font-weight:500">${bucketCount > 1 ? bucketCount+' bucket' : appList.length > 1 ? appList.length+' aplikasi' : ''}</span>
         <span class="spv-card-arrow">Lihat detail →</span>
       </div>
     </div>`;
@@ -2994,8 +3009,8 @@ const PAGE_SESSION_KEY='tz_page_auth_'+window.location.pathname.split('/').pop()
   if(sessionStorage.getItem(PAGE_SESSION_KEY)==='1'){
     const ol=document.getElementById('lockOverlay');
     if(ol)ol.remove();
+    const rb=document.getElementById('btnRefresh');if(rb)rb.style.display='';
   } else {
-    // Blokir scroll
     document.body.style.overflow='hidden';
   }
 })();
@@ -3006,6 +3021,7 @@ function doUnlockPage(){
     const ol=document.getElementById('lockOverlay');
     if(ol)ol.remove();
     document.body.style.overflow='';
+    const rb=document.getElementById('btnRefresh');if(rb)rb.style.display='';
   } else {
     document.getElementById('lockError').style.display='block';
     document.getElementById('lockInput').value='';
