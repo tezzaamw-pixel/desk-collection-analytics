@@ -2323,13 +2323,23 @@ function renderCompareResult(safeSpvId, type, spv) {
 function buildCmpCharts(safeSpvId, summaries, metrics, st) {
   destroyCmpCharts(st);
   const cc = getChartColors();
-  const names = summaries.map(s=>s.name.split(' ')[0]); // short name
+  const DL = (typeof ChartDataLabels !== 'undefined') ? ChartDataLabels : null;
+  const names = summaries.map(s=>s.name.split(' ')[0]);
   const colors = summaries.map(s=>s.color);
   const type = st.chartType;
 
   function makeChart(canvasId, label, dataArr, fmt) {
     const ctx = document.getElementById(canvasId);
     if (!ctx) return null;
+
+    // Formatter berdasarkan format type
+    const fmtLabel = v => {
+      if (v === 0) return '0';
+      if (fmt==='rp') return fmtRpShort(v);
+      if (fmt==='rate') return (v*100).toFixed(2)+'%';
+      return fmtNum(v);
+    };
+
     const chartData = type === 'radar'
       ? {
           labels: names,
@@ -2360,20 +2370,19 @@ function buildCmpCharts(safeSpvId, summaries, metrics, st) {
       maintainAspectRatio: false,
       plugins: {
         legend: { display: false },
-        datalabels: {
-          display: ctx2 => ctx2.dataset.data[ctx2.dataIndex] > 0,
-          anchor: type==='radar'?'center':'end',
-          align: type==='radar'?'center':'end',
-          formatter: v => fmt==='rp' ? fmtRpShort(v) : fmt==='rate' ? fmtRate(v) : fmtNum(v),
+        datalabels: DL ? {
+          display: true,
+          anchor: type==='radar' ? 'center' : 'end',
+          align:  type==='radar' ? 'center' : 'top',
+          formatter: fmtLabel,
           color: cc.text,
           font: { size: 10, weight: '600' },
-        },
+          padding: { bottom: 2 },
+          clip: false,
+        } : false,
         tooltip: {
           callbacks: {
-            label: ctx2 => {
-              const v = ctx2.raw;
-              return ` ${fmt==='rp'?fmtRp(v):fmt==='rate'?fmtRate(v):fmtNum(v)}`;
-            }
+            label: ctx2 => ` ${fmt==='rp'?fmtRp(ctx2.raw):fmt==='rate'?fmtRate(ctx2.raw):fmtNum(ctx2.raw)}`
           }
         }
       },
@@ -2382,15 +2391,27 @@ function buildCmpCharts(safeSpvId, summaries, metrics, st) {
     if (type === 'bar') {
       opts.scales = {
         x: { ticks: { color: cc.text3, font: { size: 10 } }, grid: { display: false } },
-        y: { ticks: { color: cc.text3, font: { size: 10 } }, grid: { color: cc.border }, beginAtZero: true }
+        y: {
+          ticks: { color: cc.text3, font: { size: 10 } },
+          grid: { color: cc.border },
+          beginAtZero: true,
+          // Beri ruang di atas bar agar label tidak terpotong
+          grace: '15%',
+        }
       };
+      opts.layout = { padding: { top: 18 } };
     } else {
-      // Radar
       opts.scales = { r: { ticks: { display: false }, grid: { color: cc.border }, pointLabels: { color: cc.text2, font: { size: 10 } } } };
     }
 
     try {
-      const ch = new Chart(ctx.getContext('2d'), { type: type==='radar'?'radar':'bar', data: chartData, options: opts });
+      // Wajib pass plugins:[DL] agar datalabels aktif
+      const ch = new Chart(ctx.getContext('2d'), {
+        type: type==='radar' ? 'radar' : 'bar',
+        data: chartData,
+        options: opts,
+        plugins: DL ? [DL] : [],
+      });
       st.cmpCharts.push(ch);
       return ch;
     } catch(e) { return null; }
