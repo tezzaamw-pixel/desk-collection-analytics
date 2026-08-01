@@ -406,6 +406,47 @@ select:focus{border-color:var(--accent);}
 .range-mode-tab.active{background:var(--accent);color:#fff;}
 .filter-range-sep{font-size:11px;color:var(--text3);white-space:nowrap;}
 
+/* ── COMPARE SECTION ── */
+.compare-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);margin-top:16px;overflow:hidden;}
+.compare-section-header{padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:10px;background:var(--surface2);}
+.compare-section-title{font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:7px;}
+.compare-tabs{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+.compare-tab{padding:5px 14px;font-size:12px;font-weight:500;color:var(--text2);background:var(--surface2);border:none;cursor:pointer;border-right:1px solid var(--border);transition:all .12s;}
+.compare-tab:last-child{border-right:none;}
+.compare-tab:hover{background:var(--accent-bg);color:var(--accent);}
+.compare-tab.active{background:var(--accent);color:#fff;}
+.compare-body{padding:14px 16px;}
+.compare-controls{display:flex;align-items:flex-start;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.compare-ctrl-group{display:flex;flex-direction:column;gap:4px;}
+.compare-ctrl-label{font-size:10px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.04em;}
+.compare-select{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 10px;color:var(--text);font-size:12px;cursor:pointer;outline:none;min-width:160px;}
+.compare-select:focus{border-color:var(--accent);}
+.compare-chips{display:flex;flex-wrap:wrap;gap:5px;max-width:480px;}
+.compare-chip{display:flex;align-items:center;gap:5px;padding:3px 8px 3px 10px;border-radius:20px;font-size:11px;font-weight:600;border:1.5px solid;cursor:default;white-space:nowrap;}
+.compare-chip-del{background:none;border:none;cursor:pointer;font-size:13px;line-height:1;padding:0;opacity:.6;}
+.compare-chip-del:hover{opacity:1;}
+.compare-btn{padding:6px 14px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:none;}
+.compare-btn-primary{background:var(--accent);color:#fff;}
+.compare-btn-primary:hover{opacity:.9;}
+.compare-btn-secondary{background:var(--surface2);color:var(--text2);border:1px solid var(--border);}
+.compare-btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.compare-chart-controls{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.compare-chart-title{font-size:12px;font-weight:700;color:var(--text);flex:1;}
+.compare-chart-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;}
+.compare-chart-btn{padding:4px 10px;font-size:11px;font-weight:500;color:var(--text2);background:var(--surface2);border:none;cursor:pointer;border-right:1px solid var(--border);transition:all .12s;}
+.compare-chart-btn:last-child{border-right:none;}
+.compare-chart-btn.active{background:var(--accent);color:#fff;}
+.compare-charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:14px;}
+.compare-chart-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;}
+.compare-chart-wrap{position:relative;height:200px;}
+.compare-metric-picker{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px;margin-bottom:12px;}
+.compare-metric-picker-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;margin-bottom:8px;}
+.compare-metric-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.compare-metric-pill{display:flex;align-items:center;gap:5px;padding:3px 10px;border-radius:20px;font-size:11px;border:1px solid var(--border);background:var(--surface);cursor:pointer;color:var(--text2);transition:all .12s;}
+.compare-metric-pill:hover{border-color:var(--accent);color:var(--accent);}
+.compare-metric-pill.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.compare-empty{color:var(--text3);font-size:12px;padding:24px;text-align:center;}
+
 /* ── LOCK SCREEN ── */
 .lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
 .lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
@@ -814,6 +855,10 @@ function renderDetailSPV(spv, rows, bySPV){
   spvEl.className='spv-list';
   spvEl.innerHTML=buildSPVBlock(spv,rows,bulan,tahun);
   container.appendChild(spvEl);
+
+  // Init compare dropdowns after DOM is ready
+  const safeSpvId=btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+  setTimeout(()=>initCompareDropdowns(safeSpvId, spv), 0);
 }
 
 // ============================================================
@@ -959,6 +1004,62 @@ function buildSPVBlock(spv,rows,bulan,tahun){
         </div>
       </div>
     </div>
+
+    <!-- COMPARE SECTION -->
+    <div class="compare-section" id="cmp-${safeSpvId}">
+      <div class="compare-section-header">
+        <div class="compare-section-title">⚖️ Compare</div>
+        <div class="compare-tabs">
+          <button class="compare-tab active" onclick="switchCompareTab('${safeSpvId}','tl',this)">Compare TL</button>
+          <button class="compare-tab" onclick="switchCompareTab('${safeSpvId}','agent',this)">Compare Agent</button>
+        </div>
+      </div>
+      <div class="compare-body">
+        <!-- TL Compare Panel -->
+        <div id="cmpTL-${safeSpvId}">
+          <div class="compare-controls">
+            <div class="compare-ctrl-group">
+              <div class="compare-ctrl-label">Pilih TL (maks 5)</div>
+              <select class="compare-select" id="cmpSelTL-${safeSpvId}" onchange="addCompareTL('${safeSpvId}','${safeSpv}')">
+                <option value="">-- Pilih TL --</option>
+              </select>
+            </div>
+            <div class="compare-ctrl-group" style="justify-content:flex-end;margin-top:auto">
+              <div id="cmpChipsTL-${safeSpvId}" class="compare-chips"></div>
+            </div>
+            <div class="compare-ctrl-group" style="margin-top:auto">
+              <button class="compare-btn compare-btn-secondary" onclick="clearCompare('${safeSpvId}','tl')">↺ Reset</button>
+            </div>
+          </div>
+          <div id="cmpResultTL-${safeSpvId}"><div class="compare-empty">Pilih minimal 2 TL untuk mulai compare</div></div>
+        </div>
+        <!-- Agent Compare Panel -->
+        <div id="cmpAgent-${safeSpvId}" style="display:none">
+          <div class="compare-controls">
+            <div class="compare-ctrl-group">
+              <div class="compare-ctrl-label">Pilih TL</div>
+              <select class="compare-select" id="cmpSelAgentTL-${safeSpvId}" onchange="onCompareTLChange('${safeSpvId}','${safeSpv}')">
+                <option value="">-- Pilih TL --</option>
+              </select>
+            </div>
+            <div class="compare-ctrl-group">
+              <div class="compare-ctrl-label">Pilih Agent (maks 6)</div>
+              <select class="compare-select" id="cmpSelAgent-${safeSpvId}" onchange="addCompareAgent('${safeSpvId}')">
+                <option value="">-- Pilih Agent --</option>
+              </select>
+            </div>
+            <div class="compare-ctrl-group" style="justify-content:flex-end;margin-top:auto">
+              <div id="cmpChipsAgent-${safeSpvId}" class="compare-chips"></div>
+            </div>
+            <div class="compare-ctrl-group" style="margin-top:auto">
+              <button class="compare-btn compare-btn-secondary" onclick="clearCompare('${safeSpvId}','agent')">↺ Reset</button>
+            </div>
+          </div>
+          <div id="cmpResultAgent-${safeSpvId}"><div class="compare-empty">Pilih TL lalu pilih minimal 2 agent untuk mulai compare</div></div>
+        </div>
+      </div>
+    </div>
+
   </div>`;
 }
 
@@ -1927,6 +2028,425 @@ function saveSetup(){
 }
 
 document.getElementById('modalOverlay').addEventListener('click',function(e){if(e.target===this)closeModal();});
+
+// ================================================================
+// COMPARE ENGINE — Compare TL & Compare Agent
+// ================================================================
+
+// State per safeSpvId
+const cmpState = {}; // { [safeSpvId]: { tlList:[], agentList:[], activeTab:'tl', chartType:'bar', activeMetrics:[...] } }
+const CMP_COLORS = ['#1d60c8','#dc2626','#d97706','#059669','#7c3aed','#0891b2'];
+const CMP_MAX_TL = 5;
+const CMP_MAX_AGENT = 6;
+
+// Default metrik yang ditampilkan di chart utama
+const CMP_DEFAULT_METRICS = ['dailyPayment','avgRate','ptp','ptpBayar','sentuhWA','callManual','waBlokir','jumlahAlatWA','jumlahAlatGojek'];
+
+// Semua metrik yang bisa dipilih
+const CMP_ALL_METRICS = [
+  {key:'dailyPayment',  label:'Payment',      fmt:'rp'},
+  {key:'avgRate',       label:'Rate (%)',      fmt:'rate'},
+  {key:'jmlDataBayar',  label:'Data Bayar',    fmt:'num'},
+  {key:'ptp',           label:'PTP',           fmt:'num'},
+  {key:'ptpBayar',      label:'PTP Bayar',     fmt:'num'},
+  {key:'sentuhWA',      label:'Sentuh WA',     fmt:'num'},
+  {key:'responWA',      label:'Respon WA',     fmt:'num'},
+  {key:'sentuhGojek',   label:'Sentuh Gojek',  fmt:'num'},
+  {key:'responGojek',   label:'Respon Gojek',  fmt:'num'},
+  {key:'sentuhWABA',    label:'Sentuh WABA',   fmt:'num'},
+  {key:'callManual',    label:'Call Manual',   fmt:'num'},
+  {key:'callTerhubung', label:'Call Terhubung',fmt:'num'},
+  {key:'waBlokir',      label:'WA Blokir',     fmt:'num'},
+  {key:'jumlahAlatWA',  label:'Alat WA',       fmt:'num'},
+  {key:'jumlahAlatGojek',label:'Alat Gojek',   fmt:'num'},
+  {key:'totalData',     label:'Total Data',    fmt:'num'},
+  {key:'dataBaru',      label:'Data Baru',     fmt:'num'},
+  {key:'autocall',      label:'Autocall',      fmt:'num'},
+];
+
+function getCmpState(safeSpvId) {
+  if (!cmpState[safeSpvId]) cmpState[safeSpvId] = {
+    tlList:[], agentList:[], activeTab:'tl', chartType:'bar',
+    activeMetrics:[...CMP_DEFAULT_METRICS], cmpCharts:[]
+  };
+  return cmpState[safeSpvId];
+}
+
+// ── Tab switch ──────────────────────────────────────────────
+function switchCompareTab(safeSpvId, tab, btn) {
+  const st = getCmpState(safeSpvId);
+  st.activeTab = tab;
+  btn.closest('.compare-tabs').querySelectorAll('.compare-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('cmpTL-'+safeSpvId).style.display    = tab==='tl'    ? '' : 'none';
+  document.getElementById('cmpAgent-'+safeSpvId).style.display = tab==='agent' ? '' : 'none';
+}
+
+// ── Populate TL dropdowns after SPV block renders ────────────
+function initCompareDropdowns(safeSpvId, spv) {
+  const rows = spvAgentDataCache[spv] || [];
+  const tlList = [...new Set(rows.map(r=>r.teamLeader).filter(Boolean))].sort();
+
+  // TL compare dropdown
+  const selTL = document.getElementById('cmpSelTL-'+safeSpvId);
+  if (selTL) {
+    selTL.innerHTML = '<option value="">-- Pilih TL --</option>' +
+      tlList.map(t=>`<option value="${escH(t)}">${escH(t)}</option>`).join('');
+  }
+  // Agent compare: TL selector
+  const selATL = document.getElementById('cmpSelAgentTL-'+safeSpvId);
+  if (selATL) {
+    selATL.innerHTML = '<option value="">-- Pilih TL --</option>' +
+      tlList.map(t=>`<option value="${escH(t)}">${escH(t)}</option>`).join('');
+  }
+}
+
+// ── Add TL to compare ────────────────────────────────────────
+function addCompareTL(safeSpvId, safeSpv) {
+  // Recover spv name from cache by matching safeSpvId
+  const spv = Object.keys(spvAgentDataCache).find(s =>
+    btoa(encodeURIComponent(s)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16) === safeSpvId
+  ) || '';
+  const sel = document.getElementById('cmpSelTL-'+safeSpvId);
+  const tl = sel.value; if (!tl) return;
+  sel.value = '';
+  const st = getCmpState(safeSpvId);
+  if (st.tlList.includes(tl) || st.tlList.length >= CMP_MAX_TL) return;
+  st.tlList.push(tl);
+  renderCompareChips(safeSpvId, 'tl', spv);
+  if (st.tlList.length >= 2) renderCompareResult(safeSpvId, 'tl', spv);
+}
+
+// ── TL selected → populate agent dropdown ────────────────────
+function onCompareTLChange(safeSpvId, safeSpv) {
+  const spv = Object.keys(spvAgentDataCache).find(s =>
+    btoa(encodeURIComponent(s)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16) === safeSpvId
+  ) || '';
+  const tl = document.getElementById('cmpSelAgentTL-'+safeSpvId).value;
+  const sel = document.getElementById('cmpSelAgent-'+safeSpvId);
+  if (!sel) return;
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.teamLeader===tl);
+  const agents = [...new Set(rows.map(r=>r.agent).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">-- Pilih Agent --</option>' +
+    agents.map(a=>`<option value="${escH(a)}">${escH(a)}</option>`).join('');
+  // Reset agent list when TL changes
+  const st = getCmpState(safeSpvId);
+  st.agentList = [];
+  renderCompareChips(safeSpvId,'agent',spv);
+  document.getElementById('cmpResultAgent-'+safeSpvId).innerHTML =
+    '<div class="compare-empty">Pilih minimal 2 agent untuk mulai compare</div>';
+}
+
+// ── Add agent to compare ─────────────────────────────────────
+function addCompareAgent(safeSpvId) {
+  const sel = document.getElementById('cmpSelAgent-'+safeSpvId);
+  const agent = sel.value; if (!agent) return;
+  sel.value = '';
+  const st = getCmpState(safeSpvId);
+  if (st.agentList.includes(agent) || st.agentList.length >= CMP_MAX_AGENT) return;
+  st.agentList.push(agent);
+  const spv = Object.keys(spvAgentDataCache).find(s =>
+    btoa(encodeURIComponent(s)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16) === safeSpvId
+  ) || '';
+  renderCompareChips(safeSpvId,'agent',spv);
+  if (st.agentList.length >= 2) renderCompareResult(safeSpvId,'agent',spv);
+}
+
+// ── Render chips ─────────────────────────────────────────────
+function renderCompareChips(safeSpvId, type, spv) {
+  const st = getCmpState(safeSpvId);
+  const list = type==='tl' ? st.tlList : st.agentList;
+  const el = document.getElementById('cmpChips'+(type==='tl'?'TL':'Agent')+'-'+safeSpvId);
+  if (!el) return;
+  el.innerHTML = list.map((name, i) => {
+    const color = CMP_COLORS[i % CMP_COLORS.length];
+    return `<div class="compare-chip" style="background:${color}18;color:${color};border-color:${color}55">
+      <span>${escH(name)}</span>
+      <button class="compare-chip-del" onclick="removeCompareItem('${safeSpvId}','${type}',${i})" title="Hapus">×</button>
+    </div>`;
+  }).join('');
+}
+
+// ── Shared helper: recover spv from safeSpvId ────────────────
+function spvFromId(safeSpvId) {
+  return Object.keys(spvAgentDataCache).find(s =>
+    btoa(encodeURIComponent(s)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16) === safeSpvId
+  ) || '';
+}
+
+// ── Remove item from compare ──────────────────────────────────
+function removeCompareItem(safeSpvId, type, idx) {
+  const spv = spvFromId(safeSpvId);
+  const st = getCmpState(safeSpvId);
+  if (type==='tl') st.tlList.splice(idx,1);
+  else st.agentList.splice(idx,1);
+  renderCompareChips(safeSpvId, type, spv);
+  const list = type==='tl' ? st.tlList : st.agentList;
+  const resultEl = document.getElementById('cmpResult'+(type==='tl'?'TL':'Agent')+'-'+safeSpvId);
+  if (list.length < 2) {
+    destroyCmpCharts(st);
+    resultEl.innerHTML = `<div class="compare-empty">Pilih minimal 2 ${type==='tl'?'TL':'agent'} untuk mulai compare</div>`;
+  } else {
+    renderCompareResult(safeSpvId, type, spv);
+  }
+}
+
+// ── Clear compare ─────────────────────────────────────────────
+function clearCompare(safeSpvId, type) {
+  const st = getCmpState(safeSpvId);
+  destroyCmpCharts(st);
+  if (type==='tl') {
+    st.tlList=[];
+    const chips = document.getElementById('cmpChipsTL-'+safeSpvId);
+    if(chips) chips.innerHTML='';
+    const res = document.getElementById('cmpResultTL-'+safeSpvId);
+    if(res) res.innerHTML='<div class="compare-empty">Pilih minimal 2 TL untuk mulai compare</div>';
+  } else {
+    st.agentList=[];
+    const chips = document.getElementById('cmpChipsAgent-'+safeSpvId);
+    if(chips) chips.innerHTML='';
+    const res = document.getElementById('cmpResultAgent-'+safeSpvId);
+    if(res) res.innerHTML='<div class="compare-empty">Pilih minimal 2 agent untuk mulai compare</div>';
+  }
+}
+
+function destroyCmpCharts(st) {
+  (st.cmpCharts||[]).forEach(c=>{try{c.destroy();}catch(e){}});
+  st.cmpCharts=[];
+}
+
+// ── Get rows for TL or agent ──────────────────────────────────
+function getRowsFor(spv, type, name) {
+  const rows = spvAgentDataCache[spv] || [];
+  if (type==='tl') return rows.filter(r=>r.teamLeader===name);
+  return rows.filter(r=>r.agent===name);
+}
+
+// ── Render full compare result ────────────────────────────────
+function renderCompareResult(safeSpvId, type, spv) {
+  const st = getCmpState(safeSpvId);
+  destroyCmpCharts(st);
+  const list = type==='tl' ? st.tlList : st.agentList;
+  const resultEl = document.getElementById('cmpResult'+(type==='tl'?'TL':'Agent')+'-'+safeSpvId);
+  if (!resultEl || list.length < 2) return;
+
+  // Build summaries
+  const summaries = list.map((name,i) => {
+    const rows = getRowsFor(spv, type, name);
+    const s = summarizeRows(rows);
+    const hadirCount = rows.filter(r=>r.absensi==='Hadir').length;
+    const totalHari  = rows.length || 1;
+    const absensiPct = Math.round(hadirCount/totalHari*100);
+    return { name, s, hadirCount, totalHari, absensiPct, color: CMP_COLORS[i%CMP_COLORS.length] };
+  });
+
+  // Active metrics
+  const metrics = CMP_ALL_METRICS.filter(m => st.activeMetrics.includes(m.key));
+
+  // Metric picker HTML
+  const pickerHtml = `
+    <div class="compare-metric-picker">
+      <div class="compare-metric-picker-title">📌 Pilih Metrik yang Ditampilkan</div>
+      <div class="compare-metric-grid">
+        ${CMP_ALL_METRICS.map(m=>`
+          <div class="compare-metric-pill ${st.activeMetrics.includes(m.key)?'active':''}"
+            onclick="toggleCmpMetric('${safeSpvId}','${type}','${m.key}',this)">
+            ${escH(m.label)}
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  // Chart type toggle
+  const toggleHtml = `
+    <div class="compare-chart-controls">
+      <div class="compare-chart-title">📊 ${type==='tl'?'Perbandingan Team Leader':'Perbandingan Agent'}</div>
+      <div class="compare-chart-toggle">
+        <button class="compare-chart-btn ${st.chartType==='bar'?'active':''}"
+          onclick="setCmpChartType('${safeSpvId}','${type}','bar',this.closest('.compare-chart-toggle'))">Bar</button>
+        <button class="compare-chart-btn ${st.chartType==='radar'?'active':''}"
+          onclick="setCmpChartType('${safeSpvId}','${type}','radar',this.closest('.compare-chart-toggle'))">Radar</button>
+      </div>
+    </div>`;
+
+  // Summary table
+  const tableHtml = `
+    <div style="overflow-x:auto;margin-bottom:14px">
+      <table style="width:100%;border-collapse:collapse;font-size:11px">
+        <thead>
+          <tr style="background:var(--surface2)">
+            <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);font-weight:600;color:var(--text3)">Metrik</th>
+            ${summaries.map(sm=>`<th style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;color:${sm.color}">${escH(sm.name.split(' ')[0])}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          <tr style="background:var(--surface2)">
+            <td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text3);font-weight:600">Absensi (Hadir)</td>
+            ${summaries.map(sm=>`<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:${sm.absensiPct>=80?'var(--success)':sm.absensiPct>=60?'var(--warning)':'var(--danger)'}">${sm.absensiPct}%</td>`).join('')}
+          </tr>
+          ${metrics.map(m=>`
+            <tr>
+              <td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text3);font-weight:600">${escH(m.label)}</td>
+              ${summaries.map(sm=>{
+                const val = m.key==='avgRate' ? sm.s[m.key] : (sm.s[m.key]||0);
+                const fmt = m.fmt==='rp' ? fmtRp(val) : m.fmt==='rate' ? fmtRate(val) : fmtNum(val);
+                // Highlight max
+                const maxVal = Math.max(...summaries.map(x=>x.s[m.key]||0));
+                const isMax = (sm.s[m.key]||0)===maxVal && maxVal>0;
+                return `<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:${isMax?'700':'400'};color:${isMax?'var(--accent)':'var(--text)'}">${fmt}</td>`;
+              }).join('')}
+            </tr>`).join('')}
+        </tbody>
+      </table>
+    </div>`;
+
+  // Charts HTML — satu chart per metrik
+  const chartsHtml = `<div class="compare-charts-grid" id="cmpChartsGrid-${safeSpvId}">
+    <!-- Khusus: Absensi chart -->
+    <div class="compare-chart-card">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">Absensi (% Hadir)</div>
+      <div class="compare-chart-wrap"><canvas id="cmpChart-absensi-${safeSpvId}"></canvas></div>
+    </div>
+    ${metrics.map(m=>`
+      <div class="compare-chart-card">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">${escH(m.label)}</div>
+        <div class="compare-chart-wrap"><canvas id="cmpChart-${m.key}-${safeSpvId}"></canvas></div>
+      </div>`).join('')}
+  </div>`;
+
+  resultEl.innerHTML = pickerHtml + toggleHtml + tableHtml + chartsHtml;
+
+  // Build charts after DOM ready
+  setTimeout(() => buildCmpCharts(safeSpvId, summaries, metrics, st), 50);
+}
+
+// ── Build all compare charts ──────────────────────────────────
+function buildCmpCharts(safeSpvId, summaries, metrics, st) {
+  destroyCmpCharts(st);
+  const cc = getChartColors();
+  const names = summaries.map(s=>s.name.split(' ')[0]); // short name
+  const colors = summaries.map(s=>s.color);
+  const type = st.chartType;
+
+  function makeChart(canvasId, label, dataArr, fmt) {
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return null;
+    const chartData = type === 'radar'
+      ? {
+          labels: names,
+          datasets: [{
+            label,
+            data: dataArr,
+            backgroundColor: colors.map(c=>c+'33'),
+            borderColor: colors,
+            borderWidth: 2,
+            pointBackgroundColor: colors,
+            pointRadius: 4,
+          }]
+        }
+      : {
+          labels: names,
+          datasets: [{
+            label,
+            data: dataArr,
+            backgroundColor: colors.map(c=>c+'cc'),
+            borderColor: colors,
+            borderWidth: 0,
+            borderRadius: 4,
+          }]
+        };
+
+    const opts = {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        datalabels: {
+          display: ctx2 => ctx2.dataset.data[ctx2.dataIndex] > 0,
+          anchor: type==='radar'?'center':'end',
+          align: type==='radar'?'center':'end',
+          formatter: v => fmt==='rp' ? fmtRpShort(v) : fmt==='rate' ? fmtRate(v) : fmtNum(v),
+          color: cc.text,
+          font: { size: 10, weight: '600' },
+        },
+        tooltip: {
+          callbacks: {
+            label: ctx2 => {
+              const v = ctx2.raw;
+              return ` ${fmt==='rp'?fmtRp(v):fmt==='rate'?fmtRate(v):fmtNum(v)}`;
+            }
+          }
+        }
+      },
+    };
+
+    if (type === 'bar') {
+      opts.scales = {
+        x: { ticks: { color: cc.text3, font: { size: 10 } }, grid: { display: false } },
+        y: { ticks: { color: cc.text3, font: { size: 10 } }, grid: { color: cc.border }, beginAtZero: true }
+      };
+    } else {
+      // Radar
+      opts.scales = { r: { ticks: { display: false }, grid: { color: cc.border }, pointLabels: { color: cc.text2, font: { size: 10 } } } };
+    }
+
+    try {
+      const ch = new Chart(ctx.getContext('2d'), { type: type==='radar'?'radar':'bar', data: chartData, options: opts });
+      st.cmpCharts.push(ch);
+      return ch;
+    } catch(e) { return null; }
+  }
+
+  // Absensi chart
+  makeChart('cmpChart-absensi-'+safeSpvId, 'Absensi %', summaries.map(s=>s.absensiPct), 'num');
+
+  // Metric charts
+  metrics.forEach(m => {
+    makeChart('cmpChart-'+m.key+'-'+safeSpvId, m.label, summaries.map(s=>s.s[m.key]||0), m.fmt);
+  });
+}
+
+// ── Helper: short Rp ─────────────────────────────────────────
+function fmtRpShort(v) {
+  if (!v || v===0) return '0';
+  if (v>=1e9) return (v/1e9).toFixed(1).replace(/\.0$/,'')+'M';
+  if (v>=1e6) return (v/1e6).toFixed(1).replace(/\.0$/,'')+'jt';
+  if (v>=1e3) return (v/1e3).toFixed(0)+'rb';
+  return String(v);
+}
+
+// ── Helper: get chart colors from CSS vars ────────────────────
+function getChartColors() {
+  const s = getComputedStyle(document.documentElement);
+  return {
+    text:   s.getPropertyValue('--text').trim()   || '#111',
+    text2:  s.getPropertyValue('--text2').trim()  || '#444',
+    text3:  s.getPropertyValue('--text3').trim()  || '#888',
+    border: s.getPropertyValue('--border').trim() || '#e4e7ec',
+  };
+}
+
+// ── Toggle active metric ──────────────────────────────────────
+function toggleCmpMetric(safeSpvId, type, key, el) {
+  const spv = spvFromId(safeSpvId);
+  const st = getCmpState(safeSpvId);
+  const idx = st.activeMetrics.indexOf(key);
+  if (idx>=0) { if(st.activeMetrics.length<=1) return; st.activeMetrics.splice(idx,1); el.classList.remove('active'); }
+  else { st.activeMetrics.push(key); el.classList.add('active'); }
+  renderCompareResult(safeSpvId, type, spv);
+}
+
+// ── Switch bar/radar ──────────────────────────────────────────
+function setCmpChartType(safeSpvId, type, chartType, toggleEl) {
+  const spv = spvFromId(safeSpvId);
+  const st = getCmpState(safeSpvId);
+  st.chartType = chartType;
+  toggleEl.querySelectorAll('.compare-chart-btn').forEach(b=>b.classList.remove('active'));
+  toggleEl.querySelector(`[onclick*="'${chartType}'"]`)?.classList.add('active');
+  renderCompareResult(safeSpvId, type, spv);
+}
+
+// ── Initialize compare dropdowns after SPV block rendered ─────
+// Called via setTimeout in renderDetailSPV after DOM injection
 
 // ================================================================
 // MODE PRESENTASI — slide per aplikasi dengan analisa & grafik
