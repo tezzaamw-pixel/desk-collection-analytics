@@ -181,6 +181,60 @@ select:focus{border-color:var(--accent);}
 @keyframes pulse{0%,100%{opacity:1;}50%{opacity:.4;}}
 .empty-state{text-align:center;padding:50px 20px;color:var(--text3);}
 .empty-state .ei{font-size:40px;margin-bottom:10px;}
+/* ── MODAL APLIKASI (lebar penuh) ── */
+.modal-box-wide{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-md);width:100%;max-width:1100px;max-height:92vh;display:flex;flex-direction:column;overflow:hidden;}
+.app-modal-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px;}
+.app-sum-card{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;}
+.app-sum-card .lbl{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:4px;}
+.app-sum-card .val{font-size:20px;font-weight:700;color:var(--text);}
+.app-sum-card .sub{font-size:10px;color:var(--text3);margin-top:2px;}
+.app-sum-card.red .val{color:var(--danger);}
+.app-sum-card.warn .val{color:var(--warning);}
+.app-sum-card.green .val{color:var(--success);}
+.app-charts-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px;margin-bottom:18px;}
+.app-chart-box{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px;}
+.app-chart-box .act{font-size:12px;font-weight:600;color:var(--text);margin-bottom:10px;}
+.app-chart-wrap{position:relative;height:170px;}
+.app-kasus-list{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:0;overflow:hidden;margin-bottom:18px;}
+.app-kasus-item{padding:9px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.5;display:flex;gap:8px;align-items:flex-start;}
+.app-kasus-item:last-child{border-bottom:none;}
+.app-kasus-item .kn{flex-shrink:0;font-size:10px;font-weight:700;margin-top:2px;}
+.app-kasus-item .kt{flex:1;}
+.app-kasus-item .kc{flex-shrink:0;font-size:11px;font-weight:700;color:var(--danger);}
+.app-agent-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:12px;}
+.app-agent-row:last-child{border-bottom:none;}
+.app-agent-rank{width:22px;height:22px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text3);flex-shrink:0;}
+.app-agent-rank.r1{background:#fef3c7;color:#92400e;border-color:#fde68a;}
+.app-agent-rank.r2{background:#f3f4f6;color:#6b7280;border-color:#e5e7eb;}
+.app-agent-rank.r3{background:#fef3c7;color:#b45309;border-color:#fde68a;}
+.app-filter-bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--surface2);}
+.app-filter-bar select{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:5px 8px;color:var(--text);font-size:12px;cursor:pointer;outline:none;}
+.app-filter-bar label{font-size:11px;color:var(--text3);font-weight:500;}
+.app-insight-list{display:flex;flex-direction:column;gap:6px;margin-bottom:18px;}
+.app-insight-item{display:flex;gap:8px;align-items:flex-start;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);font-size:11px;color:var(--text2);line-height:1.5;}
+/* ── MODAL PREVIEW LB (agent/TL) ── */
+.modal-box-md{background:var(--surface);border-radius:var(--radius);box-shadow:var(--shadow-md);width:100%;max-width:600px;max-height:88vh;display:flex;flex-direction:column;overflow:hidden;}
+.prev-stat-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:14px;}
+.prev-stat{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;text-align:center;}
+.prev-stat .ps-lbl{font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px;}
+.prev-stat .ps-val{font-size:18px;font-weight:700;color:var(--text);}
+.prev-kasus-scroll{max-height:220px;overflow-y:auto;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);}
+.prev-kasus-row{padding:8px 12px;border-bottom:1px solid var(--border);font-size:12px;color:var(--text2);line-height:1.5;display:flex;gap:8px;}
+.prev-kasus-row:last-child{border-bottom:none;}
+.prev-kasus-row .pk-num{flex-shrink:0;font-size:10px;color:var(--text3);font-weight:600;margin-top:2px;width:18px;}
+.prev-kasus-row .pk-txt{flex:1;}
+.prev-kasus-row .pk-cnt{flex-shrink:0;font-size:11px;font-weight:700;color:var(--danger);}
+.prev-timeline{max-height:160px;overflow-y:auto;}
+.prev-tl-row{display:flex;gap:10px;padding:6px 0;border-bottom:1px solid var(--border);font-size:11px;color:var(--text2);}
+.prev-tl-row:last-child{border-bottom:none;}
+.prev-tl-date{flex-shrink:0;width:80px;color:var(--text3);}
+.prev-tl-kanal{flex-shrink:0;}
+.prev-tl-kasus{flex:1;line-height:1.4;}
+/* ── LB ROW CLICKABLE ── */
+.lb-row{cursor:pointer;}
+.lb-row:hover .lb-name{color:var(--accent);}
+/* SIDEBAR APLIKASI clickable */
+#sidebarApps .sidebar-item{cursor:pointer;}
 /* PAGINATION */
 .pagination{display:flex;align-items:center;gap:6px;padding:12px 18px;border-top:1px solid var(--border);}
 .pg-btn{padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text2);font-size:12px;cursor:pointer;}
@@ -545,7 +599,7 @@ select:focus{border-color:var(--accent);}
   </div><!-- /contentWrap -->
 </div><!-- /main -->
 
-<!-- MODAL DETAIL -->
+<!-- MODAL DETAIL KASUS -->
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal-box">
     <div class="modal-head">
@@ -553,6 +607,51 @@ select:focus{border-color:var(--accent);}
       <button class="modal-close" onclick="closeModalDirect()">✕</button>
     </div>
     <div class="modal-body" id="modalBody"></div>
+  </div>
+</div>
+
+<!-- MODAL DETAIL APLIKASI -->
+<div class="modal-overlay" id="modalAppOverlay" onclick="closeAppModal(event)">
+  <div class="modal-box-wide">
+    <div class="modal-head">
+      <div class="modal-head-title" id="modalAppTitle">Detail Aplikasi</div>
+      <button class="modal-close" onclick="closeAppModalDirect()">✕</button>
+    </div>
+    <div class="app-filter-bar" id="appFilterBar">
+      <label>Bulan</label>
+      <select id="appSelBulan" onchange="renderAppModal()"><option value="">Semua</option></select>
+      <label>Tahun</label>
+      <select id="appSelTahun" onchange="renderAppModal()"><option value="">Semua</option></select>
+      <label>Kanal</label>
+      <select id="appSelKanal" onchange="renderAppModal()">
+        <option value="">Semua Kanal</option>
+        <option value="OJK">OJK</option>
+        <option value="AFPI">AFPI</option>
+        <option value="CS">CS</option>
+      </select>
+      <label>Punishment</label>
+      <select id="appSelPunishment" onchange="renderAppModal()">
+        <option value="">Semua</option>
+        <option value="TERMINATE">Terminate/Eliminasi</option>
+        <option value="SP3">SP3</option>
+        <option value="SP2">SP2</option>
+        <option value="SP1">SP1</option>
+        <option value="COACHING">Coaching Letter</option>
+        <option value="WARNING">Warning Letter</option>
+      </select>
+    </div>
+    <div class="modal-body" id="modalAppBody"></div>
+  </div>
+</div>
+
+<!-- MODAL PREVIEW LB (Agent / TL) -->
+<div class="modal-overlay" id="modalLbOverlay" onclick="closeLbModal(event)">
+  <div class="modal-box-md">
+    <div class="modal-head">
+      <div class="modal-head-title" id="modalLbTitle">Preview</div>
+      <button class="modal-close" onclick="closeLbModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modalLbBody"></div>
   </div>
 </div>
 
@@ -680,7 +779,7 @@ function populateAplikasiFilter(){
   initAplikasiFilter(allData);
   // Sidebar apps
   const sb=document.getElementById('sidebarApps');
-  if(sb)sb.innerHTML=apps.map(a=>`<a class="sidebar-item" href="app.html?ap=${encodeURIComponent(a)}"><span class="dot" style="background:#1d60c8"></span>${a}</a>`).join('');
+  if(sb)sb.innerHTML=apps.map(a=>`<a class="sidebar-item" href="javascript:void(0)" onclick="openAppModal(this.dataset.ap)" data-ap="${a}"><span class="dot" style="background:#1d60c8"></span>${a}</a>`).join('');
 }
 
 /* ===== FILTER ===== */
@@ -1087,12 +1186,19 @@ function renderLeaderboard(data){
   }
 
   /* ── Row builder (standard) ── */
-  function buildRows(entries, maxTotal, extraFn){
+  function buildRows(entries, maxTotal, extraFn, type){
     if(!entries.length) return '<div style="padding:20px 16px;text-align:center;color:var(--text3);font-size:12px">Tidak ada data</div>';
     return entries.map(([name,d],i)=>{
       const barW = maxTotal>0 ? Math.round(d.total/maxTotal*100) : 0;
       const extra = extraFn ? extraFn(name,d,i) : '';
-      return `<div class="lb-row">
+      const clickAttr = type==='app'
+        ? `onclick="openAppModal('${name.replace(/'/g,"\\'")}')" title="Klik untuk detail aplikasi ${name}"`
+        : type==='agent'
+        ? `onclick="openLbModal('agent','${name.replace(/'/g,"\\'")}')" title="Klik untuk preview ${name}"`
+        : type==='tl'
+        ? `onclick="openLbModal('tl','${name.replace(/'/g,"\\'")}')" title="Klik untuk preview TL ${name}"`
+        : '';
+      return `<div class="lb-row" ${clickAttr}>
         <div class="lb-row-bar" style="width:${barW}%;background:var(--accent)"></div>
         <div class="lb-rank ${rankCls(i)}">${i+1}</div>
         <div class="lb-info">
@@ -1134,7 +1240,7 @@ function renderLeaderboard(data){
         </div>
         <div class="lb-kanal-summary">${kanalSummary(appEntries)}</div>
       </div>
-      <div class="lb-list">${buildRows(appEntries, appMax)}</div>
+      <div class="lb-list">${buildRows(appEntries, appMax, null, 'app')}</div>
     </div>
 
     <!-- KARTU 2: TEAM LEADER -->
@@ -1152,7 +1258,7 @@ function renderLeaderboard(data){
         </div>
         <div class="lb-kanal-summary">${kanalSummary(tlEntries)||'<span style="font-size:11px;color:var(--text3)">—</span>'}</div>
       </div>
-      <div class="lb-list">${buildRows(tlEntries, tlMax)||'<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center">Pastikan kolom Leader terisi di sheet</div>'}</div>
+      <div class="lb-list">${buildRows(tlEntries, tlMax, null, 'tl')||'<div style="padding:20px;color:var(--text3);font-size:12px;text-align:center">Pastikan kolom Leader terisi di sheet</div>'}</div>
     </div>
 
     <!-- KARTU 3: AGENT -->
@@ -1170,7 +1276,7 @@ function renderLeaderboard(data){
         </div>
         <div class="lb-kanal-summary">${kanalSummary(agEntries)}</div>
       </div>
-      <div class="lb-list">${buildRows(agEntries, agMax, agExtra)}</div>
+      <div class="lb-list">${buildRows(agEntries, agMax, agExtra, 'agent')}</div>
     </div>`;
 }
 
@@ -1425,9 +1531,296 @@ function openModal(idx){
 }
 function closeModal(e){if(e.target===document.getElementById('modalOverlay'))closeModalDirect();}
 function closeModalDirect(){document.getElementById('modalOverlay').classList.remove('open');}
+
+/* ══════════════════════════════════════════════
+   MODAL DETAIL APLIKASI
+══════════════════════════════════════════════ */
+let currentAppName='';
+let appCharts={};
+
+function openAppModal(appName){
+  if(!appName)return;
+  currentAppName=appName;
+  document.getElementById('modalAppTitle').innerHTML=`📱 ${appName} — Detail Pelanggaran`;
+  // Populate filter bulan & tahun dari data aplikasi ini
+  const appRows=allData.filter(r=>r.aplikasi===appName);
+  const bulanSet=[...new Set(appRows.map(r=>r.bulanMasuk).filter(Boolean))];
+  const tahunSet=[...new Set(appRows.map(r=>r.tahunMasuk).filter(Boolean))].sort();
+  const BULAN_ORDER=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const selB=document.getElementById('appSelBulan');
+  const selT=document.getElementById('appSelTahun');
+  selB.innerHTML='<option value="">Semua Bulan</option>'+BULAN_ORDER.filter(b=>bulanSet.includes(b)).map(b=>`<option value="${b}">${b}</option>`).join('');
+  selT.innerHTML='<option value="">Semua Tahun</option>'+tahunSet.map(t=>`<option value="${t}">${t}</option>`).join('');
+  document.getElementById('appSelKanal').value='';
+  document.getElementById('appSelPunishment').value='';
+  document.getElementById('modalAppOverlay').classList.add('open');
+  renderAppModal();
+}
+
+function getAppFilteredData(){
+  const appName=currentAppName;
+  const bulan=document.getElementById('appSelBulan').value;
+  const tahun=document.getElementById('appSelTahun').value;
+  const kanal=document.getElementById('appSelKanal').value;
+  const punishment=document.getElementById('appSelPunishment').value;
+  return allData.filter(r=>{
+    if(r.aplikasi!==appName)return false;
+    if(bulan&&r.bulanMasuk!==bulan)return false;
+    if(tahun&&r.tahunMasuk!==tahun)return false;
+    if(kanal&&(r.kanalPengaduan||'').toUpperCase()!==kanal)return false;
+    if(punishment){
+      const p=(r.punishmentInternal||'').toUpperCase();
+      if(punishment==='TERMINATE'&&!p.includes('TERMINAT')&&!p.includes('ELIMINASI'))return false;
+      if(punishment!=='TERMINATE'&&!p.includes(punishment))return false;
+    }
+    return true;
+  });
+}
+
+function destroyAppCharts(){Object.values(appCharts).forEach(c=>{try{c.destroy();}catch(e){}});appCharts={};}
+
+function renderAppModal(){
+  const data=getAppFilteredData();
+  const cc=chartColors();
+  destroyAppCharts();
+
+  // --- Statistik dasar ---
+  const total=data.length;
+  const pending=data.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length;
+  const terminate=data.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length;
+  const totalDenda=data.reduce((a,r)=>a+(parseFloat(String(r.denda||0).replace(/[^0-9.-]/g,''))||0),0);
+  const denganDurasi=data.filter(r=>r.durasiHari>0);
+  const avgDurasi=denganDurasi.length?Math.round(denganDurasi.reduce((a,r)=>a+r.durasiHari,0)/denganDurasi.length):0;
+  const agentUnik=[...new Set(data.map(r=>r.namaAgen).filter(Boolean))].length;
+  const ojk=data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length;
+  const afpi=data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='AFPI').length;
+  const cs=data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='CS').length;
+
+  // --- Top kasus (paling sering dilaporkan) ---
+  const kasusCnt={};
+  data.forEach(r=>{
+    const k=(r.kasus||'').trim();
+    if(!k||k==='—')return;
+    // Normalisasi: potong 80 char sebagai key
+    const key=k.length>80?k.substring(0,80)+'…':k;
+    kasusCnt[key]=(kasusCnt[key]||0)+1;
+  });
+  const topKasus=Object.entries(kasusCnt).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  // --- Top agent di aplikasi ini ---
+  const agCnt={};
+  data.forEach(r=>{if(r.namaAgen)agCnt[r.namaAgen]=(agCnt[r.namaAgen]||0)+1;});
+  const topAgent=Object.entries(agCnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
+  // --- Tren per bulan ---
+  const BULAN_ORDER=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const trendMap={};
+  data.forEach(r=>{if(r.bulanMasuk)trendMap[r.bulanMasuk]=(trendMap[r.bulanMasuk]||0)+1;});
+  const trendLabels=BULAN_ORDER.filter(b=>trendMap[b]);
+  const trendVals=trendLabels.map(b=>trendMap[b]);
+
+  // --- Punishment ---
+  const punCnt={};
+  data.forEach(r=>{const p=(r.punishmentInternal||'—').trim();if(p)punCnt[p]=(punCnt[p]||0)+1;});
+  const punEntries=Object.entries(punCnt).sort((a,b)=>b[1]-a[1]).slice(0,6);
+
+  // --- Insight otomatis untuk aplikasi ini ---
+  const appInsights=[];
+  if(ojk>0){const pct=Math.round(ojk/total*100);appInsights.push({dot:'dot-red',text:`<b>${ojk} pengaduan</b> (${pct}%) masuk via OJK — kanal paling berat regulasi. Prioritaskan penyelesaian kasus OJK.`});}
+  if(terminate>0){const pct=Math.round(terminate/total*100);appInsights.push({dot:pct>=20?'dot-red':'dot-warn',text:`<b>${terminate} agent</b> (${pct}%) mendapat Terminate/Eliminasi di aplikasi ini.`});}
+  if(pending>0){appInsights.push({dot:'dot-warn',text:`<b>${pending} kasus</b> masih PENDING. Segera tindaklanjuti.`});}
+  if(avgDurasi>7){appInsights.push({dot:'dot-warn',text:`Rata-rata penyelesaian <b>${avgDurasi} hari</b> — di atas target 7 hari. Perlu percepatan.`});}
+  if(topKasus.length>0&&topKasus[0][1]>=3){appInsights.push({dot:'dot-blue',text:`Kasus paling sering: "${topKasus[0][0].substring(0,60)}…" muncul <b>${topKasus[0][1]}x</b>.`});}
+  if(totalDenda>0){appInsights.push({dot:totalDenda>5000000?'dot-red':'dot-warn',text:`Total denda: <b>${fmtRp(totalDenda)}</b> di aplikasi ini.`});}
+  if(appInsights.length===0)appInsights.push({dot:'dot-green',text:'Tidak ada temuan kritis pada filter yang dipilih.'});
+
+  const rankCls=i=>i===0?'r1':i===1?'r2':i===2?'r3':'';
+
+  document.getElementById('modalAppBody').innerHTML=`
+    <!-- Summary -->
+    <div class="app-modal-grid">
+      <div class="app-sum-card red"><div class="lbl">Total Kasus</div><div class="val">${fmtNum(total)}</div><div class="sub">Periode terpilih</div></div>
+      <div class="app-sum-card warn"><div class="lbl">Pending</div><div class="val">${fmtNum(pending)}</div><div class="sub">${total?Math.round(pending/total*100):0}%</div></div>
+      <div class="app-sum-card red"><div class="lbl">Terminate</div><div class="val">${fmtNum(terminate)}</div><div class="sub">${total?Math.round(terminate/total*100):0}%</div></div>
+      <div class="app-sum-card"><div class="lbl">Agent Terlibat</div><div class="val">${fmtNum(agentUnik)}</div><div class="sub">agent unik</div></div>
+      <div class="app-sum-card"><div class="lbl">Avg Durasi</div><div class="val">${avgDurasi}</div><div class="sub">hari</div></div>
+      <div class="app-sum-card red"><div class="lbl">Total Denda</div><div class="val" style="font-size:14px">${totalDenda>0?fmtRp(totalDenda):'—'}</div></div>
+      <div class="app-sum-card" style="border-color:#f9a8d4"><div class="lbl">OJK</div><div class="val" style="color:#be185d">${fmtNum(ojk)}</div></div>
+      <div class="app-sum-card" style="border-color:#c4b5fd"><div class="lbl">AFPI</div><div class="val" style="color:#6d28d9">${fmtNum(afpi)}</div></div>
+      <div class="app-sum-card" style="border-color:#93c5fd"><div class="lbl">CS</div><div class="val" style="color:#1d4ed8">${fmtNum(cs)}</div></div>
+    </div>
+
+    <!-- Insight -->
+    <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">🔍 Analisa Otomatis</div>
+    <div class="app-insight-list">${appInsights.map(i=>`<div class="app-insight-item"><div class="ins-dot ${i.dot}" style="margin-top:3px;flex-shrink:0"></div><div>${i.text}</div></div>`).join('')}</div>
+
+    <!-- Charts Row -->
+    <div class="app-charts-row">
+      <div class="app-chart-box">
+        <div class="act">📈 Tren Kasus per Bulan</div>
+        <div class="app-chart-wrap"><canvas id="appChartTren"></canvas></div>
+      </div>
+      <div class="app-chart-box">
+        <div class="act">📡 Distribusi Kanal</div>
+        <div class="app-chart-wrap"><canvas id="appChartKanal"></canvas></div>
+      </div>
+      <div class="app-chart-box">
+        <div class="act">⚖️ Distribusi Punishment</div>
+        <div class="app-chart-wrap"><canvas id="appChartPun"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Top Kasus Sering Dilaporkan -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📋 Kasus Paling Sering Dilaporkan</div>
+        <div class="app-kasus-list">${topKasus.length?topKasus.map(([k,c],i)=>`
+          <div class="app-kasus-item">
+            <span class="kn" style="color:var(--text3)">${i+1}.</span>
+            <span class="kt">${k}</span>
+            <span class="kc">${c}x</span>
+          </div>`).join(''):'<div style="padding:16px;text-align:center;color:var(--text3);font-size:12px">Tidak ada data kasus</div>'}</div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">👤 Top Agent Pelanggar (Aplikasi Ini)</div>
+        <div class="app-kasus-list">${topAgent.length?topAgent.map(([name,cnt],i)=>`
+          <div class="app-agent-row">
+            <div class="app-agent-rank ${rankCls(i)}">${i+1}</div>
+            <div style="flex:1;font-size:12px;font-weight:600;color:var(--text)">${name}</div>
+            <div style="font-size:12px;font-weight:700;color:var(--danger)">${cnt} kasus</div>
+            ${cnt>=3?'<span class="lb-badge-repeat" style="margin-left:4px">Berulang</span>':''}
+          </div>`).join(''):'<div style="padding:16px;text-align:center;color:var(--text3);font-size:12px">Tidak ada data</div>'}</div>
+      </div>
+    </div>
+  `;
+
+  // Build charts setelah DOM tersedia
+  setTimeout(()=>{
+    // Tren
+    const ctxT=document.getElementById('appChartTren');
+    if(ctxT&&trendLabels.length){
+      appCharts.tren=new Chart(ctxT.getContext('2d'),{type:'bar',data:{labels:trendLabels,datasets:[{label:'Kasus',data:trendVals,backgroundColor:cc.danger+'cc',borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.y} kasus`}}},scales:{x:{ticks:{color:cc.text3,font:{size:9}},grid:{display:false}},y:{ticks:{color:cc.text3,font:{size:9}},grid:{color:cc.border}}}}});
+    }
+    // Kanal Donut
+    const ctxK=document.getElementById('appChartKanal');
+    if(ctxK){
+      appCharts.kanal=new Chart(ctxK.getContext('2d'),{type:'doughnut',data:{labels:['OJK','AFPI','CS'],datasets:[{data:[ojk,afpi,cs],backgroundColor:['#f9a8d4','#c4b5fd','#93c5fd'],borderWidth:2,borderColor:getComputedStyle(document.documentElement).getPropertyValue('--surface').trim()}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:cc.text2,font:{size:10}}},tooltip:{callbacks:{label:ctx=>` ${ctx.label}: ${ctx.parsed} kasus`}}}}});
+    }
+    // Punishment
+    const ctxP=document.getElementById('appChartPun');
+    if(ctxP&&punEntries.length){
+      const PALETTE=['#dc2626','#92400e','#c2410c','#d97706','#059669','#1d60c8'];
+      appCharts.pun=new Chart(ctxP.getContext('2d'),{type:'bar',data:{labels:punEntries.map(e=>e[0].length>12?e[0].substring(0,12)+'…':e[0]),datasets:[{label:'Jumlah',data:punEntries.map(e=>e[1]),backgroundColor:punEntries.map((_,i)=>PALETTE[i]||cc.accent),borderRadius:3}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>` ${ctx.parsed.y} kasus`}}},scales:{x:{ticks:{color:cc.text3,font:{size:9}},grid:{display:false}},y:{ticks:{color:cc.text3,font:{size:9}},grid:{color:cc.border}}}}});
+    }
+  },50);
+}
+
+function closeAppModal(e){if(e.target===document.getElementById('modalAppOverlay'))closeAppModalDirect();}
+function closeAppModalDirect(){document.getElementById('modalAppOverlay').classList.remove('open');destroyAppCharts();}
+
+/* ══════════════════════════════════════════════
+   MODAL PREVIEW LEADERBOARD (Agent / TL)
+══════════════════════════════════════════════ */
+function openLbModal(type, name){
+  if(!name)return;
+  const rows=allData.filter(r=>{
+    if(type==='agent')return(r.namaAgen||'').trim()===name;
+    if(type==='tl')return(r.leader||r.teamLeader||r.tl||'').trim()===name;
+    return false;
+  });
+  const BULAN_ORDER=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const total=rows.length;
+  const ojk=rows.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length;
+  const afpi=rows.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='AFPI').length;
+  const cs=rows.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='CS').length;
+  const terminate=rows.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length;
+  const pending=rows.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length;
+
+  // Top kasus berulang
+  const kasusCnt={};
+  rows.forEach(r=>{
+    const k=(r.kasus||'').trim();
+    if(!k||k==='—')return;
+    const key=k.length>90?k.substring(0,90)+'…':k;
+    kasusCnt[key]=(kasusCnt[key]||0)+1;
+  });
+  const topKasus=Object.entries(kasusCnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
+
+  // Punishment terberat
+  const punCnt={};
+  rows.forEach(r=>{const p=(r.punishmentInternal||'—').trim();if(p&&p!=='—')punCnt[p]=(punCnt[p]||0)+1;});
+  const topPun=Object.entries(punCnt).sort((a,b)=>b[1]-a[1]);
+
+  // Untuk TL: tampilkan agent yang terlibat
+  let agentSection='';
+  if(type==='tl'){
+    const agCnt={};
+    rows.forEach(r=>{if(r.namaAgen)agCnt[r.namaAgen]=(agCnt[r.namaAgen]||0)+1;});
+    const topAg=Object.entries(agCnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
+    agentSection=topAg.length?`
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">👤 Agent dengan Pelanggaran di Tim Ini</div>
+      <div class="app-kasus-list" style="margin-bottom:14px">${topAg.map(([ag,cnt],i)=>`
+        <div class="app-agent-row">
+          <div class="app-agent-rank ${i===0?'r1':i===1?'r2':i===2?'r3':''}">${i+1}</div>
+          <div style="flex:1;font-size:12px;font-weight:600;color:var(--text)">${ag}</div>
+          <div style="font-size:12px;font-weight:700;color:var(--danger)">${cnt}x</div>
+          ${cnt>=3?'<span class="lb-badge-repeat" style="margin-left:4px">Berulang</span>':''}
+        </div>`).join('')}</div>`:'';
+  }
+
+  // Untuk Agent: tampilkan riwayat timeline kasus
+  let timelineSection='';
+  if(type==='agent'){
+    const sorted=[...rows].sort((a,b)=>(a.tanggalMasuk||'').localeCompare(b.tanggalMasuk||''));
+    timelineSection=`
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">🕐 Riwayat Kasus (${total} total)</div>
+      <div class="prev-timeline" style="margin-bottom:14px">${sorted.map(r=>`
+        <div class="prev-tl-row">
+          <div class="prev-tl-date">${r.tanggalMasuk||'—'}</div>
+          <div class="prev-tl-kanal">${badgeKanal(r.kanalPengaduan)}</div>
+          <div class="prev-tl-kasus">${(r.kasus||'—').substring(0,80)}${(r.kasus||'').length>80?'…':''}</div>
+        </div>`).join('')}</div>`;
+  }
+
+  const icon=type==='agent'?'👤':'👥';
+  const label=type==='agent'?'Agent':'Team Leader';
+  document.getElementById('modalLbTitle').innerHTML=`${icon} ${label}: ${name}`;
+  document.getElementById('modalLbBody').innerHTML=`
+    <!-- Stats -->
+    <div class="prev-stat-row">
+      <div class="prev-stat"><div class="ps-lbl">Total Kasus</div><div class="ps-val" style="color:var(--danger)">${fmtNum(total)}</div></div>
+      <div class="prev-stat"><div class="ps-lbl">Pending</div><div class="ps-val" style="color:var(--warning)">${fmtNum(pending)}</div></div>
+      <div class="prev-stat"><div class="ps-lbl">Terminate</div><div class="ps-val" style="color:var(--danger)">${fmtNum(terminate)}</div></div>
+    </div>
+    <!-- Kanal breakdown -->
+    <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap">
+      ${ojk>0?`<span class="badge badge-ojk">🏛 OJK: ${ojk}</span>`:''}
+      ${afpi>0?`<span class="badge badge-afpi">🤝 AFPI: ${afpi}</span>`:''}
+      ${cs>0?`<span class="badge badge-cs">💬 CS: ${cs}</span>`:''}
+    </div>
+    <!-- Punishment -->
+    ${topPun.length?`<div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">${topPun.map(([p,c])=>`${badgePunishment(p)} <span style="font-size:10px;color:var(--text3);margin-left:-4px;margin-right:4px">${c}x</span>`).join('')}</div>`:''}
+    ${agentSection}
+    ${timelineSection}
+    <!-- Top Kasus -->
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:8px">📋 Kalimat/Kasus Paling Sering Dilaporkan</div>
+    <div class="prev-kasus-scroll">${topKasus.length?topKasus.map(([k,c],i)=>`
+      <div class="prev-kasus-row">
+        <div class="pk-num">${i+1}.</div>
+        <div class="pk-txt">${k}</div>
+        <div class="pk-cnt">${c}x</div>
+      </div>`).join(''):'<div style="padding:16px;text-align:center;color:var(--text3);font-size:12px">Hanya 1 kasus tercatat</div>'}</div>
+  `;
+  document.getElementById('modalLbOverlay').classList.add('open');
+}
+function closeLbModal(e){if(e.target===document.getElementById('modalLbOverlay'))closeLbModalDirect();}
+function closeLbModalDirect(){document.getElementById('modalLbOverlay').classList.remove('open');}
+
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     closeModalDirect();
+    closeAppModalDirect();
+    closeLbModalDirect();
     closeMsDropdown();
   }
 });
