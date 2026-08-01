@@ -201,6 +201,11 @@ select:focus{border-color:var(--accent);}
 .app-kasus-item .kn{flex-shrink:0;font-size:10px;font-weight:700;margin-top:2px;}
 .app-kasus-item .kt{flex:1;}
 .app-kasus-item .kc{flex-shrink:0;font-size:11px;font-weight:700;color:var(--danger);}
+.app-kasus-scroll{max-height:320px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.app-agent-list-scroll{max-height:320px;overflow-y:auto;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.app-agent-row-click{cursor:pointer;transition:background .12s;}
+.app-agent-row-click:hover{background:var(--accent-bg);}
+.app-agent-row-click:hover .app-agent-name{color:var(--accent);}
 .app-agent-row{display:flex;align-items:center;gap:10px;padding:8px 14px;border-bottom:1px solid var(--border);font-size:12px;}
 .app-agent-row:last-child{border-bottom:none;}
 .app-agent-rank{width:22px;height:22px;border-radius:50%;background:var(--surface);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--text3);flex-shrink:0;}
@@ -235,6 +240,11 @@ select:focus{border-color:var(--accent);}
 .lb-row:hover .lb-name{color:var(--accent);}
 /* SIDEBAR APLIKASI clickable */
 #sidebarApps .sidebar-item{cursor:pointer;}
+/* ── DATE RANGE FILTER ── */
+.ms-date-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px 12px;}
+.ms-date-input{padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:12px;outline:none;width:100%;}
+.ms-date-input:focus{border-color:var(--accent);}
+.ms-date-label{font-size:10px;color:var(--text3);font-weight:600;margin-bottom:3px;}
 /* PAGINATION */
 .pagination{display:flex;align-items:center;gap:6px;padding:12px 18px;border-top:1px solid var(--border);}
 .pg-btn{padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text2);font-size:12px;cursor:pointer;}
@@ -460,6 +470,34 @@ select:focus{border-color:var(--accent);}
         </div>
       </div>
     </div>
+    <label>Tanggal</label>
+    <div class="ms-wrap" id="msWrapTanggal">
+      <div class="ms-trigger" id="msTriggerTanggal" onclick="toggleMs('Tanggal')">
+        <span id="msLabelTanggal">Semua Tanggal</span>
+        <span class="ms-badge" id="msBadgeTanggal" style="display:none">✓</span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-dropdown" id="msDropdownTanggal" style="min-width:240px">
+        <div class="ms-dropdown-head">
+          <span style="font-size:11px;color:var(--text3);font-weight:500">Rentang Tanggal</span>
+          <span class="ms-select-all" onclick="msClearTanggal()" id="tanggalClearBtn" style="display:none">Hapus</span>
+        </div>
+        <div class="ms-date-grid">
+          <div>
+            <div class="ms-date-label">Dari Tanggal</div>
+            <input type="date" class="ms-date-input" id="dateFrom" onchange="onDateChange()">
+          </div>
+          <div>
+            <div class="ms-date-label">Sampai Tanggal</div>
+            <input type="date" class="ms-date-input" id="dateTo" onchange="onDateChange()">
+          </div>
+        </div>
+        <div class="ms-dropdown-foot">
+          <button class="ms-btn-clear" onclick="msClearTanggal()">Hapus</button>
+          <button class="ms-btn-apply" onclick="msApplyFor('Tanggal')">Terapkan</button>
+        </div>
+      </div>
+    </div>
     <button class="btn-load" onclick="applyFilter()">🔍 Filter</button>
     <button class="btn-load" style="background:var(--surface2);color:var(--text2);border:1px solid var(--border);" onclick="resetFilter()">↺ Reset</button>
   </div>
@@ -549,6 +587,19 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartDurasi"></canvas></div>
       </div>
+    </div>
+
+    <!-- GRAFIK PERGERAKAN PER TANGGAL -->
+    <div class="chart-card" style="margin-bottom:16px">
+      <div class="chart-header">
+        <div class="chart-title">📅 Pergerakan Violation per Tanggal</div>
+        <button class="chart-label-btn" id="lblBtn-harian" onclick="toggleLabels('harian')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
+        <div class="chart-type-toggle">
+          <button class="chart-type-btn active" onclick="switchChart('harian','line',this)">Line</button>
+          <button class="chart-type-btn" onclick="switchChart('harian','bar',this)">Bar</button>
+        </div>
+      </div>
+      <div class="chart-wrap" style="height:200px"><canvas id="chartHarian"></canvas></div>
     </div>
 
     <!-- TOP 10 LEADERBOARD: APLIKASI, TL, AGENT -->
@@ -644,6 +695,17 @@ select:focus{border-color:var(--accent);}
   </div>
 </div>
 
+<!-- MODAL NESTED AGENT PREVIEW (dalam App Modal) -->
+<div class="modal-overlay" id="modalAgentNestedOverlay" onclick="closeAgentNestedModal(event)" style="z-index:600">
+  <div class="modal-box-md" style="z-index:601">
+    <div class="modal-head">
+      <div class="modal-head-title" id="modalAgentNestedTitle">Detail Agent</div>
+      <button class="modal-close" onclick="closeAgentNestedModalDirect()">✕</button>
+    </div>
+    <div class="modal-body" id="modalAgentNestedBody"></div>
+  </div>
+</div>
+
 <!-- MODAL PREVIEW LB (Agent / TL) -->
 <div class="modal-overlay" id="modalLbOverlay" onclick="closeLbModal(event)">
   <div class="modal-box-md">
@@ -657,7 +719,7 @@ select:focus{border-color:var(--accent);}
 
 <script>
 // ── State label angka per chart ──────────────────────────────
-const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true};
+const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true,harian:false};
 
 function toggleLabels(key){
   showLabels[key]=!showLabels[key];
@@ -674,6 +736,7 @@ function toggleLabels(key){
   else if(key==='aplikasi')buildAplikasiChart(filteredData,cc);
   else if(key==='punishment')buildPunishmentChart(filteredData,cc);
   else if(key==='durasi')buildDurasiChart(filteredData,cc);
+  else if(key==='harian')buildHarianChart(filteredData,cc);
 }
 
 // Register datalabels plugin global
@@ -694,7 +757,7 @@ let allData=[];
 let filteredData=[];
 let currentPage=1;
 let charts={};
-let chartTypes={tren:'bar',kanal:'doughnut',agent:'bar',aplikasi:'bar',punishment:'bar',durasi:'bar'};
+let chartTypes={tren:'bar',kanal:'doughnut',agent:'bar',aplikasi:'bar',punishment:'bar',durasi:'bar',harian:'line'};
 
 /* ===== THEME ===== */
 function setTheme(t){
@@ -784,13 +847,20 @@ function populateAplikasiFilter(){
 
 /* ===== FILTER ===== */
 function applyFilter(){
-  // Semua filter kini multi-select
+  const {from:tglFrom, to:tglTo}=msState.Tanggal;
   filteredData=allData.filter(r=>{
     if(msState.Bulan.size>0&&!msState.Bulan.has(r.bulanMasuk))return false;
     if(msState.Tahun.size>0&&!msState.Tahun.has(r.tahunMasuk))return false;
     if(msState.Aplikasi.size>0&&!msState.Aplikasi.has(r.aplikasi))return false;
     if(msState.Kanal.size>0&&!msState.Kanal.has((r.kanalPengaduan||'').toUpperCase()))return false;
     if(msState.Status.size>0&&!msState.Status.has((r.statusEksternal||'').toUpperCase()))return false;
+    // Filter tanggal rentang
+    if(tglFrom||tglTo){
+      const tgl=r.tanggalMasuk||'';
+      if(!/^\d{4}-\d{2}-\d{2}$/.test(tgl))return false;
+      if(tglFrom&&tgl<tglFrom)return false;
+      if(tglTo&&tgl>tglTo)return false;
+    }
     return true;
   });
   currentPage=1;
@@ -798,8 +868,14 @@ function applyFilter(){
 }
 
 function resetFilter(){
+  // Reset tanggal
+  msState.Tanggal.from='';
+  msState.Tanggal.to='';
+  document.getElementById('dateFrom').value='';
+  document.getElementById('dateTo').value='';
+  updateTanggalDisplay();
   // [FIX 2&3] Pakai MS_CFG[k].listId dan MS_CFG[k].dropdownId — bukan string concat
-  Object.keys(msState).forEach(k=>{
+  Object.keys(msState).filter(k=>k!=='Tanggal').forEach(k=>{
     msState[k].clear();
     updateMsDisplayFor(k);
     const cfg=MS_CFG[k];
@@ -1011,6 +1087,7 @@ function buildCharts(data){
   buildAplikasiChart(data,cc);
   buildPunishmentChart(data,cc);
   buildDurasiChart(data,cc);
+  buildHarianChart(data,cc);
 }
 
 function rebuildAllCharts(){if(filteredData.length>0)buildCharts(filteredData);}
@@ -1131,6 +1208,66 @@ function buildDurasiChart(data,cc){
   const durDL=type==='line'?dlLine(cc,showLabels.durasi):dlBar(cc,showLabels.durasi);
   opts.plugins.datalabels=durDL;
   charts.durasi=new Chart(ctx,{type,data:{labels,datasets:[{label:'Avg Hari',data:vals,backgroundColor:type==='line'?cc.warning+'33':cc.warning,borderColor:cc.warning,borderWidth:type==='line'?2:0,fill:type==='line',tension:.3,pointRadius:4}]},options:opts});
+}
+
+function buildHarianChart(data,cc){
+  destroyChart('harian');
+  // Agregasi per tanggal
+  const byDate={};
+  data.forEach(r=>{
+    const tgl=r.tanggalMasuk;
+    if(!tgl||tgl==='—')return;
+    // Validasi format YYYY-MM-DD
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(tgl))return;
+    byDate[tgl]=(byDate[tgl]||0)+1;
+  });
+  if(Object.keys(byDate).length===0){
+    // Chart canvas tetap tampil kosong
+    const ctx=document.getElementById('chartHarian');
+    if(!ctx)return;
+    const ctxC=ctx.getContext('2d');
+    charts.harian=new Chart(ctxC,{type:'line',data:{labels:[],datasets:[]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},datalabels:{display:false}}}});
+    return;
+  }
+  // Sort tanggal
+  const sortedDates=Object.keys(byDate).sort();
+  const vals=sortedDates.map(d=>byDate[d]);
+  // Label singkat: tampilkan dd/MM
+  const labels=sortedDates.map(d=>{const p=d.split('-');return p[2]+'/'+p[1];});
+  const type=chartTypes.harian;
+  const ctx=document.getElementById('chartHarian');
+  if(!ctx)return;
+  const dlCfg=type==='line'?dlLine(cc,showLabels.harian):dlBar(cc,showLabels.harian);
+  const opts={
+    responsive:true,maintainAspectRatio:false,
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{
+        title:items=>{const idx=items[0].dataIndex;return sortedDates[idx];},
+        label:ctx=>` ${ctx.parsed.y} kasus`
+      }},
+      datalabels:dlCfg
+    },
+    scales:{
+      x:{ticks:{color:cc.text3,font:{size:9},maxRotation:45,minRotation:0,autoSkip:true,maxTicksLimit:30},grid:{color:cc.border+'55'}},
+      y:{ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border}}
+    }
+  };
+  charts.harian=new Chart(ctx.getContext('2d'),{
+    type,
+    data:{labels,datasets:[{
+      label:'Kasus per Hari',
+      data:vals,
+      backgroundColor:type==='line'?cc.accent+'33':cc.accent+'cc',
+      borderColor:cc.accent,
+      borderWidth:type==='line'?2:0,
+      fill:type==='line',
+      tension:.3,
+      pointRadius:sortedDates.length>60?2:4,
+      pointHoverRadius:6
+    }]},
+    options:opts
+  });
 }
 
 /* ===== LEADERBOARD TOP 10: APLIKASI / TL / AGENT ===== */
@@ -1601,16 +1738,15 @@ function renderAppModal(){
   data.forEach(r=>{
     const k=(r.kasus||'').trim();
     if(!k||k==='—')return;
-    // Normalisasi: potong 80 char sebagai key
-    const key=k.length>80?k.substring(0,80)+'…':k;
-    kasusCnt[key]=(kasusCnt[key]||0)+1;
+    // Gunakan teks penuh sebagai key untuk tampilkan isi lengkap
+    kasusCnt[k]=(kasusCnt[k]||0)+1;
   });
-  const topKasus=Object.entries(kasusCnt).sort((a,b)=>b[1]-a[1]).slice(0,10);
+  const topKasus=Object.entries(kasusCnt).sort((a,b)=>b[1]-a[1]).slice(0,100);
 
-  // --- Top agent di aplikasi ini ---
+  // --- Top agent di aplikasi ini (semua agent, tidak dibatasi) ---
   const agCnt={};
   data.forEach(r=>{if(r.namaAgen)agCnt[r.namaAgen]=(agCnt[r.namaAgen]||0)+1;});
-  const topAgent=Object.entries(agCnt).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  const topAgent=Object.entries(agCnt).sort((a,b)=>b[1]-a[1]);
 
   // --- Tren per bulan ---
   const BULAN_ORDER=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
@@ -1670,25 +1806,25 @@ function renderAppModal(){
       </div>
     </div>
 
-    <!-- Top Kasus Sering Dilaporkan -->
+    <!-- Top Kasus & Agent Grid -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px">
       <div>
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📋 Kasus Paling Sering Dilaporkan</div>
-        <div class="app-kasus-list">${topKasus.length?topKasus.map(([k,c],i)=>`
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">📋 Kasus Paling Sering Dilaporkan <span style="font-size:11px;font-weight:400;color:var(--text3)">(${topKasus.length} kasus)</span></div>
+        <div class="app-kasus-scroll">${topKasus.length?topKasus.map(([k,c],i)=>`
           <div class="app-kasus-item">
-            <span class="kn" style="color:var(--text3)">${i+1}.</span>
-            <span class="kt">${k}</span>
-            <span class="kc">${c}x</span>
+            <span class="kn" style="color:var(--text3);min-width:22px">${i+1}.</span>
+            <span class="kt" style="word-break:break-word;white-space:normal;line-height:1.5">${k}</span>
+            <span class="kc" style="min-width:28px;text-align:right">${c}x</span>
           </div>`).join(''):'<div style="padding:16px;text-align:center;color:var(--text3);font-size:12px">Tidak ada data kasus</div>'}</div>
       </div>
       <div>
-        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">👤 Top Agent Pelanggar (Aplikasi Ini)</div>
-        <div class="app-kasus-list">${topAgent.length?topAgent.map(([name,cnt],i)=>`
-          <div class="app-agent-row">
+        <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:8px">👤 Top Agent Pelanggar <span style="font-size:11px;font-weight:400;color:var(--text3)">(${topAgent.length} agent — klik untuk detail)</span></div>
+        <div class="app-agent-list-scroll">${topAgent.length?topAgent.map(([name,cnt],i)=>`
+          <div class="app-agent-row app-agent-row-click" onclick="openAgentNestedModal('${name.replace(/'/g,"\\'")}','${currentAppName.replace(/'/g,"\\'")}')">
             <div class="app-agent-rank ${rankCls(i)}">${i+1}</div>
-            <div style="flex:1;font-size:12px;font-weight:600;color:var(--text)">${name}</div>
+            <div class="app-agent-name" style="flex:1;font-size:12px;font-weight:600;color:var(--text)">${name}</div>
             <div style="font-size:12px;font-weight:700;color:var(--danger)">${cnt} kasus</div>
-            ${cnt>=3?'<span class="lb-badge-repeat" style="margin-left:4px">Berulang</span>':''}
+            ${cnt>=3?'<span class="lb-badge-repeat" style="margin-left:4px">Berulang</span>':cnt>=2?'<span class="lb-badge-warn" style="margin-left:4px">Waspada</span>':''}
           </div>`).join(''):'<div style="padding:16px;text-align:center;color:var(--text3);font-size:12px">Tidak ada data</div>'}</div>
       </div>
     </div>
@@ -1717,6 +1853,67 @@ function renderAppModal(){
 
 function closeAppModal(e){if(e.target===document.getElementById('modalAppOverlay'))closeAppModalDirect();}
 function closeAppModalDirect(){document.getElementById('modalAppOverlay').classList.remove('open');destroyAppCharts();}
+
+/* ══════════════════════════════════════════════
+   MODAL NESTED AGENT PREVIEW (dalam App Modal)
+══════════════════════════════════════════════ */
+function openAgentNestedModal(agentName, appName){
+  if(!agentName)return;
+  // Filter data agent di aplikasi ini
+  const rows=allData.filter(r=>(r.namaAgen||'').trim()===agentName&&(r.aplikasi||'').trim()===appName);
+  const allRows=allData.filter(r=>(r.namaAgen||'').trim()===agentName);
+  const total=rows.length;
+  const totalAll=allRows.length;
+  const ojk=rows.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length;
+  const afpi=rows.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='AFPI').length;
+  const cs=rows.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='CS').length;
+  const terminate=rows.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length;
+  const pending=rows.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length;
+  // Punishment list
+  const punCnt={};
+  rows.forEach(r=>{const p=(r.punishmentInternal||'—').trim();if(p&&p!=='—')punCnt[p]=(punCnt[p]||0)+1;});
+  const topPun=Object.entries(punCnt).sort((a,b)=>b[1]-a[1]);
+  // Riwayat kasus di semua aplikasi
+  const appCnt={};
+  allRows.forEach(r=>{if(r.aplikasi)appCnt[r.aplikasi]=(appCnt[r.aplikasi]||0)+1;});
+  const appList=Object.entries(appCnt).sort((a,b)=>b[1]-a[1]);
+  // Timeline kasus di aplikasi ini (diurutkan tanggal)
+  const sorted=[...rows].sort((a,b)=>(a.tanggalMasuk||'').localeCompare(b.tanggalMasuk||''));
+  // Badge berulang
+  const repeatBadge=total>=3?'<span class="lb-badge-repeat" style="font-size:10px;margin-left:6px">Berulang</span>':total>=2?'<span class="lb-badge-warn" style="font-size:10px;margin-left:6px">Waspada</span>':'';
+
+  document.getElementById('modalAgentNestedTitle').innerHTML=`👤 ${agentName}${repeatBadge} <span style="font-size:11px;font-weight:400;color:var(--text3)">di ${appName}</span>`;
+  document.getElementById('modalAgentNestedBody').innerHTML=`
+    <div class="prev-stat-row">
+      <div class="prev-stat"><div class="ps-lbl">Kasus di ${appName}</div><div class="ps-val" style="color:var(--danger)">${fmtNum(total)}</div></div>
+      <div class="prev-stat"><div class="ps-lbl">Total Semua App</div><div class="ps-val" style="color:var(--warning)">${fmtNum(totalAll)}</div></div>
+      <div class="prev-stat"><div class="ps-lbl">Terminate</div><div class="ps-val" style="color:var(--danger)">${fmtNum(terminate)}</div></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+      ${ojk>0?`<span class="badge badge-ojk">🏛 OJK: ${ojk}</span>`:''}
+      ${afpi>0?`<span class="badge badge-afpi">🤝 AFPI: ${afpi}</span>`:''}
+      ${cs>0?`<span class="badge badge-cs">💬 CS: ${cs}</span>`:''}
+      ${pending>0?`<span class="badge badge-pending">⏳ Pending: ${pending}</span>`:''}
+    </div>
+    ${topPun.length?`<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${topPun.map(([p,c])=>`${badgePunishment(p)}<span style="font-size:10px;color:var(--text3);margin-left:-2px;margin-right:6px">${c}x</span>`).join('')}</div>`:''}
+    ${appList.length>1?`
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">📱 Riwayat Aplikasi</div>
+    <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:12px">${appList.map(([ap,cnt])=>`<span style="padding:3px 8px;border-radius:12px;font-size:11px;font-weight:600;background:var(--accent-bg);color:var(--accent)">${ap} (${cnt})</span>`).join('')}</div>`:''}
+    <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:6px">🕐 Riwayat Kasus di ${appName}</div>
+    <div class="prev-kasus-scroll">
+      ${sorted.length?sorted.map(r=>`
+        <div class="prev-kasus-row">
+          <div style="flex-shrink:0;width:85px;font-size:10px;color:var(--text3)">${r.tanggalMasuk||'—'}</div>
+          <div style="flex-shrink:0;margin-right:6px">${badgeKanal(r.kanalPengaduan)}</div>
+          <div style="flex:1;font-size:11px;line-height:1.5;color:var(--text2)">${r.kasus||'—'}</div>
+          <div style="flex-shrink:0;margin-left:6px">${badgePunishment(r.punishmentInternal)}</div>
+        </div>`).join(''):'<div style="padding:16px;text-align:center;color:var(--text3);font-size:12px">Tidak ada data</div>'}
+    </div>
+  `;
+  document.getElementById('modalAgentNestedOverlay').classList.add('open');
+}
+function closeAgentNestedModal(e){if(e.target===document.getElementById('modalAgentNestedOverlay'))closeAgentNestedModalDirect();}
+function closeAgentNestedModalDirect(){document.getElementById('modalAgentNestedOverlay').classList.remove('open');}
 
 /* ══════════════════════════════════════════════
    MODAL PREVIEW LEADERBOARD (Agent / TL)
@@ -1844,10 +2041,11 @@ function closeLbModalDirect(){document.getElementById('modalLbOverlay').classLis
 
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
+    closeAgentNestedModalDirect();
     closeModalDirect();
     closeAppModalDirect();
     closeLbModalDirect();
-    closeMsDropdown();
+    closeAllMs();
   }
 });
 
@@ -1864,6 +2062,7 @@ const msState={
   Aplikasi: new Set(),
   Kanal: new Set(),
   Status: new Set(),
+  Tanggal: {from:'', to:''},  // bukan Set, tapi objek rentang
 };
 
 // Config tiap filter
@@ -1873,6 +2072,7 @@ const MS_CFG={
   Aplikasi: {label:'Aplikasi',allLabel:'Semua Aplikasi',items:[],                   triggerId:'msTriggerAplikasi',dropdownId:'msDropdownAplikasi',listId:'msListAplikasi',badgeId:'msBadgeAplikasi',labelId:'msLabelAplikasi'},
   Kanal:    {label:'Kanal',   allLabel:'Semua Kanal',   items:['OJK','AFPI','CS'],  triggerId:'msTriggerKanal', dropdownId:'msDropdownKanal',  listId:'msListKanal',    badgeId:'msBadgeKanal',  labelId:'msLabelKanal'},
   Status:   {label:'Status',  allLabel:'Semua Status',  items:['VALID','INVALID','PENDING'],triggerId:'msTriggerStatus',dropdownId:'msDropdownStatus',listId:'msListStatus',badgeId:'msBadgeStatus',labelId:'msLabelStatus'},
+  Tanggal:  {label:'Tanggal',allLabel:'Semua Tanggal',items:[],triggerId:'msTriggerTanggal',dropdownId:'msDropdownTanggal',listId:'',badgeId:'msBadgeTanggal',labelId:'msLabelTanggal'},
 };
 
 function initMsFor(key, items){
@@ -1899,6 +2099,49 @@ function initMsFor(key, items){
   ['Bulan','Tahun','Kanal','Status'].forEach(k=>initMsFor(k));
   // Aplikasi diisi setelah data load
 })();
+
+function onDateChange(){
+  const from=document.getElementById('dateFrom').value;
+  const to=document.getElementById('dateTo').value;
+  msState.Tanggal.from=from;
+  msState.Tanggal.to=to;
+  updateTanggalDisplay();
+}
+
+function msClearTanggal(){
+  msState.Tanggal.from='';
+  msState.Tanggal.to='';
+  document.getElementById('dateFrom').value='';
+  document.getElementById('dateTo').value='';
+  updateTanggalDisplay();
+  closeAllMs();
+  applyFilter();
+}
+
+function updateTanggalDisplay(){
+  const {from,to}=msState.Tanggal;
+  const label=document.getElementById('msLabelTanggal');
+  const badge=document.getElementById('msBadgeTanggal');
+  const trigger=document.getElementById('msTriggerTanggal');
+  const clearBtn=document.getElementById('tanggalClearBtn');
+  const hasFilter=from||to;
+  if(hasFilter){
+    let txt='';
+    if(from&&to)txt=from.split('-').reverse().join('/')+'–'+to.split('-').reverse().join('/');
+    else if(from)txt='Dari '+from.split('-').reverse().join('/');
+    else txt='s/d '+to.split('-').reverse().join('/');
+    label.textContent=txt;
+    badge.style.display='';
+    badge.textContent='✓';
+    trigger?.classList.add('active');
+    if(clearBtn)clearBtn.style.display='';
+  } else {
+    label.textContent='Semua Tanggal';
+    badge.style.display='none';
+    trigger?.classList.remove('active');
+    if(clearBtn)clearBtn.style.display='none';
+  }
+}
 
 function toggleMs(key){
   const cfg=MS_CFG[key];
@@ -2017,7 +2260,7 @@ function initAplikasiFilter(data){
 
 // Klik di luar → tutup semua
 document.addEventListener('click',function(e){
-  const allWraps=['msWrap','msWrapTahun','msWrapAplikasi','msWrapKanal','msWrapStatus'];
+  const allWraps=['msWrap','msWrapTahun','msWrapAplikasi','msWrapKanal','msWrapStatus','msWrapTanggal'];
   const clickedInAny=allWraps.some(id=>{
     const el=document.getElementById(id);
     return el&&el.contains(e.target);
