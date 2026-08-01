@@ -793,40 +793,47 @@ function doUnlock(){
   }
 })();
 
-/* ===== CACHE ===== */
-const CACHE_KEY='tz_violation_cache';
-const CACHE_TTL=5*60*1000;
-function getCache(){try{const c=JSON.parse(sessionStorage.getItem(CACHE_KEY)||'null');if(c&&Date.now()-c.ts<CACHE_TTL)return c.data;}catch(e){}return null;}
-function setCache(d){try{sessionStorage.setItem(CACHE_KEY,JSON.stringify({ts:Date.now(),data:d}));}catch(e){}}
-function clearCache(){sessionStorage.removeItem(CACHE_KEY);}
-
-/* ===== FETCH ===== */
-async function fetchJSON(url){
-  let data;
-  try{
-    const res=await fetch(url);
-    const text=await res.text();
-    if(text.trim().charCodeAt(0)===60){await new Promise(r=>setTimeout(r,2000));data=await(await fetch(url)).json();}
-    else data=JSON.parse(text);
-  }catch(e){throw e;}
-  return data;
-}
+/* ── CACHE & FETCH (localStorage, TTL 30 menit, SWR) ── */
+const LC_PREFIX='tz_c_', LC_TTL=30*60*1000;
+const VIOL_URL=API_URL+'?action=violation';
+function _lcKey(url){let h=0;const s=url.split('?')[1]||url;for(let i=0;i<s.length;i++)h=Math.imul(31,h)+s.charCodeAt(i)|0;return LC_PREFIX+(h>>>0).toString(36);}
+function _lcGet(url){try{const v=localStorage.getItem(_lcKey(url));if(!v)return null;const p=JSON.parse(v);return p;}catch(e){return null;}}
+function _lcSet(url,data){try{localStorage.setItem(_lcKey(url),JSON.stringify({data,ts:Date.now()}));}catch(e){}}
+function clearCache(){try{Object.keys(localStorage).filter(k=>k.startsWith(LC_PREFIX)).forEach(k=>localStorage.removeItem(k));}catch(e){}}
+async function _doFetch(url){const res=await fetch(url);const text=await res.text();if(text.trim().charCodeAt(0)===60){const r2=await fetch(url);return r2.json();}return JSON.parse(text);}
 
 async function initPage(){
   document.getElementById('navTimestamp').textContent='Update: '+new Date().toLocaleDateString('id-ID')+', '+new Date().toLocaleTimeString('id-ID');
-  const cached=getCache();
-  if(cached){allData=cached;renderAll();}
-  else await loadData();
+  const cached=_lcGet(VIOL_URL);
+  const fresh=cached&&Date.now()-cached.ts<LC_TTL;
+  if(cached){
+    // Ada cache → tampil langsung
+    allData=cached.data?.rows||[];
+    populateAplikasiFilter();
+    renderAll();
+    // Kalau sudah stale, update di background tanpa ganggu tampilan
+    if(!fresh){
+      _doFetch(VIOL_URL).then(d=>{
+        if(d&&d.success){
+          _lcSet(VIOL_URL,d);
+          // Update timestamp saja, tidak re-render paksa
+          document.getElementById('navTimestamp').textContent='Update: '+new Date().toLocaleDateString('id-ID')+', '+new Date().toLocaleTimeString('id-ID')+' ✓';
+        }
+      }).catch(()=>{});
+    }
+  } else {
+    await loadData();
+  }
 }
 
 async function loadData(){
   document.getElementById('loadingWrap').style.display='flex';
   document.getElementById('contentWrap').style.display='none';
   try{
-    const data=await fetchJSON(API_URL+'?action=violation');
+    const data=await _doFetch(VIOL_URL);
     if(!data.success)throw new Error(data.message||'Gagal memuat data');
     allData=data.rows||[];
-    setCache(allData);
+    _lcSet(VIOL_URL,data);
     populateAplikasiFilter();
     renderAll();
   }catch(e){

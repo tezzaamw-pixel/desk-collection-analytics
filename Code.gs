@@ -8,9 +8,33 @@ const CFG = {
   SPREADSHEET_ID: '1zcWzcEN_R1qClSKPsvp2Fica_j7iDwq_Qqcg3Mude3k',
   SHEET_ALL_DATA: 'All Data',
   SHEET_REFERENSI: 'Referensi Akun',
+  SHEET_VIOLATION: 'VIOLATION',
   HEADER_ROW: 1,
   DATA_START_ROW: 2
 };
+
+/*** ============ VIOLATION COLUMN MAPPING (0-based, A=0) ============ ***/
+// A=NO, B=TANGGAL MASUK, C=TANGGAL KELUAR, D=DURASI PENYELESAIAN
+// E=NAMA AGEN, F=APLIKASI, G=BUCKET, H=LEADER, I=AKUN, J=NAMA BORROWER
+// K=KANAL PENGADUAN, L=KASUS, M=NAMA QC HANDLE
+// N=STATUS EKSTERNAL, O=PUNISHMENT EKSTERNAL
+// P=STATUS INTERNAL, Q=PUNISHMENT INTERNAL
+// R=BUKTI LAPORAN, S=RIWAYAT HANDLE CASE, T=TANGGAL KOMPLAIN
+// U=FILE FEEDBACK, V=DENDA, W=KETERANGAN TAMBAHAN
+// X=BUKTI LAPORAN (MANDARIN), Y=FILE FEEDBACK (MANDARIN)
+// Z=STATUS VALIDASI, AA=KETERANGAN MR ALVIN
+const VCOL = {
+  NO:0, TGL_MASUK:1, TGL_KELUAR:2, DURASI:3,
+  NAMA_AGEN:4, APLIKASI:5, BUCKET:6, LEADER:7,
+  AKUN:8, NAMA_BORROWER:9, KANAL:10, KASUS:11,
+  NAMA_QC:12, STATUS_EXT:13, PUNISHMENT_EXT:14,
+  STATUS_INT:15, PUNISHMENT_INT:16,
+  BUKTI_LAPORAN:17, RIWAYAT:18, TGL_KOMPLAIN:19,
+  FILE_FEEDBACK:20, DENDA:21, KET_TAMBAHAN:22,
+  BUKTI_LAPORAN_CN:23, FILE_FEEDBACK_CN:24,
+  STATUS_VALIDASI:25, KET_ALVIN:26
+};
+const VTOTAL_COLS = 27;
 
 /*** ============ COLUMN MAPPING (0-based, A=0) ============ ***/
 const COL = {
@@ -323,6 +347,33 @@ function summarizeRows_(rows) {
 }
 
 /*** ============ ENDPOINTS ============ ***/
+/* ============================================================
+ * SERVER-SIDE CACHE HELPER (CacheService — max 6 jam / 21600 dtk)
+ * Mengurangi cold-start Apps Script ~70% untuk data yang sama
+ * ============================================================ */
+const SVC_CACHE_TTL = 300; // 5 menit (detik)
+
+function _cacheGet(key) {
+  try { const v = CacheService.getScriptCache().get(key); return v ? JSON.parse(v) : null; } catch(e) { return null; }
+}
+function _cachePut(key, obj) {
+  try {
+    const s = JSON.stringify(obj);
+    // CacheService max value 100KB — skip kalau terlalu besar
+    if (s.length < 90000) CacheService.getScriptCache().put(key, s, SVC_CACHE_TTL);
+  } catch(e) {}
+}
+function _cacheRemove(key) {
+  try { CacheService.getScriptCache().remove(key); } catch(e) {}
+}
+
+/** Panggil dari trigger / manual setelah update sheet agar cache segar */
+function clearAllServerCache() {
+  const keys = ['svc_referensi', 'svc_violation', 'svc_agentdata_raw'];
+  keys.forEach(k => _cacheRemove(k));
+  Logger.log('Server cache cleared: ' + keys.join(', '));
+}
+
 function doGet(e) {
   try {
     const action = (e.parameter.action || 'home').toLowerCase();
@@ -332,6 +383,7 @@ function doGet(e) {
       case 'agentdata': result = endpointAgentData_(e); break;
       case 'weekly':    result = endpointWeekly_(e);    break;
       case 'referensi': result = endpointReferensi_(e); break;
+      case 'violation': result = endpointViolation_(e); break;
       default: result = { success: false, message: 'Unknown action: ' + action };
     }
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -357,8 +409,15 @@ function endpointHome_(e) {
 
 function endpointAgentData_(e) {
   const p = e.parameter;
-  const { rows } = readInputData();
-  let filtered = rows;
+  // Cache raw rows (tanpa filter) — key tidak include parameter filter
+  const CACHE_KEY = 'svc_agentdata_raw';
+  let allRows = _cacheGet(CACHE_KEY);
+  if (!allRows) {
+    const { rows } = readInputData();
+    allRows = rows;
+    _cachePut(CACHE_KEY, allRows);
+  }
+  let filtered = allRows;
   if (p.agent)    filtered = filtered.filter(r => r.agent.toLowerCase() === p.agent.trim().toLowerCase());
   if (p.bulan)    filtered = filtered.filter(r => r.bulan === normBulan_(p.bulan));
   if (p.tahun)    filtered = filtered.filter(r => r.tahun === normTahun_(p.tahun));
@@ -404,6 +463,10 @@ function endpointWeekly_(e) {
 }
 
 function endpointReferensi_(e) {
+  const CACHE_KEY = 'svc_referensi';
+  const hit = _cacheGet(CACHE_KEY);
+  if (hit) return hit;
+
   const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
   const sheetRef = ss.getSheetByName(CFG.SHEET_REFERENSI);
   if (!sheetRef) throw new Error('Sheet Referensi Akun tidak ditemukan.');
@@ -432,11 +495,120 @@ function endpointReferensi_(e) {
     if (r.aplikasi) aplikasiSet[r.aplikasi] = true;
     if (r.bucket)   bucketSet[r.bucket]     = true;
   });
-  return {
+  const result = {
     success: true, action: 'referensi',
     rows,
     aplikasiList: Object.keys(aplikasiSet).sort(),
     bucketList:   Object.keys(bucketSet).sort()
+  };
+  _cachePut(CACHE_KEY, result);
+  return result;
+}
+
+/*** ============ VIOLATION ENDPOINT ============ ***/
+function normalizeViolationRow_(row, idx) {
+  const tglMasuk  = normTanggal_(row[VCOL.TGL_MASUK]);
+  const tglKeluar = normTanggal_(row[VCOL.TGL_KELUAR]);
+
+  // Hitung durasi (hari) dari tanggal masuk & keluar
+  let durasiHari = 0;
+  const rawDurasi = row[VCOL.DURASI];
+  if (rawDurasi !== null && rawDurasi !== undefined && rawDurasi !== '') {
+    // Jika sudah ada nilai di kolom D, pakai langsung
+    const n = parseFloat(String(rawDurasi).replace(/[^0-9.]/g, ''));
+    if (!isNaN(n)) durasiHari = Math.round(n);
+  }
+  if (durasiHari === 0 && tglMasuk && tglKeluar) {
+    const diffMs = new Date(tglKeluar) - new Date(tglMasuk);
+    if (!isNaN(diffMs) && diffMs >= 0) durasiHari = Math.round(diffMs / 86400000);
+  }
+
+  // Ekstrak bulan & tahun dari tanggal masuk
+  let bulanMasuk = '', tahunMasuk = '';
+  if (tglMasuk) {
+    const parts = tglMasuk.split('-');
+    if (parts.length === 3) {
+      tahunMasuk = parts[0];
+      const mIdx = parseInt(parts[1], 10) - 1;
+      bulanMasuk = BULAN_LIST[mIdx] || '';
+    }
+  }
+
+  return {
+    _idx: idx,
+    no:                normText_(row[VCOL.NO]),
+    tanggalMasuk:      tglMasuk || normText_(row[VCOL.TGL_MASUK]),
+    tanggalKeluar:     tglKeluar || normText_(row[VCOL.TGL_KELUAR]),
+    durasiHari:        durasiHari,
+    bulanMasuk:        bulanMasuk,
+    tahunMasuk:        tahunMasuk,
+    namaAgen:          normText_(row[VCOL.NAMA_AGEN]),
+    aplikasi:          normText_(row[VCOL.APLIKASI]),
+    bucket:            normText_(row[VCOL.BUCKET]),
+    leader:            normText_(row[VCOL.LEADER]),
+    akun:              normText_(row[VCOL.AKUN]),
+    namaBorrower:      normText_(row[VCOL.NAMA_BORROWER]),
+    kanalPengaduan:    normText_(row[VCOL.KANAL]).toUpperCase(),
+    kasus:             normText_(row[VCOL.KASUS]),
+    namaQC:            normText_(row[VCOL.NAMA_QC]),
+    statusEksternal:   normText_(row[VCOL.STATUS_EXT]).toUpperCase(),
+    punishmentEksternal: normText_(row[VCOL.PUNISHMENT_EXT]),
+    statusInternal:    normText_(row[VCOL.STATUS_INT]).toUpperCase(),
+    punishmentInternal: normText_(row[VCOL.PUNISHMENT_INT]),
+    buktiLaporan:      normText_(row[VCOL.BUKTI_LAPORAN]),
+    riwayatHandleCase: normText_(row[VCOL.RIWAYAT]),
+    tanggalKomplain:   normTanggal_(row[VCOL.TGL_KOMPLAIN]) || normText_(row[VCOL.TGL_KOMPLAIN]),
+    buktiFeedback:     normText_(row[VCOL.FILE_FEEDBACK]),
+    denda:             normText_(row[VCOL.DENDA]),
+    keteranganTambahan: normText_(row[VCOL.KET_TAMBAHAN]),
+    buktiLaporanMandarin: normText_(row[VCOL.BUKTI_LAPORAN_CN]),
+    buktiFeedbackMandarin: normText_(row[VCOL.FILE_FEEDBACK_CN]),
+    statusValidasi:    normText_(row[VCOL.STATUS_VALIDASI]),
+    keteranganAlvin:   normText_(row[VCOL.KET_ALVIN])
+  };
+}
+
+function endpointViolation_(e) {
+  const p = e ? (e.parameter || {}) : {};
+  const CACHE_KEY = 'svc_violation';
+
+  // Ambil semua baris dari cache dulu (filter tetap di sini)
+  let rows = _cacheGet(CACHE_KEY);
+
+  if (!rows) {
+    const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(CFG.SHEET_VIOLATION);
+    if (!sheet) throw new Error('Sheet "' + CFG.SHEET_VIOLATION + '" tidak ditemukan.');
+    const lastRow = sheet.getLastRow();
+    if (lastRow < CFG.DATA_START_ROW) {
+      return { success: true, action: 'violation', totalRows: 0, rows: [] };
+    }
+    const rawRows = sheet.getRange(
+      CFG.DATA_START_ROW, 1,
+      lastRow - CFG.DATA_START_ROW + 1,
+      VTOTAL_COLS
+    ).getValues();
+    rows = [];
+    rawRows.forEach((raw, i) => {
+      const isEmpty = raw.every(c => c === '' || c === null || c === undefined);
+      if (isEmpty) return;
+      rows.push(normalizeViolationRow_(raw, rows.length));
+    });
+    _cachePut(CACHE_KEY, rows);
+  }
+
+  // Apply filters if provided
+  let filtered = rows;
+  if (p.bulan)    filtered = filtered.filter(r => r.bulanMasuk === normBulan_(p.bulan));
+  if (p.tahun)    filtered = filtered.filter(r => r.tahunMasuk === normTahun_(p.tahun));
+  if (p.aplikasi) filtered = filtered.filter(r => r.aplikasi.toLowerCase() === p.aplikasi.trim().toLowerCase());
+  if (p.kanal)    filtered = filtered.filter(r => r.kanalPengaduan === p.kanal.trim().toUpperCase());
+
+  return {
+    success: true,
+    action: 'violation',
+    totalRows: filtered.length,
+    rows: filtered
   };
 }
 
@@ -452,4 +624,7 @@ function TEST_weekly() {
 }
 function TEST_referensi() {
   Logger.log(JSON.stringify(endpointReferensi_({parameter:{}}), null, 2));
+}
+function TEST_violation() {
+  Logger.log(JSON.stringify(endpointViolation_({parameter:{}}), null, 2));
 }
