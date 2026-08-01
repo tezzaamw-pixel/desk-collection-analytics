@@ -627,10 +627,11 @@ function reloadData(){clearCache();loadData();}
 
 function populateAplikasiFilter(){
   const apps=[...new Set(allData.map(r=>r.aplikasi).filter(Boolean))].sort();
-  const sel=document.getElementById('selAplikasi');
-  sel.innerHTML='<option value="">Semua Aplikasi</option>'+apps.map(a=>`<option value="${a}">${a}</option>`).join('');
+  // [FIX 1] selAplikasi sudah diganti multi-select, pakai initAplikasiFilter
+  initAplikasiFilter(allData);
   // Sidebar apps
-  document.getElementById('sidebarApps').innerHTML=apps.map(a=>`<a class="sidebar-item" href="app.html?ap=${encodeURIComponent(a)}"><span class="dot" style="background:#1d60c8"></span>${a}</a>`).join('');
+  const sb=document.getElementById('sidebarApps');
+  if(sb)sb.innerHTML=apps.map(a=>`<a class="sidebar-item" href="app.html?ap=${encodeURIComponent(a)}"><span class="dot" style="background:#1d60c8"></span>${a}</a>`).join('');
 }
 
 /* ===== FILTER ===== */
@@ -649,15 +650,18 @@ function applyFilter(){
 }
 
 function resetFilter(){
+  // [FIX 2&3] Pakai MS_CFG[k].listId dan MS_CFG[k].dropdownId — bukan string concat
   Object.keys(msState).forEach(k=>{
     msState[k].clear();
     updateMsDisplayFor(k);
-    // Uncheck semua
-    const list=document.getElementById('msList'+k);
-    if(list)list.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false);
-    const items=list?list.querySelectorAll('.ms-item'):[];
-    items.forEach(it=>it.classList.remove('checked'));
-    const sa=document.querySelector(`#msDropdown${k} .ms-select-all`);
+    const cfg=MS_CFG[k];
+    if(!cfg)return;
+    const list=document.getElementById(cfg.listId);
+    if(list){
+      list.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false);
+      list.querySelectorAll('.ms-item').forEach(it=>it.classList.remove('checked'));
+    }
+    const sa=document.querySelector(`#${cfg.dropdownId} .ms-select-all`);
     if(sa)sa.textContent='Pilih Semua';
   });
   filteredData=[...allData];
@@ -666,11 +670,16 @@ function resetFilter(){
 }
 
 function renderAll(){
-  document.getElementById('loadingWrap').style.display='none';
-  document.getElementById('contentWrap').style.display='block';
-  // Init filter Aplikasi dari data aktual
-  initAplikasiFilter(allData);
-  applyFilter();
+  try{
+    document.getElementById('loadingWrap').style.display='none';
+    document.getElementById('contentWrap').style.display='block';
+    initAplikasiFilter(allData);
+    applyFilter();
+  }catch(e){
+    console.error('renderAll error:',e);
+    const lw=document.getElementById('loadingWrap');
+    if(lw)lw.innerHTML='<div style="color:var(--danger);font-size:13px">⚠ Error render: '+e.message+'</div>';
+  }
 }
 
 /* ===== FORMAT ===== */
@@ -1201,11 +1210,11 @@ function searchTable(){
 
 function renderTable(data){
   if(!Array.isArray(data))data=[];
-  renderSummary(data);
-  renderKanalGrid(data);
-  if(data.length>0)buildCharts(data);
-  renderLeaderboard(data);
-  renderInsight(data);
+  try{renderSummary(data);}catch(e){console.warn('renderSummary error:',e);}
+  try{renderKanalGrid(data);}catch(e){console.warn('renderKanalGrid error:',e);}
+  try{if(data.length>0)buildCharts(data);}catch(e){console.warn('buildCharts error:',e);}
+  try{renderLeaderboard(data);}catch(e){console.warn('renderLeaderboard error:',e);}
+  try{renderInsight(data);}catch(e){console.warn('renderInsight error:',e);}
 
   // [FIX] Delegasikan render tabel ke renderTableOnly (tidak duplikat kode)
   renderTableOnly(data);
@@ -1384,14 +1393,20 @@ const MS_CFG={
 function initMsFor(key, items){
   const cfg=MS_CFG[key];
   if(!cfg)return;
-  if(items)cfg.items=items;
+  if(items&&items.length>0)cfg.items=items;
+  if(!cfg.items||cfg.items.length===0)return;
   const list=document.getElementById(cfg.listId);
-  if(!list)return;
-  list.innerHTML=cfg.items.map(v=>`
-    <label class="ms-item" id="msItem-${key}-${v.replace(/[^a-z0-9]/gi,'_')}">
-      <input type="checkbox" value="${v}" onchange="msOnChangeFor('${key}','${v}',this)">
+  if(!list){console.warn('initMsFor: list element not found for',key,'listId:',cfg.listId);return;}
+  // [FIX 7] Hindari duplikat — clear dulu state yang sudah ada tapi tetap preserve centang
+  const prevChecked=new Set([...msState[key]]);
+  list.innerHTML=cfg.items.map(v=>{
+    const safeV=v.replace(/[^a-z0-9]/gi,'_');
+    const isChecked=prevChecked.has(v);
+    return`<label class="ms-item ${isChecked?'checked':''}" id="msItem-${key}-${safeV}">
+      <input type="checkbox" value="${v}" ${isChecked?'checked':''} onchange="msOnChangeFor('${key}','${v}',this)">
       ${v}
-    </label>`).join('');
+    </label>`;
+  }).join('');
 }
 
 // Init semua filter statis saat DOM ready
@@ -1503,9 +1518,16 @@ function updateMsDisplay(){updateMsDisplayFor('Bulan');}
 
 // Init aplikasi setelah data load
 function initAplikasiFilter(data){
+  // [FIX 4a] Aplikasi dari data aktual
   const apps=[...new Set(data.map(r=>r.aplikasi).filter(Boolean))].sort();
   MS_CFG.Aplikasi.items=apps;
   initMsFor('Aplikasi', apps);
+  // [FIX 4b] Tahun dari data aktual (bukan hardcode)
+  const years=[...new Set(data.map(r=>r.tahunMasuk).filter(Boolean))].sort();
+  if(years.length>0){
+    MS_CFG.Tahun.items=years;
+    initMsFor('Tahun', years);
+  }
 }
 
 // Klik di luar → tutup semua
