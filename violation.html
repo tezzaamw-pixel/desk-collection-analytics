@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <style>
 :root{
   --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
@@ -281,26 +282,81 @@ select:focus{border-color:var(--accent);}
       </div>
     </div>
     <label>Tahun</label>
-    <select id="selTahun">
-      <option value="2026">2026</option>
-      <option value="2025">2025</option>
-    </select>
+    <div class="ms-wrap" id="msWrapTahun">
+      <div class="ms-trigger" id="msTriggerTahun" onclick="toggleMs('Tahun')">
+        <span id="msLabelTahun">Semua Tahun</span>
+        <span class="ms-badge" id="msBadgeTahun" style="display:none">0</span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-dropdown" id="msDropdownTahun">
+        <div class="ms-dropdown-head">
+          <span style="font-size:11px;color:var(--text3);font-weight:500">Pilih Tahun</span>
+          <span class="ms-select-all" onclick="msSelectAllFor('Tahun')">Pilih Semua</span>
+        </div>
+        <div class="ms-dropdown-list" id="msListTahun"></div>
+        <div class="ms-dropdown-foot">
+          <button class="ms-btn-clear" onclick="msClearFor('Tahun')">Hapus</button>
+          <button class="ms-btn-apply" onclick="msApplyFor('Tahun')">Terapkan</button>
+        </div>
+      </div>
+    </div>
     <label>Aplikasi</label>
-    <select id="selAplikasi"><option value="">Semua Aplikasi</option></select>
+    <div class="ms-wrap" id="msWrapAplikasi">
+      <div class="ms-trigger" id="msTriggerAplikasi" onclick="toggleMs('Aplikasi')">
+        <span id="msLabelAplikasi">Semua Aplikasi</span>
+        <span class="ms-badge" id="msBadgeAplikasi" style="display:none">0</span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-dropdown" id="msDropdownAplikasi" style="min-width:220px">
+        <div class="ms-dropdown-head">
+          <span style="font-size:11px;color:var(--text3);font-weight:500">Pilih Aplikasi</span>
+          <span class="ms-select-all" onclick="msSelectAllFor('Aplikasi')">Pilih Semua</span>
+        </div>
+        <div class="ms-dropdown-list" id="msListAplikasi" style="max-height:240px"></div>
+        <div class="ms-dropdown-foot">
+          <button class="ms-btn-clear" onclick="msClearFor('Aplikasi')">Hapus</button>
+          <button class="ms-btn-apply" onclick="msApplyFor('Aplikasi')">Terapkan</button>
+        </div>
+      </div>
+    </div>
     <label>Kanal</label>
-    <select id="selKanal">
-      <option value="">Semua Kanal</option>
-      <option value="OJK">OJK</option>
-      <option value="AFPI">AFPI</option>
-      <option value="CS">CS</option>
-    </select>
+    <div class="ms-wrap" id="msWrapKanal">
+      <div class="ms-trigger" id="msTriggerKanal" onclick="toggleMs('Kanal')">
+        <span id="msLabelKanal">Semua Kanal</span>
+        <span class="ms-badge" id="msBadgeKanal" style="display:none">0</span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-dropdown" id="msDropdownKanal">
+        <div class="ms-dropdown-head">
+          <span style="font-size:11px;color:var(--text3);font-weight:500">Pilih Kanal</span>
+          <span class="ms-select-all" onclick="msSelectAllFor('Kanal')">Pilih Semua</span>
+        </div>
+        <div class="ms-dropdown-list" id="msListKanal"></div>
+        <div class="ms-dropdown-foot">
+          <button class="ms-btn-clear" onclick="msClearFor('Kanal')">Hapus</button>
+          <button class="ms-btn-apply" onclick="msApplyFor('Kanal')">Terapkan</button>
+        </div>
+      </div>
+    </div>
     <label>Status Ext.</label>
-    <select id="selStatusExt">
-      <option value="">Semua Status</option>
-      <option value="VALID">Valid</option>
-      <option value="INVALID">Invalid</option>
-      <option value="PENDING">Pending</option>
-    </select>
+    <div class="ms-wrap" id="msWrapStatus">
+      <div class="ms-trigger" id="msTriggerStatus" onclick="toggleMs('Status')">
+        <span id="msLabelStatus">Semua Status</span>
+        <span class="ms-badge" id="msBadgeStatus" style="display:none">0</span>
+        <span class="ms-arrow">▼</span>
+      </div>
+      <div class="ms-dropdown" id="msDropdownStatus">
+        <div class="ms-dropdown-head">
+          <span style="font-size:11px;color:var(--text3);font-weight:500">Pilih Status</span>
+          <span class="ms-select-all" onclick="msSelectAllFor('Status')">Pilih Semua</span>
+        </div>
+        <div class="ms-dropdown-list" id="msListStatus"></div>
+        <div class="ms-dropdown-foot">
+          <button class="ms-btn-clear" onclick="msClearFor('Status')">Hapus</button>
+          <button class="ms-btn-apply" onclick="msApplyFor('Status')">Terapkan</button>
+        </div>
+      </div>
+    </div>
     <button class="btn-load" onclick="applyFilter()">🔍 Filter</button>
     <button class="btn-load" style="background:var(--surface2);color:var(--text2);border:1px solid var(--border);" onclick="resetFilter()">↺ Reset</button>
   </div>
@@ -327,6 +383,7 @@ select:focus{border-color:var(--accent);}
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">Tren Kasus per Bulan</div>
+          <button class="chart-label-btn" id="lblBtn-tren" onclick="toggleLabels('tren')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
             <button class="chart-type-btn active" onclick="switchChart('tren','bar',this)">Bar</button>
             <button class="chart-type-btn" onclick="switchChart('tren','line',this)">Line</button>
@@ -337,6 +394,7 @@ select:focus{border-color:var(--accent);}
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">Distribusi Kanal Pengaduan</div>
+          <button class="chart-label-btn" id="lblBtn-kanal" onclick="toggleLabels('kanal')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
             <button class="chart-type-btn active" onclick="switchChart('kanal','doughnut',this)">Donut</button>
             <button class="chart-type-btn" onclick="switchChart('kanal','bar',this)">Bar</button>
@@ -347,6 +405,7 @@ select:focus{border-color:var(--accent);}
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">Top Agent Pelanggar</div>
+          <button class="chart-label-btn" id="lblBtn-agent" onclick="toggleLabels('agent')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
             <button class="chart-type-btn active" onclick="switchChart('agent','bar',this)">Bar</button>
             <button class="chart-type-btn" onclick="switchChart('agent','horizontalBar',this)">H-Bar</button>
@@ -357,6 +416,7 @@ select:focus{border-color:var(--accent);}
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">Kasus per Aplikasi</div>
+          <button class="chart-label-btn" id="lblBtn-aplikasi" onclick="toggleLabels('aplikasi')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
             <button class="chart-type-btn active" onclick="switchChart('aplikasi','bar',this)">Bar</button>
             <button class="chart-type-btn" onclick="switchChart('aplikasi','doughnut',this)">Donut</button>
@@ -367,6 +427,7 @@ select:focus{border-color:var(--accent);}
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">Distribusi Punishment Internal</div>
+          <button class="chart-label-btn" id="lblBtn-punishment" onclick="toggleLabels('punishment')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
             <button class="chart-type-btn active" onclick="switchChart('punishment','bar',this)">Bar</button>
             <button class="chart-type-btn" onclick="switchChart('punishment','doughnut',this)">Donut</button>
@@ -377,6 +438,7 @@ select:focus{border-color:var(--accent);}
       <div class="chart-card">
         <div class="chart-header">
           <div class="chart-title">Rata-rata Durasi Penyelesaian (hari)</div>
+          <button class="chart-label-btn" id="lblBtn-durasi" onclick="toggleLabels('durasi')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
             <button class="chart-type-btn active" onclick="switchChart('durasi','bar',this)">Bar</button>
             <button class="chart-type-btn" onclick="switchChart('durasi','line',this)">Line</button>
@@ -384,6 +446,12 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartDurasi"></canvas></div>
       </div>
+    </div>
+
+    <!-- TOP 10 LEADERBOARD: APLIKASI, TL, AGENT -->
+    <div class="section-title">🏆 Top 10 Pelanggaran Terbanyak</div>
+    <div class="leaderboard-grid" id="leaderboardGrid">
+      <!-- diisi JS -->
     </div>
 
     <!-- INSIGHT / ANALISA OTOMATIS -->
@@ -440,6 +508,36 @@ select:focus{border-color:var(--accent);}
 </div>
 
 <script>
+// ── State label angka per chart ──────────────────────────────
+const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true};
+
+function toggleLabels(key){
+  showLabels[key]=!showLabels[key];
+  const btn=document.getElementById('lblBtn-'+key);
+  if(btn){
+    btn.classList.toggle('on', showLabels[key]);
+    btn.textContent=showLabels[key]?'🔢 Angka':'— Angka';
+  }
+  // Rebuild chart yang bersangkutan saja
+  const cc=chartColors();
+  if(key==='tren')buildTrenChart(filteredData,cc);
+  else if(key==='kanal')buildKanalChart(filteredData,cc);
+  else if(key==='agent')buildAgentChart(filteredData,cc);
+  else if(key==='aplikasi')buildAplikasiChart(filteredData,cc);
+  else if(key==='punishment')buildPunishmentChart(filteredData,cc);
+  else if(key==='durasi')buildDurasiChart(filteredData,cc);
+}
+
+// Register datalabels plugin global
+if(typeof ChartDataLabels !== 'undefined') Chart.register(ChartDataLabels);
+
+// Helper format label angka singkat
+function fmtLabel(v){
+  if(v===null||v===undefined||v===0)return '';
+  if(v>=1000)return (v/1000).toFixed(1).replace(/\.0$/,'')+'k';
+  return String(v);
+}
+
 const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
 const PASSWORD='Masuk';
 const PAGE_SIZE=25;
@@ -537,18 +635,13 @@ function populateAplikasiFilter(){
 
 /* ===== FILTER ===== */
 function applyFilter(){
-  const tahun=document.getElementById('selTahun').value;
-  const aplikasi=document.getElementById('selAplikasi').value;
-  const kanal=document.getElementById('selKanal').value;
-  const statusExt=document.getElementById('selStatusExt').value;
-  // Multi-select bulan: pakai Set selectedBulans
-  const hasBulanFilter=selectedBulans.size>0;
+  // Semua filter kini multi-select
   filteredData=allData.filter(r=>{
-    if(hasBulanFilter&&!selectedBulans.has(r.bulanMasuk))return false;
-    if(tahun&&r.tahunMasuk!==tahun)return false;
-    if(aplikasi&&r.aplikasi!==aplikasi)return false;
-    if(kanal&&r.kanalPengaduan!==kanal)return false;
-    if(statusExt&&r.statusEksternal!==statusExt)return false;
+    if(msState.Bulan.size>0&&!msState.Bulan.has(r.bulanMasuk))return false;
+    if(msState.Tahun.size>0&&!msState.Tahun.has(r.tahunMasuk))return false;
+    if(msState.Aplikasi.size>0&&!msState.Aplikasi.has(r.aplikasi))return false;
+    if(msState.Kanal.size>0&&!msState.Kanal.has((r.kanalPengaduan||'').toUpperCase()))return false;
+    if(msState.Status.size>0&&!msState.Status.has((r.statusEksternal||'').toUpperCase()))return false;
     return true;
   });
   currentPage=1;
@@ -556,21 +649,27 @@ function applyFilter(){
 }
 
 function resetFilter(){
-  selectedBulans.clear();
-  updateMsDisplay();
-  document.getElementById('selTahun').value='2026';
-  document.getElementById('selAplikasi').value='';
-  document.getElementById('selKanal').value='';
-  document.getElementById('selStatusExt').value='';
+  Object.keys(msState).forEach(k=>{
+    msState[k].clear();
+    updateMsDisplayFor(k);
+    // Uncheck semua
+    const list=document.getElementById('msList'+k);
+    if(list)list.querySelectorAll('input[type=checkbox]').forEach(cb=>cb.checked=false);
+    const items=list?list.querySelectorAll('.ms-item'):[];
+    items.forEach(it=>it.classList.remove('checked'));
+    const sa=document.querySelector(`#msDropdown${k} .ms-select-all`);
+    if(sa)sa.textContent='Pilih Semua';
+  });
   filteredData=[...allData];
   currentPage=1;
   renderTable(filteredData);
 }
 
 function renderAll(){
-  // [FIX] renderAll hanya tampilkan konten lalu jalankan applyFilter SEKALI — tidak ada loop
   document.getElementById('loadingWrap').style.display='none';
   document.getElementById('contentWrap').style.display='block';
+  // Init filter Aplikasi dari data aktual
+  initAplikasiFilter(allData);
   applyFilter();
 }
 
@@ -663,18 +762,80 @@ function chartColors(){
 
 const PALETTE=['#1d60c8','#dc2626','#d97706','#059669','#7c3aed','#0891b2','#c2410c','#15803d'];
 
-function baseChartOpts(cc){
+// Konfigurasi datalabels untuk berbagai tipe chart
+function dlBar(cc, show){
+  const visible = show!==false;
+  return{
+    display:(ctx)=>visible&&ctx.dataset.data[ctx.dataIndex]>0,
+    anchor:'end', align:'end',
+    formatter:(v)=>fmtLabel(v),
+    color:cc.text2,
+    font:{size:10,weight:'600'},
+    padding:{bottom:2}
+  };
+}
+function dlBarH(cc, show){
+  const visible = show!==false;
+  return{
+    display:(ctx)=>visible&&ctx.dataset.data[ctx.dataIndex]>0,
+    anchor:'end', align:'end',
+    formatter:(v)=>fmtLabel(v),
+    color:cc.text2,
+    font:{size:10,weight:'600'},
+    padding:{left:4}
+  };
+}
+function dlDoughnut(cc, show){
+  const visible = show!==false;
+  return{
+    display:(ctx)=>{
+      if(!visible)return false;
+      const data=ctx.dataset.data;
+      const total=data.reduce((a,b)=>a+b,0)||1;
+      return data[ctx.dataIndex]/total*100>5;
+    },
+    formatter:(v,ctx)=>{
+      const total=ctx.dataset.data.reduce((a,b)=>a+b,0)||1;
+      const pct=Math.round(v/total*100);
+      return v+'\n'+pct+'%';
+    },
+    color:'#fff',
+    font:{size:11,weight:'700'},
+    textAlign:'center'
+  };
+}
+function dlLine(cc, show){
+  const visible = show!==false;
+  return{
+    display:(ctx)=>visible&&ctx.dataset.data[ctx.dataIndex]>0,
+    anchor:'top', align:'top',
+    formatter:(v)=>fmtLabel(v),
+    color:cc.text,
+    font:{size:10,weight:'600'},
+    padding:{bottom:4}
+  };
+}
+
+function baseChartOpts(cc, dlConfig){
   return{
     responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{labels:{color:cc.text2,font:{size:11}}},tooltip:{callbacks:{label:(ctx)=>` ${ctx.label||ctx.dataset.label}: ${fmtNum(ctx.parsed.y??ctx.parsed)}`}}},
+    plugins:{
+      legend:{labels:{color:cc.text2,font:{size:11}}},
+      tooltip:{callbacks:{label:(ctx)=>` ${ctx.label||ctx.dataset.label}: ${fmtNum(ctx.parsed.y??ctx.parsed)}`}},
+      datalabels: dlConfig||dlBar(cc)
+    },
     scales:{x:{ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border}},y:{ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border}}}
   };
 }
 
-function makeDoughnutOpts(cc){
+function makeDoughnutOpts(cc, show){
   return{
     responsive:true,maintainAspectRatio:false,
-    plugins:{legend:{position:'right',labels:{color:cc.text2,font:{size:11}}},tooltip:{callbacks:{label:(ctx)=>` ${ctx.label}: ${fmtNum(ctx.parsed)} (${Math.round(ctx.parsed/(ctx.dataset.data.reduce((a,b)=>a+b,0)||1)*100)}%)`}}}
+    plugins:{
+      legend:{position:'right',labels:{color:cc.text2,font:{size:11}}},
+      tooltip:{callbacks:{label:(ctx)=>` ${ctx.label}: ${fmtNum(ctx.parsed)} (${Math.round(ctx.parsed/(ctx.dataset.data.reduce((a,b)=>a+b,0)||1)*100)}%)`}},
+      datalabels: dlDoughnut(cc, show)
+    }
   };
 }
 
@@ -682,6 +843,11 @@ function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];
 
 function buildCharts(data){
   const cc=chartColors();
+  // Sync tombol label state
+  Object.keys(showLabels).forEach(k=>{
+    const btn=document.getElementById('lblBtn-'+k);
+    if(btn){btn.classList.toggle('on',showLabels[k]);btn.textContent=showLabels[k]?'🔢 Angka':'— Angka';}
+  });
   buildTrenChart(data,cc);
   buildKanalChart(data,cc);
   buildAgentChart(data,cc);
@@ -710,8 +876,8 @@ function buildTrenChart(data,cc){
   const vals=labels.map(b=>byBulan[b]);
   const type=chartTypes.tren;
   const ctx=document.getElementById('chartTren').getContext('2d');
-  const opts=baseChartOpts(cc);
-  opts.plugins.datalabels={display:false};
+  const dlCfg=type==='line'?dlLine(cc,showLabels.tren):dlBar(cc,showLabels.tren);
+  const opts=baseChartOpts(cc, dlCfg);
   charts.tren=new Chart(ctx,{type,data:{labels,datasets:[{label:'Jumlah Kasus',data:vals,backgroundColor:type==='line'?cc.accent+'33':cc.danger,borderColor:cc.danger,borderWidth:type==='line'?2:0,fill:type==='line',tension:.3,pointRadius:4}]},options:opts});
 }
 
@@ -724,10 +890,9 @@ function buildKanalChart(data,cc){
   const ctx=document.getElementById('chartKanal').getContext('2d');
   const type=chartTypes.kanal;
   if(type==='doughnut'){
-    charts.kanal=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:['#f9a8d4','#c4b5fd','#93c5fd'],borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc)});
+    charts.kanal=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:['#f9a8d4','#c4b5fd','#93c5fd'],borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc,showLabels.kanal)});
   } else {
-    const opts=baseChartOpts(cc);
-    charts.kanal=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:['#f9a8d4','#c4b5fd','#93c5fd']}]},options:opts});
+    charts.kanal=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:['#f9a8d4','#c4b5fd','#93c5fd']}]},options:baseChartOpts(cc,dlBar(cc,showLabels.kanal))});
   }
 }
 
@@ -741,7 +906,8 @@ function buildAgentChart(data,cc){
   const ctx=document.getElementById('chartAgent').getContext('2d');
   const type=chartTypes.agent==='horizontalBar'?'bar':'bar';
   const isH=chartTypes.agent==='horizontalBar';
-  const opts=baseChartOpts(cc);
+  const dlCfg=isH?dlBarH(cc,showLabels.agent):dlBar(cc,showLabels.agent);
+  const opts=baseChartOpts(cc, dlCfg);
   if(isH)opts.indexAxis='y';
   charts.agent=new Chart(ctx,{type,data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:cc.danger+'cc'}]},options:opts});
 }
@@ -756,9 +922,9 @@ function buildAplikasiChart(data,cc){
   const ctx=document.getElementById('chartAplikasi').getContext('2d');
   const type=chartTypes.aplikasi;
   if(type==='doughnut'){
-    charts.aplikasi=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:PALETTE,borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc)});
+    charts.aplikasi=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:PALETTE,borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc,showLabels.aplikasi)});
   } else {
-    charts.aplikasi=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:PALETTE}]},options:baseChartOpts(cc)});
+    charts.aplikasi=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Kasus',data:vals,backgroundColor:PALETTE}]},options:baseChartOpts(cc,dlBar(cc,showLabels.aplikasi))});
   }
 }
 
@@ -786,9 +952,9 @@ function buildPunishmentChart(data,cc){
   const ctx=document.getElementById('chartPunishment').getContext('2d');
   const type=chartTypes.punishment;
   if(type==='doughnut'){
-    charts.punishment=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:bgs,borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc)});
+    charts.punishment=new Chart(ctx,{type:'doughnut',data:{labels,datasets:[{data:vals,backgroundColor:bgs,borderWidth:2,borderColor:getCssVar('--surface')}]},options:makeDoughnutOpts(cc,showLabels.punishment)});
   } else {
-    charts.punishment=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Jumlah',data:vals,backgroundColor:bgs}]},options:baseChartOpts(cc)});
+    charts.punishment=new Chart(ctx,{type:'bar',data:{labels,datasets:[{label:'Jumlah',data:vals,backgroundColor:bgs}]},options:baseChartOpts(cc,dlBar(cc,showLabels.punishment))});
   }
 }
 
@@ -805,7 +971,132 @@ function buildDurasiChart(data,cc){
   const ctx=document.getElementById('chartDurasi').getContext('2d');
   const type=chartTypes.durasi;
   const opts=baseChartOpts(cc);
+  const durDL=type==='line'?dlLine(cc,showLabels.durasi):dlBar(cc,showLabels.durasi);
+  opts.plugins.datalabels=durDL;
   charts.durasi=new Chart(ctx,{type,data:{labels,datasets:[{label:'Avg Hari',data:vals,backgroundColor:type==='line'?cc.warning+'33':cc.warning,borderColor:cc.warning,borderWidth:type==='line'?2:0,fill:type==='line',tension:.3,pointRadius:4}]},options:opts});
+}
+
+/* ===== LEADERBOARD TOP 10: APLIKASI / TL / AGENT ===== */
+function renderLeaderboard(data){
+  const el=document.getElementById('leaderboardGrid');
+  if(!el)return;
+  if(!data||data.length===0){el.innerHTML='';return;}
+
+  const KANALS=['OJK','AFPI','CS'];
+
+  function buildMap(data, keyFn){
+    const map={};
+    data.forEach(r=>{
+      const k=keyFn(r);
+      if(!k||k==='—'||k.trim()==='')return;
+      if(!map[k])map[k]={total:0,OJK:0,AFPI:0,CS:0,other:0};
+      map[k].total++;
+      const kanal=(r.kanalPengaduan||'').toUpperCase();
+      if(kanal==='OJK')map[k].OJK++;
+      else if(kanal==='AFPI')map[k].AFPI++;
+      else if(kanal==='CS')map[k].CS++;
+      else map[k].other++;
+    });
+    return map;
+  }
+
+  function buildRows(map, top=10){
+    return Object.entries(map)
+      .sort((a,b)=>b[1].total-a[1].total)
+      .slice(0,top);
+  }
+
+  function rankCls(i){return i===0?'lb-r1':i===1?'lb-r2':i===2?'lb-r3':'lb-rn';}
+
+  function rowsHtml(entries){
+    return entries.map(([name,d],i)=>{
+      const pills=[
+        d.OJK>0?`<span class="lb-pill lb-pill-ojk">OJK ${d.OJK}</span>`:'',
+        d.AFPI>0?`<span class="lb-pill lb-pill-afpi">AFPI ${d.AFPI}</span>`:'',
+        d.CS>0?`<span class="lb-pill lb-pill-cs">CS ${d.CS}</span>`:'',
+        d.other>0?`<span class="lb-pill lb-pill-other">Lain ${d.other}</span>`:'',
+      ].filter(Boolean).join('');
+      return `<div class="lb-row">
+        <div class="lb-rank ${rankCls(i)}">${i+1}</div>
+        <div class="lb-name" title="${name}">${name}</div>
+        <div class="lb-breakdown">${pills}</div>
+        <div class="lb-total">${d.total}</div>
+      </div>`;
+    }).join('');
+  }
+
+  // --- CARD 1: Top Aplikasi ---
+  const appMap=buildMap(data, r=>r.aplikasi||'');
+  const appRows=buildRows(appMap);
+
+  // --- CARD 2: Top Team Leader ---
+  const tlMap=buildMap(data, r=>r.leader||r.teamLeader||r.tl||'');
+  const tlRows=buildRows(tlMap);
+
+  // --- CARD 3: Top Agent (repeat offender) ---
+  const agMap=buildMap(data, r=>r.namaAgen||'');
+  const agRows=buildRows(agMap);
+  // Hitung badge repeat: agent dengan ≥2 kasus = repeat offender
+  function agRowsHtml(entries){
+    return entries.map(([name,d],i)=>{
+      const isRepeat=d.total>=3;
+      const isWarn=d.total>=2&&d.total<3;
+      const pills=[
+        d.OJK>0?`<span class="lb-pill lb-pill-ojk">OJK ${d.OJK}</span>`:'',
+        d.AFPI>0?`<span class="lb-pill lb-pill-afpi">AFPI ${d.AFPI}</span>`:'',
+        d.CS>0?`<span class="lb-pill lb-pill-cs">CS ${d.CS}</span>`:'',
+        d.other>0?`<span class="lb-pill lb-pill-other">Lain ${d.other}</span>`:'',
+      ].filter(Boolean).join('');
+      const badge=isRepeat
+        ?`<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--danger-bg);color:var(--danger);font-weight:600;margin-left:4px">Berulang</span>`
+        :isWarn?`<span style="font-size:10px;padding:1px 6px;border-radius:10px;background:var(--warning-bg);color:var(--warning);font-weight:600;margin-left:4px">Waspada</span>`
+        :'';
+      return `<div class="lb-row">
+        <div class="lb-rank ${rankCls(i)}">${i+1}</div>
+        <div style="flex:1;min-width:0">
+          <div style="display:flex;align-items:center;gap:0">
+            <div class="lb-name" title="${name}">${name}</div>${badge}
+          </div>
+          <div class="lb-breakdown" style="margin-top:3px">${pills}</div>
+        </div>
+        <div class="lb-total">${d.total}</div>
+      </div>`;
+    }).join('');
+  }
+
+  el.innerHTML=`
+    <div class="lb-card">
+      <div class="lb-card-header">
+        <div>
+          <div class="lb-card-title">📱 Top Aplikasi</div>
+          <div class="lb-card-sub">Aplikasi dengan pelanggaran terbanyak</div>
+        </div>
+        <div class="lb-total" style="font-size:11px;color:var(--text3)">${appRows.length} aplikasi</div>
+      </div>
+      ${appRows.length?rowsHtml(appRows):'<div style="padding:16px;color:var(--text3);font-size:12px">Tidak ada data</div>'}
+    </div>
+
+    <div class="lb-card">
+      <div class="lb-card-header">
+        <div>
+          <div class="lb-card-title">👥 Top Team Leader</div>
+          <div class="lb-card-sub">TL dengan agent pelanggar terbanyak</div>
+        </div>
+        <div class="lb-total" style="font-size:11px;color:var(--text3)">${tlRows.length} TL</div>
+      </div>
+      ${tlRows.length?rowsHtml(tlRows):'<div style="padding:16px;color:var(--text3);font-size:12px">Tidak ada data — pastikan kolom Leader terisi</div>'}
+    </div>
+
+    <div class="lb-card">
+      <div class="lb-card-header">
+        <div>
+          <div class="lb-card-title">👤 Top Agent Pelanggar</div>
+          <div class="lb-card-sub">Agent dengan pelanggaran berulang terbanyak</div>
+        </div>
+        <div class="lb-total" style="font-size:11px;color:var(--text3)">${agRows.length} agent</div>
+      </div>
+      ${agRows.length?agRowsHtml(agRows):'<div style="padding:16px;color:var(--text3);font-size:12px">Tidak ada data</div>'}
+    </div>`;
 }
 
 /* ===== INSIGHT OTOMATIS ===== */
@@ -909,11 +1200,11 @@ function searchTable(){
 }
 
 function renderTable(data){
-  // [FIX] Guard: pastikan data adalah array valid
   if(!Array.isArray(data))data=[];
   renderSummary(data);
   renderKanalGrid(data);
   if(data.length>0)buildCharts(data);
+  renderLeaderboard(data);
   renderInsight(data);
 
   // [FIX] Delegasikan render tabel ke renderTableOnly (tidak duplikat kode)
@@ -1067,109 +1358,164 @@ document.addEventListener('keydown',e=>{
 });
 
 /* ================================================================
-   MULTI-SELECT BULAN
+   MULTI-SELECT — SISTEM GENERIK untuk semua filter
 ================================================================ */
 const BULAN_LIST=['Januari','Februari','Maret','April','Mei','Juni',
   'Juli','Agustus','September','Oktober','November','Desember'];
 
-let selectedBulans=new Set(); // Set bulan yang dipilih
+// State untuk semua filter multi-select
+const msState={
+  Bulan: new Set(),
+  Tahun: new Set(),
+  Aplikasi: new Set(),
+  Kanal: new Set(),
+  Status: new Set(),
+};
 
-// Init dropdown list
-(function initMs(){
-  const list=document.getElementById('msDropdownList');
+// Config tiap filter
+const MS_CFG={
+  Bulan:    {label:'Bulan',   allLabel:'Semua Bulan',   items:BULAN_LIST,          triggerId:'msTrigger',      dropdownId:'msDropdown',       listId:'msDropdownList', badgeId:'msBadge', labelId:'msLabel'},
+  Tahun:    {label:'Tahun',   allLabel:'Semua Tahun',   items:['2025','2026','2027'],triggerId:'msTriggerTahun', dropdownId:'msDropdownTahun',  listId:'msListTahun',    badgeId:'msBadgeTahun', labelId:'msLabelTahun'},
+  Aplikasi: {label:'Aplikasi',allLabel:'Semua Aplikasi',items:[],                   triggerId:'msTriggerAplikasi',dropdownId:'msDropdownAplikasi',listId:'msListAplikasi',badgeId:'msBadgeAplikasi',labelId:'msLabelAplikasi'},
+  Kanal:    {label:'Kanal',   allLabel:'Semua Kanal',   items:['OJK','AFPI','CS'],  triggerId:'msTriggerKanal', dropdownId:'msDropdownKanal',  listId:'msListKanal',    badgeId:'msBadgeKanal',  labelId:'msLabelKanal'},
+  Status:   {label:'Status',  allLabel:'Semua Status',  items:['VALID','INVALID','PENDING'],triggerId:'msTriggerStatus',dropdownId:'msDropdownStatus',listId:'msListStatus',badgeId:'msBadgeStatus',labelId:'msLabelStatus'},
+};
+
+function initMsFor(key, items){
+  const cfg=MS_CFG[key];
+  if(!cfg)return;
+  if(items)cfg.items=items;
+  const list=document.getElementById(cfg.listId);
   if(!list)return;
-  list.innerHTML=BULAN_LIST.map(b=>`
-    <label class="ms-item" id="msItem-${b}">
-      <input type="checkbox" id="msChk-${b}" value="${b}" onchange="msOnChange('${b}')">
-      ${b}
+  list.innerHTML=cfg.items.map(v=>`
+    <label class="ms-item" id="msItem-${key}-${v.replace(/[^a-z0-9]/gi,'_')}">
+      <input type="checkbox" value="${v}" onchange="msOnChangeFor('${key}','${v}',this)">
+      ${v}
     </label>`).join('');
+}
+
+// Init semua filter statis saat DOM ready
+(function(){
+  ['Bulan','Tahun','Kanal','Status'].forEach(k=>initMsFor(k));
+  // Aplikasi diisi setelah data load
 })();
 
-function toggleMsDropdown(){
-  const dd=document.getElementById('msDropdown');
-  const trigger=document.getElementById('msTrigger');
+function toggleMs(key){
+  const cfg=MS_CFG[key];
+  const dd=document.getElementById(cfg.dropdownId);
+  const tr=document.getElementById(cfg.triggerId);
   const isOpen=dd.classList.contains('open');
-  if(isOpen){closeMsDropdown();}
-  else{dd.classList.add('open');trigger.classList.add('open');}
-}
-
-function closeMsDropdown(){
-  document.getElementById('msDropdown').classList.remove('open');
-  document.getElementById('msTrigger').classList.remove('open');
-}
-
-function msOnChange(bulan){
-  const chk=document.getElementById('msChk-'+bulan);
-  const item=document.getElementById('msItem-'+bulan);
-  if(chk.checked){selectedBulans.add(bulan);item.classList.add('checked');}
-  else{selectedBulans.delete(bulan);item.classList.remove('checked');}
-  updateMsDisplay();
-}
-
-function msSelectAll(){
-  const allChecked=selectedBulans.size===BULAN_LIST.length;
-  if(allChecked){
-    // Uncheck all
-    selectedBulans.clear();
-    BULAN_LIST.forEach(b=>{
-      document.getElementById('msChk-'+b).checked=false;
-      document.getElementById('msItem-'+b).classList.remove('checked');
-    });
-    document.querySelector('.ms-select-all').textContent='Pilih Semua';
-  } else {
-    // Check all
-    BULAN_LIST.forEach(b=>{
-      selectedBulans.add(b);
-      document.getElementById('msChk-'+b).checked=true;
-      document.getElementById('msItem-'+b).classList.add('checked');
-    });
-    document.querySelector('.ms-select-all').textContent='Hapus Semua';
-  }
-  updateMsDisplay();
-}
-
-function msClear(){
-  selectedBulans.clear();
-  BULAN_LIST.forEach(b=>{
-    document.getElementById('msChk-'+b).checked=false;
-    document.getElementById('msItem-'+b).classList.remove('checked');
+  // Tutup semua dulu
+  Object.values(MS_CFG).forEach(c=>{
+    document.getElementById(c.dropdownId)?.classList.remove('open');
+    document.getElementById(c.triggerId)?.classList.remove('open');
   });
-  document.querySelector('.ms-select-all').textContent='Pilih Semua';
-  updateMsDisplay();
+  if(!isOpen){dd.classList.add('open');tr.classList.add('open');}
+}
+// Alias lama untuk bulan
+function toggleMsDropdown(){toggleMs('Bulan');}
+
+function closeAllMs(){
+  Object.values(MS_CFG).forEach(cfg=>{
+    document.getElementById(cfg.dropdownId)?.classList.remove('open');
+    document.getElementById(cfg.triggerId)?.classList.remove('open');
+  });
 }
 
-function updateMsDisplay(){
-  const label=document.getElementById('msLabel');
-  const badge=document.getElementById('msBadge');
-  const trigger=document.getElementById('msTrigger');
-  const n=selectedBulans.size;
-  if(n===0){
-    label.textContent='Semua Bulan';
-    badge.style.display='none';
-    trigger.classList.remove('active');
-  } else if(n===1){
-    label.textContent=[...selectedBulans][0];
-    badge.style.display='none';
-    trigger.classList.add('active');
+function msOnChangeFor(key, val, cb){
+  const safeVal=val.replace(/[^a-z0-9]/gi,'_');
+  const item=document.getElementById(`msItem-${key}-${safeVal}`);
+  if(cb.checked){msState[key].add(val);item?.classList.add('checked');}
+  else{msState[key].delete(val);item?.classList.remove('checked');}
+  updateMsDisplayFor(key);
+}
+
+function msSelectAllFor(key){
+  const cfg=MS_CFG[key];
+  const allChecked=msState[key].size===cfg.items.length;
+  if(allChecked){
+    msState[key].clear();
+    cfg.items.forEach(v=>{
+      const safeVal=v.replace(/[^a-z0-9]/gi,'_');
+      const cb=document.querySelector(`#msItem-${key}-${safeVal} input`);
+      if(cb)cb.checked=false;
+      document.getElementById(`msItem-${key}-${safeVal}`)?.classList.remove('checked');
+    });
   } else {
-    label.textContent=n+' Bulan';
-    badge.textContent=n;
-    badge.style.display='';
-    trigger.classList.add('active');
+    cfg.items.forEach(v=>{
+      msState[key].add(v);
+      const safeVal=v.replace(/[^a-z0-9]/gi,'_');
+      const cb=document.querySelector(`#msItem-${key}-${safeVal} input`);
+      if(cb)cb.checked=true;
+      document.getElementById(`msItem-${key}-${safeVal}`)?.classList.add('checked');
+    });
   }
-  const selectAllBtn=document.querySelector('.ms-select-all');
-  if(selectAllBtn)selectAllBtn.textContent=n===BULAN_LIST.length?'Hapus Semua':'Pilih Semua';
+  updateMsDisplayFor(key);
 }
 
-function msApply(){
-  closeMsDropdown();
+function msClearFor(key){
+  const cfg=MS_CFG[key];
+  msState[key].clear();
+  cfg.items.forEach(v=>{
+    const safeVal=v.replace(/[^a-z0-9]/gi,'_');
+    const cb=document.querySelector(`#msItem-${key}-${safeVal} input`);
+    if(cb)cb.checked=false;
+    document.getElementById(`msItem-${key}-${safeVal}`)?.classList.remove('checked');
+  });
+  updateMsDisplayFor(key);
+}
+
+function msApplyFor(key){
+  closeAllMs();
   applyFilter();
 }
+// Alias lama untuk bulan
+function msApply(){msApplyFor('Bulan');}
+function msSelectAll(){msSelectAllFor('Bulan');}
+function msClear(){msClearFor('Bulan');}
 
-// Klik di luar dropdown → tutup
+function updateMsDisplayFor(key){
+  const cfg=MS_CFG[key];
+  const n=msState[key].size;
+  const label=document.getElementById(cfg.labelId);
+  const badge=document.getElementById(cfg.badgeId);
+  const trigger=document.getElementById(cfg.triggerId);
+  if(!label)return;
+  if(n===0){
+    label.textContent=cfg.allLabel;
+    if(badge)badge.style.display='none';
+    trigger?.classList.remove('active');
+  } else if(n===1){
+    label.textContent=[...msState[key]][0];
+    if(badge)badge.style.display='none';
+    trigger?.classList.add('active');
+  } else {
+    label.textContent=n+' '+cfg.label;
+    if(badge){badge.textContent=n;badge.style.display='';}
+    trigger?.classList.add('active');
+  }
+  // Update "Pilih Semua" / "Hapus Semua"
+  const sa=document.querySelector(`#${cfg.dropdownId} .ms-select-all`);
+  if(sa)sa.textContent=n===cfg.items.length?'Hapus Semua':'Pilih Semua';
+}
+// Alias lama
+function updateMsDisplay(){updateMsDisplayFor('Bulan');}
+
+// Init aplikasi setelah data load
+function initAplikasiFilter(data){
+  const apps=[...new Set(data.map(r=>r.aplikasi).filter(Boolean))].sort();
+  MS_CFG.Aplikasi.items=apps;
+  initMsFor('Aplikasi', apps);
+}
+
+// Klik di luar → tutup semua
 document.addEventListener('click',function(e){
-  const wrap=document.getElementById('msWrap');
-  if(wrap&&!wrap.contains(e.target))closeMsDropdown();
+  const allWraps=['msWrap','msWrapTahun','msWrapAplikasi','msWrapKanal','msWrapStatus'];
+  const clickedInAny=allWraps.some(id=>{
+    const el=document.getElementById(id);
+    return el&&el.contains(e.target);
+  });
+  if(!clickedInAny)closeAllMs();
 });
 </script>
 </body>
