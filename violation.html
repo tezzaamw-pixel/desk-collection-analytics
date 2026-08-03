@@ -325,6 +325,7 @@ select:focus{border-color:var(--accent);}
 .lb-badge-warn{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-weight:700;margin-left:4px;vertical-align:middle;}
 
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -337,6 +338,7 @@ select:focus{border-color:var(--accent);}
   <div class="nav-right">
     <span class="nav-timestamp" id="navTimestamp">—</span>
     <button class="btn-nav" id="btnRefresh" onclick="reloadData()" style="display:none">↻ Refresh</button>
+    <button class="btn-nav" id="btnExport" onclick="exportData()" style="display:none;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.35);color:#4ade80">⬇ Export</button>
     <div class="nav-live"><div class="nav-live-dot"></div>Live</div>
     <div class="theme-toggle">
       <button class="theme-btn active" id="btnLight" onclick="setTheme('light')">☀ Terang</button>
@@ -776,6 +778,7 @@ function doUnlock(){
     document.getElementById('lockScreen').style.display='none';
     document.getElementById('mainContent').style.display='block';
     document.getElementById('btnRefresh').style.display='';
+    const be=document.getElementById('btnExport');if(be)be.style.display='';
     sessionStorage.setItem('viol_auth','1');
     initPage();
   } else {
@@ -789,6 +792,7 @@ function doUnlock(){
     document.getElementById('lockScreen').style.display='none';
     document.getElementById('mainContent').style.display='block';
     document.getElementById('btnRefresh').style.display='';
+    const be=document.getElementById('btnExport');if(be)be.style.display='';
     initPage();
   }
 })();
@@ -842,6 +846,102 @@ async function loadData(){
 }
 
 function reloadData(){clearCache();loadData();}
+
+/* ===== EXPORT ===== */
+function exportData(){
+  if(!filteredData||filteredData.length===0){
+    alert('Tidak ada data untuk diekspor. Terapkan filter terlebih dahulu atau tunggu data dimuat.');
+    return;
+  }
+  if(typeof XLSX==='undefined'){
+    alert('Library export belum siap. Coba lagi dalam beberapa detik.');
+    return;
+  }
+
+  // Build filter summary untuk sheet info
+  const filterInfo=[];
+  if(msState.Bulan.size>0) filterInfo.push('Bulan: '+[...msState.Bulan].join(', '));
+  if(msState.Tahun.size>0) filterInfo.push('Tahun: '+[...msState.Tahun].join(', '));
+  if(msState.Aplikasi.size>0) filterInfo.push('Aplikasi: '+[...msState.Aplikasi].join(', '));
+  if(msState.Kanal.size>0) filterInfo.push('Kanal: '+[...msState.Kanal].join(', '));
+  if(msState.Status.size>0) filterInfo.push('Status: '+[...msState.Status].join(', '));
+  if(msState.Tanggal.from||msState.Tanggal.to){
+    filterInfo.push('Tanggal: '+(msState.Tanggal.from||'awal')+' s/d '+(msState.Tanggal.to||'akhir'));
+  }
+  const filterStr=filterInfo.length?filterInfo.join(' | '):'Semua Data (tanpa filter)';
+
+  // Header kolom
+  const COLS=[
+    {key:'no',           label:'No'},
+    {key:'tanggalMasuk', label:'Tanggal Masuk'},
+    {key:'tanggalKeluar',label:'Tanggal Keluar'},
+    {key:'durasiHari',   label:'Durasi (Hari)'},
+    {key:'bulanMasuk',   label:'Bulan'},
+    {key:'tahunMasuk',   label:'Tahun'},
+    {key:'namaAgen',     label:'Nama Agent'},
+    {key:'leader',       label:'Team Leader'},
+    {key:'aplikasi',     label:'Aplikasi'},
+    {key:'bucket',       label:'Bucket'},
+    {key:'akun',         label:'Akun'},
+    {key:'namaBorrower', label:'Nama Borrower'},
+    {key:'kanalPengaduan',label:'Kanal Pengaduan'},
+    {key:'kasus',        label:'Kasus'},
+    {key:'namaQC',       label:'Nama QC'},
+    {key:'statusEksternal',   label:'Status Eksternal'},
+    {key:'punishmentEksternal',label:'Punishment Eksternal'},
+    {key:'statusInternal',    label:'Status Internal'},
+    {key:'punishmentInternal', label:'Punishment Internal'},
+    {key:'tanggalKomplain',   label:'Tanggal Komplain'},
+  ];
+
+  // Build rows
+  const dataRows=filteredData.map(r=>
+    COLS.reduce((obj,c)=>{obj[c.label]=r[c.key]??'';return obj;},{})
+  );
+
+  // Sheet data
+  const ws=XLSX.utils.json_to_sheet(dataRows,{header:COLS.map(c=>c.label)});
+
+  // Set column widths
+  ws['!cols']=COLS.map(c=>({wch:Math.max(c.label.length,14)}));
+  ws['!cols'][3]={wch:8};  // Durasi
+  ws['!cols'][12]={wch:16}; // Kanal
+  ws['!cols'][13]={wch:50}; // Kasus — lebar
+  ws['!cols'][6]={wch:22};  // Nama Agent
+  ws['!cols'][7]={wch:22};  // TL
+
+  // Sheet info ringkasan filter
+  const wsInfo=XLSX.utils.aoa_to_sheet([
+    ['System TZ Analytics — Export Violation'],
+    ['Tanggal Export:', new Date().toLocaleString('id-ID')],
+    ['Filter Aktif:', filterStr],
+    ['Total Data:', filteredData.length],
+    [],
+    ['Total Kasus',filteredData.length],
+    ['Pending',filteredData.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length],
+    ['Selesai',filteredData.filter(r=>r.tanggalKeluar&&r.tanggalKeluar!=='—').length],
+    ['OJK',filteredData.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length],
+    ['AFPI',filteredData.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='AFPI').length],
+    ['CS',filteredData.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='CS').length],
+    ['Terminate/Eliminasi',filteredData.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length],
+  ]);
+  wsInfo['!cols']=[{wch:25},{wch:45}];
+
+  // Workbook
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,wsInfo,'Ringkasan');
+  XLSX.utils.book_append_sheet(wb,ws,'Data Violation');
+
+  // Filename: ViolationExport_YYYY-MM-DD_HH-mm.xlsx
+  const now=new Date();
+  const stamp=now.getFullYear()+'-'+
+    String(now.getMonth()+1).padStart(2,'0')+'-'+
+    String(now.getDate()).padStart(2,'0')+'_'+
+    String(now.getHours()).padStart(2,'0')+'-'+
+    String(now.getMinutes()).padStart(2,'0');
+  const appLabel=msState.Aplikasi.size===1?'_'+[...msState.Aplikasi][0]:'';
+  XLSX.writeFile(wb,`Violation${appLabel}_${stamp}.xlsx`);
+}
 
 function populateAplikasiFilter(){
   const apps=[...new Set(allData.map(r=>r.aplikasi).filter(Boolean))].sort();
