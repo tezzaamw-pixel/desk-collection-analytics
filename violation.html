@@ -338,7 +338,13 @@ select:focus{border-color:var(--accent);}
   <div class="nav-right">
     <span class="nav-timestamp" id="navTimestamp">—</span>
     <button class="btn-nav" id="btnRefresh" onclick="reloadData()" style="display:none">↻ Refresh</button>
-    <button class="btn-nav" id="btnExport" onclick="exportData()" style="display:none;background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.35);color:#4ade80">⬇ Export</button>
+    <div style="position:relative;display:none" id="btnExport">
+      <button class="btn-nav" onclick="toggleExportMenu()" style="background:rgba(34,197,94,0.18);border-color:rgba(34,197,94,0.35);color:#4ade80">⬇ Export ▾</button>
+      <div id="exportMenu" style="display:none;position:absolute;right:0;top:36px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 4px 16px rgba(0,0,0,.15);min-width:170px;z-index:999;overflow:hidden">
+        <button onclick="exportPDF()" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12px;cursor:pointer;font-weight:500" onmouseover="this.style.background='var(--accent-bg)'" onmouseout="this.style.background='none'">📄 Export PDF / Print</button>
+        <button onclick="exportExcel()" style="display:block;width:100%;text-align:left;padding:10px 14px;background:none;border:none;color:var(--text);font-size:12px;cursor:pointer;font-weight:500" onmouseover="this.style.background='var(--accent-bg)'" onmouseout="this.style.background='none'">📊 Export Excel (.xlsx)</button>
+      </div>
+    </div>
     <div class="nav-live"><div class="nav-live-dot"></div>Live</div>
     <div class="theme-toggle">
       <button class="theme-btn active" id="btnLight" onclick="setTheme('light')">☀ Terang</button>
@@ -848,101 +854,500 @@ async function loadData(){
 function reloadData(){clearCache();loadData();}
 
 /* ===== EXPORT ===== */
-function exportData(){
-  if(!filteredData||filteredData.length===0){
-    alert('Tidak ada data untuk diekspor. Terapkan filter terlebih dahulu atau tunggu data dimuat.');
-    return;
-  }
-  if(typeof XLSX==='undefined'){
-    alert('Library export belum siap. Coba lagi dalam beberapa detik.');
-    return;
-  }
 
-  // Build filter summary untuk sheet info
-  const filterInfo=[];
-  if(msState.Bulan.size>0) filterInfo.push('Bulan: '+[...msState.Bulan].join(', '));
-  if(msState.Tahun.size>0) filterInfo.push('Tahun: '+[...msState.Tahun].join(', '));
-  if(msState.Aplikasi.size>0) filterInfo.push('Aplikasi: '+[...msState.Aplikasi].join(', '));
-  if(msState.Kanal.size>0) filterInfo.push('Kanal: '+[...msState.Kanal].join(', '));
-  if(msState.Status.size>0) filterInfo.push('Status: '+[...msState.Status].join(', '));
-  if(msState.Tanggal.from||msState.Tanggal.to){
-    filterInfo.push('Tanggal: '+(msState.Tanggal.from||'awal')+' s/d '+(msState.Tanggal.to||'akhir'));
-  }
-  const filterStr=filterInfo.length?filterInfo.join(' | '):'Semua Data (tanpa filter)';
-
-  // Header kolom
-  const COLS=[
-    {key:'no',           label:'No'},
-    {key:'tanggalMasuk', label:'Tanggal Masuk'},
-    {key:'tanggalKeluar',label:'Tanggal Keluar'},
-    {key:'durasiHari',   label:'Durasi (Hari)'},
-    {key:'bulanMasuk',   label:'Bulan'},
-    {key:'tahunMasuk',   label:'Tahun'},
-    {key:'namaAgen',     label:'Nama Agent'},
-    {key:'leader',       label:'Team Leader'},
-    {key:'aplikasi',     label:'Aplikasi'},
-    {key:'bucket',       label:'Bucket'},
-    {key:'akun',         label:'Akun'},
-    {key:'namaBorrower', label:'Nama Borrower'},
-    {key:'kanalPengaduan',label:'Kanal Pengaduan'},
-    {key:'kasus',        label:'Kasus'},
-    {key:'namaQC',       label:'Nama QC'},
-    {key:'statusEksternal',   label:'Status Eksternal'},
-    {key:'punishmentEksternal',label:'Punishment Eksternal'},
-    {key:'statusInternal',    label:'Status Internal'},
-    {key:'punishmentInternal', label:'Punishment Internal'},
-    {key:'tanggalKomplain',   label:'Tanggal Komplain'},
-  ];
-
-  // Build rows
-  const dataRows=filteredData.map(r=>
-    COLS.reduce((obj,c)=>{obj[c.label]=r[c.key]??'';return obj;},{})
-  );
-
-  // Sheet data
-  const ws=XLSX.utils.json_to_sheet(dataRows,{header:COLS.map(c=>c.label)});
-
-  // Set column widths
-  ws['!cols']=COLS.map(c=>({wch:Math.max(c.label.length,14)}));
-  ws['!cols'][3]={wch:8};  // Durasi
-  ws['!cols'][12]={wch:16}; // Kanal
-  ws['!cols'][13]={wch:50}; // Kasus — lebar
-  ws['!cols'][6]={wch:22};  // Nama Agent
-  ws['!cols'][7]={wch:22};  // TL
-
-  // Sheet info ringkasan filter
-  const wsInfo=XLSX.utils.aoa_to_sheet([
-    ['System TZ Analytics — Export Violation'],
-    ['Tanggal Export:', new Date().toLocaleString('id-ID')],
-    ['Filter Aktif:', filterStr],
-    ['Total Data:', filteredData.length],
-    [],
-    ['Total Kasus',filteredData.length],
-    ['Pending',filteredData.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length],
-    ['Selesai',filteredData.filter(r=>r.tanggalKeluar&&r.tanggalKeluar!=='—').length],
-    ['OJK',filteredData.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length],
-    ['AFPI',filteredData.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='AFPI').length],
-    ['CS',filteredData.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='CS').length],
-    ['Terminate/Eliminasi',filteredData.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length],
-  ]);
-  wsInfo['!cols']=[{wch:25},{wch:45}];
-
-  // Workbook
-  const wb=XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb,wsInfo,'Ringkasan');
-  XLSX.utils.book_append_sheet(wb,ws,'Data Violation');
-
-  // Filename: ViolationExport_YYYY-MM-DD_HH-mm.xlsx
-  const now=new Date();
-  const stamp=now.getFullYear()+'-'+
-    String(now.getMonth()+1).padStart(2,'0')+'-'+
-    String(now.getDate()).padStart(2,'0')+'_'+
-    String(now.getHours()).padStart(2,'0')+'-'+
-    String(now.getMinutes()).padStart(2,'0');
-  const appLabel=msState.Aplikasi.size===1?'_'+[...msState.Aplikasi][0]:'';
-  XLSX.writeFile(wb,`Violation${appLabel}_${stamp}.xlsx`);
+// ── Helper: build aggregation top 10 ──
+function _buildTop10(data, keyFn) {
+  const map = {};
+  data.forEach(r => {
+    const k = (keyFn(r)||'').trim();
+    if (!k || k==='—') return;
+    if (!map[k]) map[k] = {total:0,OJK:0,AFPI:0,CS:0,repeat:false};
+    map[k].total++;
+    const kanal = (r.kanalPengaduan||'').toUpperCase();
+    if (kanal==='OJK') map[k].OJK++;
+    else if (kanal==='AFPI') map[k].AFPI++;
+    else if (kanal==='CS') map[k].CS++;
+  });
+  // Mark repeat agents
+  Object.keys(map).forEach(k => { if(map[k].total>=3) map[k].repeat=true; });
+  return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
 }
 
+// ── Helper: build filter summary string ──
+function _filterSummary() {
+  const parts = [];
+  if (msState.Bulan.size>0)    parts.push('Bulan: '+[...msState.Bulan].join(', '));
+  if (msState.Tahun.size>0)    parts.push('Tahun: '+[...msState.Tahun].join(', '));
+  if (msState.Aplikasi.size>0) parts.push('Aplikasi: '+[...msState.Aplikasi].join(', '));
+  if (msState.Kanal.size>0)    parts.push('Kanal: '+[...msState.Kanal].join(', '));
+  if (msState.Status.size>0)   parts.push('Status: '+[...msState.Status].join(', '));
+  if (msState.Tanggal.from||msState.Tanggal.to)
+    parts.push('Tanggal: '+(msState.Tanggal.from||'awal')+' s/d '+(msState.Tanggal.to||'akhir'));
+  return parts.length ? parts.join(' | ') : 'Semua Data (tanpa filter)';
+}
+
+// ── Toggle export dropdown ──
+function toggleExportMenu() {
+  const menu = document.getElementById('exportMenu');
+  if (!menu) return;
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+}
+
+// Close export menu if click outside
+document.addEventListener('click', e => {
+  const btn = document.getElementById('btnExport');
+  const menu = document.getElementById('exportMenu');
+  if (menu && btn && !btn.contains(e.target) && !menu.contains(e.target)) {
+    menu.style.display = 'none';
+  }
+});
+
+// ════════════════════════════════════════════════
+// EXPORT EXCEL — professional multi-sheet
+// ════════════════════════════════════════════════
+function exportExcel() {
+  document.getElementById('exportMenu').style.display = 'none';
+  if (!filteredData||filteredData.length===0) { alert('Tidak ada data untuk diekspor.'); return; }
+  if (typeof XLSX==='undefined') { alert('Library export belum siap. Coba beberapa detik lagi.'); return; }
+
+  const now = new Date();
+  const stamp = now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+
+    String(now.getDate()).padStart(2,'0')+'_'+
+    String(now.getHours()).padStart(2,'0')+'-'+String(now.getMinutes()).padStart(2,'0');
+  const appLabel = msState.Aplikasi.size===1 ? '_'+[...msState.Aplikasi][0] : '';
+  const filterStr = _filterSummary();
+  const data = filteredData;
+
+  const wb = XLSX.utils.book_new();
+
+  // ── SHEET 1: RINGKASAN EKSEKUTIF ──────────────────────
+  const pending   = data.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length;
+  const selesai   = data.filter(r=>r.tanggalKeluar&&r.tanggalKeluar!=='—').length;
+  const ojk       = data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length;
+  const afpi      = data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='AFPI').length;
+  const cs        = data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='CS').length;
+  const terminate = data.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length;
+  const avgDurasi = (()=>{const d=data.filter(r=>r.durasiHari>0);return d.length?Math.round(d.reduce((a,r)=>a+r.durasiHari,0)/d.length):0;})();
+
+  const wsRingkasan = XLSX.utils.aoa_to_sheet([
+    ['LAPORAN PELANGGARAN — SYSTEM TZ ANALYTICS'],
+    [],
+    ['Dibuat oleh:', 'System TZ Analytics'],
+    ['Tanggal Export:', now.toLocaleString('id-ID')],
+    ['Filter Aktif:', filterStr],
+    [],
+    ['RINGKASAN EKSEKUTIF'],
+    ['Metrik', 'Nilai', 'Keterangan'],
+    ['Total Kasus', data.length, 'Periode terpilih'],
+    ['Masih Pending', pending, Math.round(pending/data.length*100)+'% dari total'],
+    ['Selesai', selesai, Math.round(selesai/data.length*100)+'% dari total'],
+    ['Terminate / Eliminasi', terminate, 'Punishment terberat'],
+    ['Rata-rata Durasi Penyelesaian', avgDurasi+' hari', ''],
+    [],
+    ['BREAKDOWN KANAL PENGADUAN'],
+    ['Kanal', 'Jumlah', '% dari Total'],
+    ['OJK',  ojk,  Math.round(ojk/data.length*100)+'%'],
+    ['AFPI', afpi, Math.round(afpi/data.length*100)+'%'],
+    ['CS',   cs,   Math.round(cs/data.length*100)+'%'],
+    [],
+    ['BREAKDOWN PER BULAN'],
+    ['Bulan', 'Jumlah Kasus'],
+    ...(()=>{
+      const byBln={};
+      data.forEach(r=>{if(r.bulanMasuk)byBln[r.bulanMasuk]=(byBln[r.bulanMasuk]||0)+1;});
+      return Object.entries(byBln).map(([b,c])=>[b,c]);
+    })(),
+  ]);
+  wsRingkasan['!cols']=[{wch:30},{wch:20},{wch:35}];
+  XLSX.utils.book_append_sheet(wb, wsRingkasan, 'Ringkasan Eksekutif');
+
+  // ── SHEET 2: TOP 10 PELANGGAR ──────────────────────────
+  const topApps   = _buildTop10(data, r=>r.aplikasi||'');
+  const topTLs    = _buildTop10(data, r=>r.leader||'');
+  const topAgents = _buildTop10(data, r=>r.namaAgen||'');
+
+  const top10Rows = [
+    ['TOP 10 PELANGGARAN TERBANYAK'],
+    [],
+    ['TOP APLIKASI'],
+    ['Rank','Nama Aplikasi','Total Kasus','OJK','AFPI','CS'],
+    ...topApps.map(([name,d],i)=>[i+1,name,d.total,d.OJK,d.AFPI,d.CS]),
+    [],
+    ['TOP TEAM LEADER'],
+    ['Rank','Nama Team Leader','Total Kasus','OJK','AFPI','CS'],
+    ...topTLs.map(([name,d],i)=>[i+1,name,d.total,d.OJK,d.AFPI,d.CS]),
+    [],
+    ['TOP AGENT PELANGGAR'],
+    ['Rank','Nama Agent','Total Kasus','OJK','AFPI','CS','Status'],
+    ...topAgents.map(([name,d],i)=>[i+1,name,d.total,d.OJK,d.AFPI,d.CS,d.total>=3?'⚠ Berulang':d.total>=2?'Waspada':'Normal']),
+  ];
+  const wsTop10 = XLSX.utils.aoa_to_sheet(top10Rows);
+  wsTop10['!cols']=[{wch:6},{wch:28},{wch:12},{wch:8},{wch:8},{wch:8},{wch:12}];
+  XLSX.utils.book_append_sheet(wb, wsTop10, 'Top 10 Pelanggar');
+
+  // ── SHEET 3: DATA VIOLATION LENGKAP ───────────────────
+  const COLS = [
+    {key:'no',            label:'No'},
+    {key:'tanggalMasuk',  label:'Tanggal Masuk'},
+    {key:'tanggalKeluar', label:'Tanggal Keluar'},
+    {key:'durasiHari',    label:'Durasi (Hari)'},
+    {key:'bulanMasuk',    label:'Bulan'},
+    {key:'tahunMasuk',    label:'Tahun'},
+    {key:'namaAgen',      label:'Nama Agent'},
+    {key:'leader',        label:'Team Leader'},
+    {key:'aplikasi',      label:'Aplikasi'},
+    {key:'bucket',        label:'Bucket'},
+    {key:'akun',          label:'Akun'},
+    {key:'namaBorrower',  label:'Nama Borrower'},
+    {key:'kanalPengaduan',label:'Kanal Pengaduan'},
+    {key:'kasus',         label:'Isi Kasus'},
+    {key:'namaQC',        label:'Nama QC'},
+    {key:'statusEksternal',    label:'Status Eksternal'},
+    {key:'punishmentEksternal',label:'Punishment Eksternal'},
+    {key:'statusInternal',     label:'Status Internal'},
+    {key:'punishmentInternal', label:'Punishment Internal'},
+    {key:'tanggalKomplain',    label:'Tanggal Komplain'},
+    {key:'buktiLaporan',       label:'Link Dokumen Pelaporan'},
+    {key:'buktiLaporanMandarin',label:'Link Dokumen (Mandarin)'},
+  ];
+
+  const dataRows = data.map(r => COLS.reduce((obj,c)=>{obj[c.label]=r[c.key]??'';return obj;},{}));
+  const wsData = XLSX.utils.json_to_sheet(dataRows, {header:COLS.map(c=>c.label)});
+  wsData['!cols'] = COLS.map((c,i)=>{
+    if (c.key==='kasus') return {wch:60};
+    if (c.key==='buktiLaporan'||c.key==='buktiLaporanMandarin') return {wch:45};
+    if (c.key==='namaAgen'||c.key==='leader') return {wch:22};
+    if (c.key==='durasiHari'||c.key==='no') return {wch:8};
+    return {wch:16};
+  });
+  XLSX.utils.book_append_sheet(wb, wsData, 'Data Violation');
+
+  // ── SHEET 4: DISTRIBUSI PUNISHMENT ────────────────────
+  const punMap = {};
+  data.forEach(r=>{
+    const p=(r.punishmentInternal||'—').trim();
+    punMap[p]=(punMap[p]||0)+1;
+  });
+  const punRows = [
+    ['DISTRIBUSI PUNISHMENT INTERNAL'],
+    [],
+    ['Punishment','Jumlah','% dari Total'],
+    ...Object.entries(punMap).sort((a,b)=>b[1]-a[1])
+      .map(([p,c])=>[p,c,Math.round(c/data.length*100)+'%']),
+  ];
+  const wsPun = XLSX.utils.aoa_to_sheet(punRows);
+  wsPun['!cols']=[{wch:30},{wch:10},{wch:14}];
+  XLSX.utils.book_append_sheet(wb, wsPun, 'Distribusi Punishment');
+
+  XLSX.writeFile(wb, `Violation${appLabel}_${stamp}.xlsx`);
+}
+
+// ════════════════════════════════════════════════
+// EXPORT PDF — buka tab baru dengan laporan rapi
+// ════════════════════════════════════════════════
+function exportPDF() {
+  document.getElementById('exportMenu').style.display = 'none';
+  if (!filteredData||filteredData.length===0) { alert('Tidak ada data untuk diekspor.'); return; }
+
+  const data = filteredData;
+  const now = new Date();
+  const tglStr = now.toLocaleDateString('id-ID',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const filterStr = _filterSummary();
+
+  // Summary stats
+  const total    = data.length;
+  const pending  = data.filter(r=>r.statusEksternal==='PENDING'||r.statusInternal==='PENDING').length;
+  const selesai  = data.filter(r=>r.tanggalKeluar&&r.tanggalKeluar!=='—').length;
+  const ojk      = data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='OJK').length;
+  const afpi     = data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='AFPI').length;
+  const cs       = data.filter(r=>(r.kanalPengaduan||'').toUpperCase()==='CS').length;
+  const terminate= data.filter(r=>{const p=(r.punishmentInternal||'').toUpperCase();return p.includes('TERMINAT')||p.includes('ELIMINASI');}).length;
+  const avgDur   = (()=>{const d=data.filter(r=>r.durasiHari>0);return d.length?Math.round(d.reduce((a,r)=>a+r.durasiHari,0)/d.length):0;})();
+
+  // Top 10
+  const topApps   = _buildTop10(data, r=>r.aplikasi||'');
+  const topTLs    = _buildTop10(data, r=>r.leader||'');
+  const topAgents = _buildTop10(data, r=>r.namaAgen||'');
+
+  // Punishment breakdown
+  const punMap={};
+  data.forEach(r=>{const p=(r.punishmentInternal||'—').trim();punMap[p]=(punMap[p]||0)+1;});
+  const punEntries=Object.entries(punMap).sort((a,b)=>b[1]-a[1]).slice(0,10);
+
+  // Per bulan
+  const byBln={};
+  data.forEach(r=>{if(r.bulanMasuk)byBln[r.bulanMasuk]=(byBln[r.bulanMasuk]||0)+1;});
+
+  // Chart images dari canvas yang sudah ada di halaman
+  function getChartImg(id) {
+    const canvas = document.getElementById(id);
+    if (!canvas) return '';
+    try { return canvas.toDataURL('image/png'); } catch(e) { return ''; }
+  }
+  const imgTren    = getChartImg('chartTren');
+  const imgKanal   = getChartImg('chartKanal');
+  const imgAgent   = getChartImg('chartAgent');
+  const imgHarian  = getChartImg('chartHarian');
+  const imgPun     = getChartImg('chartPunishment');
+
+  // Helper HTML builders
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  const pct = (n,t) => t>0?Math.round(n/t*100)+'%':'0%';
+
+  const top10TableHtml = (entries, cols) => `
+    <table>
+      <thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead>
+      <tbody>${entries.map(([name,d],i)=>`
+        <tr class="${i<3?'top'+i:''}">
+          <td style="text-align:center;font-weight:700">${i+1}</td>
+          <td>${esc(name)}${d.total>=3?'<span class="badge-repeat">Berulang</span>':d.total>=2?'<span class="badge-warn">Waspada</span>':''}</td>
+          <td style="text-align:center;font-weight:700;color:#1d4ed8">${d.total}</td>
+          <td style="text-align:center">${d.OJK||'-'}</td>
+          <td style="text-align:center">${d.AFPI||'-'}</td>
+          <td style="text-align:center">${d.CS||'-'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
+
+  const dataTableHtml = data.slice(0,200).map((r,i)=>`
+    <tr>
+      <td>${i+1}</td>
+      <td>${esc(r.tanggalMasuk)}</td>
+      <td>${esc(r.namaAgen)}</td>
+      <td>${esc(r.leader)}</td>
+      <td>${esc(r.aplikasi)}</td>
+      <td>${esc(r.bucket)}</td>
+      <td><span class="badge-kanal badge-${(r.kanalPengaduan||'').toLowerCase()}">${esc(r.kanalPengaduan)}</span></td>
+      <td class="kasus-cell">${esc(r.kasus)}</td>
+      <td>${esc(r.punishmentInternal)}</td>
+      <td>${esc(r.statusEksternal)}</td>
+      <td>${r.buktiLaporan&&r.buktiLaporan!=='—'?`<a href="${esc(r.buktiLaporan)}" target="_blank">🔗 Lihat</a>`:'-'}</td>
+    </tr>`).join('');
+
+  const html = `<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Laporan Pelanggaran — System TZ Analytics</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif;font-size:12px;color:#1e293b;background:#f8fafc;padding:0;}
+  .page{max-width:1100px;margin:0 auto;padding:32px 40px;}
+
+  /* HEADER */
+  .report-header{background:linear-gradient(135deg,#1e3a5f 0%,#1d4ed8 100%);color:#fff;padding:28px 32px;border-radius:10px;margin-bottom:24px;display:flex;justify-content:space-between;align-items:flex-start;}
+  .report-header h1{font-size:20px;font-weight:700;margin-bottom:4px;}
+  .report-header .sub{font-size:12px;opacity:.8;margin-bottom:2px;}
+  .header-badge{background:rgba(255,255,255,.15);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:4px 12px;font-size:11px;white-space:nowrap;}
+
+  /* SECTION */
+  .section{background:#fff;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:20px;}
+  .section-title{font-size:13px;font-weight:700;color:#1e3a5f;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #e2e8f0;display:flex;align-items:center;gap:8px;}
+
+  /* STAT CARDS */
+  .stat-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}
+  .stat-card{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px 10px;text-align:center;}
+  .stat-card.danger{border-color:#fca5a5;background:#fff5f5;}
+  .stat-card.success{border-color:#86efac;background:#f0fff4;}
+  .stat-card.warning{border-color:#fde68a;background:#fffbeb;}
+  .stat-val{font-size:22px;font-weight:700;color:#1e3a5f;margin-bottom:2px;}
+  .stat-val.danger{color:#dc2626;}
+  .stat-val.success{color:#16a34a;}
+  .stat-val.warning{color:#d97706;}
+  .stat-lbl{font-size:10px;color:#64748b;font-weight:500;}
+
+  /* KANAL GRID */
+  .kanal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+  .kanal-card{border-radius:8px;padding:14px;text-align:center;}
+  .kanal-card.ojk{background:#eff6ff;border:1px solid #bfdbfe;}
+  .kanal-card.afpi{background:#fdf4ff;border:1px solid #e9d5ff;}
+  .kanal-card.cs{background:#f0fdf4;border:1px solid #bbf7d0;}
+  .kanal-num{font-size:28px;font-weight:800;margin-bottom:2px;}
+  .kanal-card.ojk .kanal-num{color:#1d4ed8;}
+  .kanal-card.afpi .kanal-num{color:#7c3aed;}
+  .kanal-card.cs .kanal-num{color:#059669;}
+  .kanal-pct{font-size:11px;color:#64748b;}
+
+  /* CHARTS */
+  .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .chart-grid.three{grid-template-columns:1fr 1fr 1fr;}
+  .chart-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:12px;text-align:center;}
+  .chart-box-title{font-size:11px;font-weight:600;color:#475569;margin-bottom:8px;}
+  .chart-box img{max-width:100%;height:auto;border-radius:4px;}
+  .chart-box .no-chart{color:#94a3b8;font-size:11px;padding:20px 0;}
+
+  /* TOP 10 TABLES */
+  .top10-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  table{width:100%;border-collapse:collapse;font-size:11px;}
+  th{background:#1e3a5f;color:#fff;padding:7px 8px;text-align:left;font-weight:600;}
+  td{padding:6px 8px;border-bottom:1px solid #f1f5f9;vertical-align:top;}
+  tr.top0 td{background:#fffbeb;}
+  tr.top1 td{background:#f8fafc;}
+  tr.top2 td{background:#f8fafc;}
+  tr:hover td{background:#f0f9ff;}
+  .badge-repeat{display:inline-block;margin-left:4px;background:#fee2e2;color:#dc2626;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;}
+  .badge-warn{display:inline-block;margin-left:4px;background:#fef3c7;color:#d97706;font-size:9px;font-weight:700;padding:1px 5px;border-radius:10px;}
+  .badge-kanal{display:inline-block;padding:1px 6px;border-radius:10px;font-size:10px;font-weight:600;}
+  .badge-ojk{background:#dbeafe;color:#1d4ed8;}
+  .badge-afpi{background:#f3e8ff;color:#7c3aed;}
+  .badge-cs{background:#dcfce7;color:#16a34a;}
+
+  /* DATA TABLE */
+  .data-table-wrap{overflow-x:auto;}
+  .data-table-wrap table th{font-size:10px;padding:6px 6px;}
+  .data-table-wrap table td{font-size:10px;padding:5px 6px;}
+  .kasus-cell{max-width:220px;word-wrap:break-word;}
+
+  /* FILTER INFO */
+  .filter-bar{background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:8px 14px;font-size:11px;color:#1d4ed8;margin-bottom:20px;}
+  .filter-bar b{margin-right:6px;}
+
+  /* FOOTER */
+  .report-footer{text-align:center;color:#94a3b8;font-size:10px;margin-top:24px;padding-top:16px;border-top:1px solid #e2e8f0;}
+
+  /* PRINT */
+  @media print{
+    body{background:#fff;}
+    .page{padding:16px 20px;}
+    .section{break-inside:avoid;border:1px solid #ddd;}
+    .no-print{display:none!important;}
+    .report-header{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+    th{-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- PRINT BUTTON -->
+  <div class="no-print" style="text-align:right;margin-bottom:16px">
+    <button onclick="window.print()" style="background:#1d4ed8;color:#fff;border:none;padding:8px 20px;border-radius:6px;font-size:12px;font-weight:600;cursor:pointer;margin-right:8px">🖨 Print / Save PDF</button>
+    <button onclick="window.close()" style="background:#f1f5f9;color:#475569;border:1px solid #e2e8f0;padding:8px 16px;border-radius:6px;font-size:12px;cursor:pointer">✕ Tutup</button>
+  </div>
+
+  <!-- HEADER -->
+  <div class="report-header">
+    <div>
+      <div style="font-size:11px;opacity:.7;margin-bottom:4px;text-transform:uppercase;letter-spacing:.05em">System TZ Analytics</div>
+      <h1>Laporan Pelanggaran Agent</h1>
+      <div class="sub">${tglStr}</div>
+      <div class="sub" style="margin-top:6px;opacity:.7">Dokumen ini bersifat internal dan rahasia</div>
+    </div>
+    <div style="text-align:right">
+      <div class="header-badge" style="margin-bottom:6px">Total: ${total.toLocaleString('id-ID')} kasus</div>
+      <div class="header-badge">Terminate: ${terminate} kasus</div>
+    </div>
+  </div>
+
+  <!-- FILTER INFO -->
+  <div class="filter-bar"><b>Filter Aktif:</b>${esc(filterStr)}</div>
+
+  <!-- RINGKASAN EKSEKUTIF -->
+  <div class="section">
+    <div class="section-title">📊 Ringkasan Eksekutif</div>
+    <div class="stat-grid">
+      <div class="stat-card"><div class="stat-val">${total.toLocaleString('id-ID')}</div><div class="stat-lbl">Total Kasus</div></div>
+      <div class="stat-card warning"><div class="stat-val warning">${pending}</div><div class="stat-lbl">Masih Pending</div></div>
+      <div class="stat-card success"><div class="stat-val success">${selesai}</div><div class="stat-lbl">Selesai</div></div>
+      <div class="stat-card danger"><div class="stat-val danger">${terminate}</div><div class="stat-lbl">Terminate/Eliminasi</div></div>
+      <div class="stat-card"><div class="stat-val">${avgDur}</div><div class="stat-lbl">Avg Durasi (Hari)</div></div>
+      <div class="stat-card"><div class="stat-val">${pct(selesai,total)}</div><div class="stat-lbl">Rate Selesai</div></div>
+    </div>
+  </div>
+
+  <!-- BREAKDOWN KANAL -->
+  <div class="section">
+    <div class="section-title">📢 Breakdown Kanal Pengaduan</div>
+    <div class="kanal-grid">
+      <div class="kanal-card ojk"><div class="kanal-num">${ojk.toLocaleString('id-ID')}</div><div style="font-weight:700;color:#1d4ed8;margin-bottom:2px">OJK</div><div class="kanal-pct">${pct(ojk,total)} dari total</div></div>
+      <div class="kanal-card afpi"><div class="kanal-num">${afpi.toLocaleString('id-ID')}</div><div style="font-weight:700;color:#7c3aed;margin-bottom:2px">AFPI</div><div class="kanal-pct">${pct(afpi,total)} dari total</div></div>
+      <div class="kanal-card cs"><div class="kanal-num">${cs.toLocaleString('id-ID')}</div><div style="font-weight:700;color:#059669;margin-bottom:2px">CS</div><div class="kanal-pct">${pct(cs,total)} dari total</div></div>
+    </div>
+  </div>
+
+  <!-- GRAFIK -->
+  <div class="section">
+    <div class="section-title">📈 Grafik Analitik</div>
+    <div class="chart-grid" style="margin-bottom:12px">
+      <div class="chart-box">
+        <div class="chart-box-title">Tren Kasus per Bulan</div>
+        ${imgTren?`<img src="${imgTren}" alt="Tren Kasus">`:'<div class="no-chart">Data tidak tersedia</div>'}
+      </div>
+      <div class="chart-box">
+        <div class="chart-box-title">Distribusi Kanal Pengaduan</div>
+        ${imgKanal?`<img src="${imgKanal}" alt="Kanal">`:'<div class="no-chart">Data tidak tersedia</div>'}
+      </div>
+    </div>
+    <div class="chart-grid three">
+      <div class="chart-box">
+        <div class="chart-box-title">Valid Ext. vs Valid Int.</div>
+        ${imgAgent?`<img src="${imgAgent}" alt="Valid">`:'<div class="no-chart">Data tidak tersedia</div>'}
+      </div>
+      <div class="chart-box">
+        <div class="chart-box-title">Pergerakan Violation per Tanggal</div>
+        ${imgHarian?`<img src="${imgHarian}" alt="Harian">`:'<div class="no-chart">Data tidak tersedia</div>'}
+      </div>
+      <div class="chart-box">
+        <div class="chart-box-title">Distribusi Punishment</div>
+        ${imgPun?`<img src="${imgPun}" alt="Punishment">`:'<div class="no-chart">Data tidak tersedia</div>'}
+      </div>
+    </div>
+  </div>
+
+  <!-- TOP 10 -->
+  <div class="section">
+    <div class="section-title">🏆 Top 10 Pelanggaran Terbanyak</div>
+    <div class="top10-grid">
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">📱 Top Aplikasi</div>
+        ${top10TableHtml(topApps,['#','Aplikasi','Total','OJK','AFPI','CS'])}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">👥 Top Team Leader</div>
+        ${top10TableHtml(topTLs,['#','Team Leader','Total','OJK','AFPI','CS'])}
+      </div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">👤 Top Agent Pelanggar</div>
+        ${top10TableHtml(topAgents,['#','Agent','Total','OJK','AFPI','CS'])}
+      </div>
+    </div>
+  </div>
+
+  <!-- DISTRIBUSI PUNISHMENT -->
+  <div class="section">
+    <div class="section-title">⚖️ Distribusi Punishment Internal</div>
+    <table>
+      <thead><tr><th>#</th><th>Punishment</th><th>Jumlah</th><th>% dari Total</th></tr></thead>
+      <tbody>${punEntries.map(([p,c],i)=>`<tr><td style="text-align:center">${i+1}</td><td>${esc(p)}</td><td style="text-align:center;font-weight:700">${c}</td><td style="text-align:center">${pct(c,total)}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>
+
+  <!-- DATA VIOLATION TABLE -->
+  <div class="section">
+    <div class="section-title">📋 Detail Data Violation ${data.length>200?'<span style="font-size:10px;font-weight:400;color:#94a3b8">(menampilkan 200 dari '+data.length.toLocaleString('id-ID')+' baris — download Excel untuk data lengkap)</span>':''}</div>
+    <div class="data-table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Tgl Masuk</th><th>Nama Agent</th><th>Team Leader</th><th>Aplikasi</th><th>Bucket</th><th>Kanal</th><th>Isi Kasus</th><th>Punishment</th><th>Status Ext.</th><th>Link Dokumen</th></tr></thead>
+        <tbody>${dataTableHtml}</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- FOOTER -->
+  <div class="report-footer">
+    Laporan ini digenerate oleh System TZ Analytics pada ${now.toLocaleString('id-ID')} &nbsp;|&nbsp; Confidential — Internal Use Only
+  </div>
+
+</div>
+</body>
+</html>`;
+
+  const win = window.open('', '_blank');
+  if (!win) { alert('Popup diblokir browser. Izinkan popup untuk halaman ini dan coba lagi.'); return; }
+  win.document.write(html);
+  win.document.close();
+}
 function populateAplikasiFilter(){
   const apps=[...new Set(allData.map(r=>r.aplikasi).filter(Boolean))].sort();
   // [FIX 1] selAplikasi sudah diganti multi-select, pakai initAplikasiFilter
