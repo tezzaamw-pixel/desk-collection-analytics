@@ -535,6 +535,24 @@ select:focus{border-color:var(--accent);}
 .h2h-data-btn{padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);border:none;cursor:pointer;color:var(--text2);transition:all .15s;}
 .h2h-data-btn.active{background:var(--accent);color:#fff;}
 
+/* ── CMP CHECKLIST DROPDOWN ── */
+.cmp-ms-wrap{position:relative;display:inline-block;}
+.cmp-ms-trigger{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;font-size:12px;color:var(--text);user-select:none;white-space:nowrap;}
+.cmp-ms-trigger:hover{border-color:var(--accent);}
+.cmp-ms-trigger.open{border-color:var(--accent);}
+.cmp-ms-badge{background:var(--accent);color:#fff;font-size:10px;font-weight:700;padding:1px 6px;border-radius:10px;min-width:18px;text-align:center;}
+.cmp-ms-arrow{font-size:9px;color:var(--text3);transition:transform .15s;}
+.cmp-ms-trigger.open .cmp-ms-arrow{transform:rotate(180deg);}
+.cmp-ms-dropdown{display:none;position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:9999;min-width:180px;max-height:240px;overflow-y:auto;}
+.cmp-ms-dropdown.open{display:block;}
+.cmp-ms-item{display:flex;align-items:center;gap:8px;padding:8px 14px;cursor:pointer;font-size:12px;color:var(--text);white-space:nowrap;transition:background .1s;}
+.cmp-ms-item:hover{background:var(--accent-bg);}
+.cmp-ms-item.selected{background:var(--accent-bg);color:var(--accent);font-weight:600;}
+.cmp-ms-item.disabled{opacity:.4;cursor:not-allowed;}
+.cmp-ms-cb{width:13px;height:13px;border:1.5px solid var(--border);border-radius:3px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;background:var(--surface);}
+.cmp-ms-item.selected .cmp-ms-cb{background:var(--accent);border-color:var(--accent);color:#fff;}
+.cmp-ms-footer{padding:6px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--text3);position:sticky;bottom:0;background:var(--surface);}
+
 /* ── LOCK SCREEN ── */
 .lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
 .lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
@@ -547,6 +565,13 @@ select:focus{border-color:var(--accent);}
 .lock-btn:hover{opacity:.9;}
 .lock-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
 
+
+/* ── LANGUAGE TOGGLE ── */
+.tz-lang-wrap{display:flex;border:1px solid rgba(255,255,255,.2);border-radius:6px;overflow:hidden;}
+.tz-lang-btn{padding:4px 10px;font-size:11px;font-weight:600;background:transparent;border:none;cursor:pointer;color:rgba(255,255,255,.7);transition:all .15s;white-space:nowrap;}
+.tz-lang-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
+.tz-lang-btn.active{background:rgba(255,255,255,.2);color:#fff;}
+
 </style>
 </head>
 <body>
@@ -557,6 +582,10 @@ select:focus{border-color:var(--accent);}
   </div>
   <div class="nav-right">
     <button class="btn-nav" id="btnRefresh" onclick="clearCache();loadData()" style="display:none">↻ Refresh</button>
+        <div class="tz-lang-wrap">
+      <button class="tz-lang-btn active" data-lang="id" onclick="tzSetLang('id')" title="Bahasa Indonesia">🇮🇩 ID</button>
+      <button class="tz-lang-btn" data-lang="zh" onclick="tzSetLang('zh')" title="中文">🇨🇳 中文</button>
+    </div>
     <div class="theme-toggle">
       <button class="theme-btn active" id="btnTerang" onclick="setTheme('light')">☀ Terang</button>
       <button class="theme-btn" id="btnGelap" onclick="setTheme('dark')">🌙 Gelap</button>
@@ -741,6 +770,21 @@ let currentSpvView=null;
 function fmtRp(n){if(!n||n===0)return 'Rp 0';if(n>=1e9)return 'Rp '+(n/1e9).toFixed(2)+' M';if(n>=1e6)return 'Rp '+(n/1e6).toFixed(1)+' jt';if(n>=1e3)return 'Rp '+(n/1e3).toFixed(0)+' rb';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
 function fmtRpFull(n){if(!n||n===0)return 'Rp 0';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
 function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
+
+// ── ABSENSI HELPER ──────────────────────────────────────────
+// OFF = hari libur terjadwal, TIDAK dihitung sebagai tidak hadir
+// Rumus: Hadir / (Total - Off) * 100
+// Tidak hadir = Izin + Sakit + Alpha
+function calcAbsensi(rows) {
+  const hadir  = rows.filter(r=>r.absensi==='Hadir').length;
+  const off    = rows.filter(r=>r.absensi==='Off').length;
+  const izin   = rows.filter(r=>r.absensi==='Izin').length;
+  const sakit  = rows.filter(r=>r.absensi==='Sakit').length;
+  const alpha  = rows.filter(r=>r.absensi==='Alpha').length;
+  const hariKerja = rows.length - off; // total hari kerja (non-Off)
+  const pct = hariKerja > 0 ? Math.round(hadir / hariKerja * 100) : 0;
+  return { hadir, off, izin, sakit, alpha, hariKerja, totalHari: rows.length, pct };
+}
 function fmtRate(n){return n?(n*100).toFixed(2)+'%':'0%';}
 function fmtMetric(m,val){if(!m)return String(val);if(m.fmt==='rp')return fmtRp(val);if(m.fmt==='rate')return fmtRate(val);return fmtNum(val);}
 function escH(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -1113,14 +1157,27 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       <div class="compare-body">
         <!-- TL Compare Panel -->
         <div id="cmpTL-${safeSpvId}">
-          <div class="compare-controls">
-            <div class="compare-ctrl-group">
+          <div class="compare-controls" style="align-items:flex-start">
+            <div class="compare-ctrl-group" style="flex:0 0 auto">
               <div class="compare-ctrl-label">Pilih TL (maks 5)</div>
-              <select class="compare-select" id="cmpSelTL-${safeSpvId}" onchange="addCompareTL('${safeSpvId}','${safeSpv}')">
-                <option value="">-- Pilih TL --</option>
-              </select>
+              <div class="cmp-ms-wrap" id="cmpMsTL-${safeSpvId}">
+                <div class="cmp-ms-trigger" id="cmpMsTrigTL-${safeSpvId}" onclick="toggleCmpMs('${safeSpvId}','tl')">
+                  <span id="cmpMsLabelTL-${safeSpvId}">-- Pilih TL --</span>
+                  <div style="display:flex;align-items:center;gap:5px">
+                    <span class="cmp-ms-badge" id="cmpMsBadgeTL-${safeSpvId}" style="display:none">0</span>
+                    <span class="cmp-ms-arrow">▼</span>
+                  </div>
+                </div>
+                <div class="cmp-ms-dropdown" id="cmpMsDdTL-${safeSpvId}">
+                  <div id="cmpMsListTL-${safeSpvId}"></div>
+                  <div class="cmp-ms-footer">
+                    <span id="cmpMsInfoTL-${safeSpvId}">0 dipilih</span>
+                    <span style="cursor:pointer;color:var(--accent)" onclick="clearCompare('${safeSpvId}','tl')">Reset</span>
+                  </div>
+                </div>
+              </div>
             </div>
-            <div class="compare-ctrl-group" style="justify-content:flex-end;margin-top:auto">
+            <div class="compare-ctrl-group" style="flex:1;margin-top:auto">
               <div id="cmpChipsTL-${safeSpvId}" class="compare-chips"></div>
             </div>
             <div class="compare-ctrl-group" style="margin-top:auto">
@@ -1217,13 +1274,15 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
     peerAvg.waBlokir=peerS.waBlokir/n;
   }
 
-  const hadirCount=agentRows.filter(r=>r.absensi==='Hadir').length;
-  const offCount=agentRows.filter(r=>r.absensi==='Off').length;
-  const izinCount=agentRows.filter(r=>r.absensi==='Izin').length;
-  const sakitCount=agentRows.filter(r=>r.absensi==='Sakit').length;
-  const alphaCount=agentRows.filter(r=>r.absensi==='Alpha').length;
-  const totalHari=agentRows.length||1;
-  const hadirRatio=hadirCount/totalHari;
+  const _abs=calcAbsensi(agentRows);
+  const hadirCount=_abs.hadir;
+  const offCount=_abs.off;
+  const izinCount=_abs.izin;
+  const sakitCount=_abs.sakit;
+  const alphaCount=_abs.alpha;
+  const totalHari=_abs.totalHari;       // total baris (termasuk Off)
+  const hariKerja=_abs.hariKerja;       // hari kerja (tanpa Off)
+  const hadirRatio=hariKerja>0?hadirCount/hariKerja:0; // Off tidak dihitung
 
   const catatanRows=agentRows.filter(r=>r.catatanSPV&&r.catatanSPV.trim()!=='');
   const catatanCount=catatanRows.length;
@@ -1249,19 +1308,19 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
     issues.push({type:'alpha',group:'Kehadiran',level:'kritis',
       label:`Alpha ${alphaCount} hari`,
       detail:`Tidak hadir tanpa keterangan ${alphaCount} hari`,
-      pct:Math.round(alphaCount/totalHari*100)});
+      pct:Math.round(alphaCount/hariKerja*100)});
   }
   if(hadirRatio<0.6&&alphaCount===0){
     score+=30;
     issues.push({type:'absensi',group:'Kehadiran',level:'kritis',
       label:'Tingkat kehadiran rendah',
-      detail:`${hadirCount}/${totalHari} hari hadir (${Math.round(hadirRatio*100)}%) — Off: ${offCount}, Izin: ${izinCount}, Sakit: ${sakitCount}`,
+      detail:`${hadirCount}/${hariKerja} hari kerja hadir (${Math.round(hadirRatio*100)}%) — Off: ${offCount}, Izin: ${izinCount}, Sakit: ${sakitCount}`,
       pct:Math.round(hadirRatio*100)});
   } else if(hadirRatio<0.8&&alphaCount===0){
     score+=12;
     issues.push({type:'absensi',group:'Kehadiran',level:'waspada',
       label:'Kehadiran perlu diperhatikan',
-      detail:`${hadirCount}/${totalHari} hari hadir (${Math.round(hadirRatio*100)}%) — Off: ${offCount}, Izin: ${izinCount}`,
+      detail:`${hadirCount}/${hariKerja} hari kerja hadir (${Math.round(hadirRatio*100)}%) — Off: ${offCount}, Izin: ${izinCount}`,
       pct:Math.round(hadirRatio*100)});
   }
 
@@ -1357,14 +1416,14 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
   // Rank by payment
   const ranked=agList.map(ag=>{
     const rs=summarizeRows(byAgent[ag]);
-    const hadir=byAgent[ag].filter(r=>r.absensi==='Hadir').length;
-    return{ag,payment:rs.dailyPayment,rate:rs.avgRate,sentuhWA:rs.sentuhWA,ptp:rs.ptp,hadir,total:byAgent[ag].length,rows:byAgent[ag]};
+    const _a=calcAbsensi(byAgent[ag]);
+    return{ag,payment:rs.dailyPayment,rate:rs.avgRate,sentuhWA:rs.sentuhWA,ptp:rs.ptp,hadir:_a.hadir,hariKerja:_a.hariKerja,total:byAgent[ag].length,rows:byAgent[ag]};
   }).sort((a,b)=>b.payment-a.payment);
 
   // Hitung rata-rata & temukan outlier
   const avgPayment=s.dailyPayment/n;
   const avgSentuhWA=s.sentuhWA/n;
-  const avgHadirRatio=ranked.reduce((a,x)=>a+x.hadir/x.total,0)/n;
+  const avgHadirRatio=ranked.reduce((a,x)=>a+(x.hariKerja>0?x.hadir/x.hariKerja:0),0)/n;
 
   // Insights bucket
   const insights=[];
@@ -1766,7 +1825,7 @@ function selectAttentionAgent(spv, safeSpvId, idx){
       <div class="analysis-stat"><div class="lbl">Rate Bayar</div><div class="val ${s.avgRate<0.01?'bad':s.avgRate<0.02?'ok':''}">${fmtRate(s.avgRate)}</div><div class="lbl">${fmtNum(s.jmlDataBayar)} data bayar</div></div>
       <div class="analysis-stat"><div class="lbl">Sentuh WA</div><div class="val ${s.sentuhWA<(risk.peerAvg.sentuhWA*0.5||200)?'bad':''}">${fmtNum(s.sentuhWA)}</div><div class="lbl">vs avg ${fmtNum(Math.round(risk.peerAvg.sentuhWA||0))}</div></div>
       <div class="analysis-stat"><div class="lbl">Call Manual</div><div class="val">${fmtNum(s.callManual)}</div><div class="lbl">${fmtNum(s.callTerhubung)} terhubung (${s.callManual>0?Math.round(risk.callConnRatio*100):0}%)</div></div>
-      <div class="analysis-stat"><div class="lbl">Kehadiran</div><div class="val ${hadirCount/totalHari<0.7?'bad':hadirCount/totalHari<0.85?'ok':''}">${hadirCount}/${totalHari} hari</div><div class="lbl">Alpha: ${risk.alphaCount} · Izin: ${risk.izinCount}</div></div>
+      <div class="analysis-stat"><div class="lbl">Kehadiran</div><div class="val ${hadirCount/hariKerja<0.7?'bad':hadirCount/hariKerja<0.85?'ok':''}">${hadirCount}/${hariKerja} hari kerja</div><div class="lbl">Off: ${risk.offCount} · Alpha: ${risk.alphaCount} · Izin: ${risk.izinCount}</div></div>
       <div class="analysis-stat"><div class="lbl">PTP Bayar</div><div class="val ${risk.ptpBayarRatio<0.3&&s.ptp>5?'bad':''}">${fmtNum(s.ptpBayar)}/${fmtNum(s.ptp)}</div><div class="lbl">${s.ptp>0?Math.round(risk.ptpBayarRatio*100)+'%':'-'} realisasi</div></div>
     </div>
     ${issueGroupHtml}
@@ -1847,11 +1906,11 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
   const agentList=[...byAgent.entries()].map(([ag,rows])=>{
     const as=summarizeRows(rows);
     const hadir=rows.filter(r=>r.absensi==='Hadir').length;
+    const _atl=calcAbsensi(rows);
     const namaAkun=rows[0]&&rows[0].namaAkun?rows[0].namaAkun:'—';
     const rotasi=agentRotasiInfo[ag]||null;
-    // Ada catatan SPV jika minimal 1 baris punya catatanSPV tidak kosong
     const hasCatatan=rows.some(r=>r.catatanSPV&&r.catatanSPV.trim()!=='');
-    return{ag,s:as,hadir,total:rows.length,namaAkun,rows,rotasi,hasCatatan};
+    return{ag,s:as,hadir:_atl.hadir,hariKerja:_atl.hariKerja,offCount:_atl.off,total:rows.length,namaAkun,rows,rotasi,hasCatatan};
   }).sort((a,b)=>{
     // Agent lama/nonaktif ke paling bawah
     const aLama=a.rotasi&&a.rotasi.status==='lama'?1:0;
@@ -1913,7 +1972,7 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
       <td><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:700;margin-right:6px;flex-shrink:0;background:var(--surface2);color:var(--text3)">${j+1}</span>
         <span class="agent-link" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${catatanDot}${rotasiLabel}
       </td>
-      <td><span class="absensi-pill ${hadir}">${a.hadir}/${a.total}</span></td>
+      <td><span class="absensi-pill ${hadir}">${a.hadir}/${a.hariKerja??a.total}</span></td>
       <td class="num" style="white-space:nowrap">${fmtRpFull(a.s.dailyPayment)}</td>
       ${metricCells}
     </tr>
@@ -1924,7 +1983,7 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
             <div class="agent-preview-header">
               <div>
                 <div class="agent-preview-name">${escH(a.ag)}${catatanDot}${rotasiLabel}</div>
-                <div class="agent-preview-meta">Akun: ${escH(a.namaAkun)} · ${a.hadir}/${a.total} hari hadir${a.rotasi&&a.rotasi.status==='lama'?` · Digantikan oleh <strong>${escH(a.rotasi.lawan)}</strong>`:''}</div>
+                <div class="agent-preview-meta">Akun: ${escH(a.namaAkun)} · ${a.hadir}/${a.hariKerja??a.total} hari kerja hadir (Off: ${a.offCount??0})${a.rotasi&&a.rotasi.status==='lama'?` · Digantikan oleh <strong>${escH(a.rotasi.lawan)}</strong>`:''}</div>
               </div>
               <div style="display:flex;gap:8px;align-items:center">
                 <a class="preview-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(document.getElementById('selBulan').value)}&tahun=${encodeURIComponent(document.getElementById('selTahun').value)}">Detail lengkap →</a>
@@ -2181,18 +2240,111 @@ function switchCompareTab(safeSpvId, tab, btn) {
   document.getElementById('cmpAgent-'+safeSpvId).style.display = tab==='agent' ? '' : 'none';
 }
 
+// ── CMP Multi-Select Checklist (TL picker) ───────────────────
+function toggleCmpMs(safeSpvId, type) {
+  const tr = document.getElementById('cmpMsTrigTL-'+safeSpvId);
+  const dd = document.getElementById('cmpMsDdTL-'+safeSpvId);
+  if (!tr || !dd) return;
+  const isOpen = dd.classList.contains('open');
+  // Close all open dropdowns
+  document.querySelectorAll('.cmp-ms-dropdown.open').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('.cmp-ms-trigger.open').forEach(el=>el.classList.remove('open'));
+  if (!isOpen) {
+    const rect = tr.getBoundingClientRect();
+    // position:fixed uses viewport coords — NO scrollY needed
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const estH = Math.min(240, 40 + dd.querySelectorAll('.cmp-ms-item').length * 36 + 32);
+    if (spaceAbove > spaceBelow && spaceAbove > 100) {
+      // Open upward
+      dd.style.top  = Math.max(4, rect.top - estH - 4) + 'px';
+      dd.style.bottom = 'auto';
+    } else {
+      // Open downward
+      dd.style.top  = (rect.bottom + 4) + 'px';
+      dd.style.bottom = 'auto';
+    }
+    dd.style.left     = rect.left + 'px';
+    dd.style.minWidth = Math.max(rect.width, 180) + 'px';
+    dd.classList.add('open');
+    tr.classList.add('open');
+  }
+}
+
+// Close checklist when clicking outside or scrolling
+document.addEventListener('click', e => {
+  if (!e.target.closest('.cmp-ms-wrap') && !e.target.closest('.cmp-ms-dropdown')) {
+    document.querySelectorAll('.cmp-ms-dropdown.open').forEach(el=>el.classList.remove('open'));
+    document.querySelectorAll('.cmp-ms-trigger.open').forEach(el=>el.classList.remove('open'));
+  }
+});
+document.addEventListener('scroll', () => {
+  document.querySelectorAll('.cmp-ms-dropdown.open').forEach(el=>el.classList.remove('open'));
+  document.querySelectorAll('.cmp-ms-trigger.open').forEach(el=>el.classList.remove('open'));
+}, true);
+
+function updateCmpMsTL(safeSpvId) {
+  const st = getCmpState(safeSpvId);
+  const list = st.tlList;
+  const badge = document.getElementById('cmpMsBadgeTL-'+safeSpvId);
+  const label = document.getElementById('cmpMsLabelTL-'+safeSpvId);
+  const info  = document.getElementById('cmpMsInfoTL-'+safeSpvId);
+  if (badge) { badge.textContent=list.length; badge.style.display=list.length?'':'none'; }
+  if (label) label.textContent = list.length ? list.map(n=>n.split(' ')[0]).join(', ') : '-- Pilih TL --';
+  if (info)  info.textContent = list.length+' dipilih (maks '+CMP_MAX_TL+')';
+  // Update item states
+  const listEl = document.getElementById('cmpMsListTL-'+safeSpvId);
+  if (listEl) {
+    listEl.querySelectorAll('.cmp-ms-item').forEach(item => {
+      const tl = item.dataset.tl;
+      const sel = list.includes(tl);
+      const maxed = !sel && list.length >= CMP_MAX_TL;
+      item.classList.toggle('selected', sel);
+      item.classList.toggle('disabled', maxed);
+      item.querySelector('.cmp-ms-cb').textContent = sel ? '✓' : '';
+    });
+  }
+}
+
+function onCmpMsTLClick(safeSpvId, tlName) {
+  const st = getCmpState(safeSpvId);
+  const spv = spvFromId(safeSpvId);
+  const idx = st.tlList.indexOf(tlName);
+  if (idx >= 0) {
+    // Deselect
+    st.tlList.splice(idx, 1);
+  } else {
+    if (st.tlList.length >= CMP_MAX_TL) return;
+    st.tlList.push(tlName);
+  }
+  updateCmpMsTL(safeSpvId);
+  renderCompareChips(safeSpvId, 'tl', spv);
+  if (st.tlList.length >= 2) renderCompareResult(safeSpvId, 'tl', spv);
+  else {
+    const res = document.getElementById('cmpResultTL-'+safeSpvId);
+    if (res && st.tlList.length < 2) {
+      destroyCmpCharts(st);
+      res.innerHTML = '<div class="compare-empty">Pilih minimal 2 TL untuk mulai compare</div>';
+    }
+  }
+}
+
 // ── Populate TL dropdowns after SPV block renders ────────────
 function initCompareDropdowns(safeSpvId, spv) {
   const rows = spvAgentDataCache[spv] || [];
   const tlList = [...new Set(rows.map(r=>r.teamLeader).filter(Boolean))].sort();
 
-  // TL compare dropdown
-  const selTL = document.getElementById('cmpSelTL-'+safeSpvId);
-  if (selTL) {
-    selTL.innerHTML = '<option value="">-- Pilih TL --</option>' +
-      tlList.map(t=>`<option value="${escH(t)}">${escH(t)}</option>`).join('');
+  // TL compare — checklist
+  const listEl = document.getElementById('cmpMsListTL-'+safeSpvId);
+  if (listEl) {
+    listEl.innerHTML = tlList.map(t=>`
+      <div class="cmp-ms-item" data-tl="${escH(t)}" onclick="onCmpMsTLClick('${safeSpvId}','${escA(t)}')">
+        <div class="cmp-ms-cb"></div>
+        <span>${escH(t)}</span>
+      </div>`).join('');
   }
-  // Agent compare: TL selector
+
+  // Agent compare: TL selector (tetap dropdown biasa — pilih 1 TL saja)
   const selATL = document.getElementById('cmpSelAgentTL-'+safeSpvId);
   if (selATL) {
     selATL.innerHTML = '<option value="">-- Pilih TL --</option>' +
@@ -2264,6 +2416,8 @@ function renderCompareChips(safeSpvId, type, spv) {
       <button class="compare-chip-del" onclick="removeCompareItem('${safeSpvId}','${type}',${i})" title="Hapus">×</button>
     </div>`;
   }).join('');
+  // Sync checklist state for TL
+  if (type==='tl') updateCmpMsTL(safeSpvId);
 }
 
 // ── Shared helper: recover spv from safeSpvId ────────────────
@@ -2296,6 +2450,7 @@ function clearCompare(safeSpvId, type) {
   destroyCmpCharts(st);
   if (type==='tl') {
     st.tlList=[];
+    updateCmpMsTL(safeSpvId);
     const chips = document.getElementById('cmpChipsTL-'+safeSpvId);
     if(chips) chips.innerHTML='';
     const res = document.getElementById('cmpResultTL-'+safeSpvId);
@@ -2333,9 +2488,11 @@ function renderCompareResult(safeSpvId, type, spv) {
   const summaries = list.map((name,i) => {
     const rows = getRowsFor(spv, type, name);
     const s = summarizeRows(rows);
-    const hadirCount = rows.filter(r=>r.absensi==='Hadir').length;
-    const totalHari  = rows.length || 1;
-    const absensiPct = Math.round(hadirCount/totalHari*100);
+    const _cAbs = calcAbsensi(rows);
+    const hadirCount = _cAbs.hadir;
+    const totalHari  = _cAbs.totalHari;
+    const hariKerja  = _cAbs.hariKerja || 1;
+    const absensiPct = _cAbs.pct; // hadir / hariKerja (tanpa Off)
     // auto-hitung rate jika kosong: dailyPayment / osDataBaru * 100
     // cmpRate: pakai avgRate dari summarizeRows
     // Kalau avgRate=0 tapi ada jmlDataBayar, derive dari jmlDataBayar/totalData
@@ -3092,8 +3249,9 @@ function presNavigate(delta){presNavigateTo(presCurrentIdx+delta);}
 function buildGlobalSlide(s, byApp, bulan, tahun){
   const apps=Object.keys(byApp).sort();
   const totalAgents=new Set(allRows.map(r=>r.agent)).size;
-  const hadirCount=allRows.filter(r=>r.absensi==='Hadir').length;
-  const hadirRatio=allRows.length>0?hadirCount/allRows.length:0;
+  const _pAbs=calcAbsensi(allRows);
+  const hadirCount=_pAbs.hadir;
+  const hadirRatio=_pAbs.hariKerja>0?hadirCount/_pAbs.hariKerja:0;
 
   const appRows=apps.map(ap=>{
     const rs=summarizeRows(byApp[ap]);
@@ -3191,7 +3349,8 @@ function buildAppSlide(ap, rows, s, color, bulan, tahun){
   const sid=SAFE_ID(ap);
   const agents=new Set(rows.map(r=>r.agent)).size;
   const hadirRows=rows.filter(r=>r.absensi==='Hadir');
-  const hadirRatio=rows.length>0?hadirRows.length/rows.length:0;
+  const _bAbs=calcAbsensi(rows);
+  const hadirRatio=_bAbs.hariKerja>0?_bAbs.hadir/_bAbs.hariKerja:0;
   const hadirTapiNol=hadirRows.filter(r=>(r.dailyPayment||0)===0).length;
 
   // ── Per Agent ───────────────────────────────────────────────
@@ -3264,7 +3423,7 @@ function buildAppSlide(ap, rows, s, color, bulan, tahun){
     <div class="pres-kpi-row">
       <div class="pres-kpi accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(s.dailyPayment)}</div><div class="sub">${fmtRp(s.paymentOvertime)} overtime</div></div>
       <div class="pres-kpi ${s.avgRate>=0.02?'good':s.avgRate<0.01?'bad':''}"><div class="lbl">Avg Rate</div><div class="val">${fmtRate(s.avgRate)}</div><div class="sub">${fmtNum(s.jmlDataBayar)} data bayar</div></div>
-      <div class="pres-kpi ${hadirRatio<0.75?'warn':''}"><div class="lbl">Kehadiran</div><div class="val">${Math.round(hadirRatio*100)}%</div><div class="sub">${hadirRows.length}/${rows.length} hari</div></div>
+      <div class="pres-kpi ${hadirRatio<0.75?'warn':''}"><div class="lbl">Kehadiran</div><div class="val">${Math.round(hadirRatio*100)}%</div><div class="sub">${hadirRows.length}/${_bAbs.hariKerja} hari kerja</div></div>
       <div class="pres-kpi"><div class="lbl">Sentuh WA</div><div class="val">${fmtNum(s.sentuhWA)}</div><div class="sub">${fmtNum(s.responWA)} respon (${s.sentuhWA>0?Math.round(s.responWA/s.sentuhWA*100):0}%)</div></div>
       <div class="pres-kpi"><div class="lbl">Call Manual</div><div class="val">${fmtNum(s.callManual)}</div><div class="sub">${fmtNum(s.callTerhubung)} terhubung (${s.callManual>0?Math.round(s.callTerhubung/s.callManual*100):0}%)</div></div>
       <div class="pres-kpi"><div class="lbl">PTP</div><div class="val">${fmtNum(s.ptp)}</div><div class="sub">${fmtNum(s.ptpBayar)} bayar (${s.ptp>0?Math.round(s.ptpBayar/s.ptp*100):0}%)</div></div>
@@ -3925,6 +4084,211 @@ function doUnlockPage(){
   }
 }
 
+</script>
+<script>
+/* ================================================================
+   TZ LANGUAGE ENGINE — Indonesia ↔ 中文
+   Inject di semua halaman System TZ Analytics
+   ================================================================ */
+
+const TZ_DICT_ZH = {
+  // NAVBAR & GLOBAL
+  'System TZ Analytics':'TZ 分析系统','Terang':'明亮','Gelap':'深色',
+  'Refresh':'刷新','↻ Refresh':'↻ 刷新','Live':'实时',
+  '⬇ Export ▾':'⬇ 导出 ▾','📄 Export PDF / Print':'📄 导出PDF/打印',
+  '📊 Export Excel (.xlsx)':'📊 导出Excel(.xlsx)',
+
+  // NAVIGASI
+  'Home':'主页','Tim':'团队','Agent':'坐席','Violation':'违规',
+  'Navigasi':'导航','Nama Aplikasi':'应用名称','Alat':'工具',
+  'Mode Presentasi':'演示模式',
+
+  // FILTER
+  'Bulan':'月份','Tahun':'年份','Aplikasi':'应用','Bucket':'组别',
+  'Tampilkan':'显示','Reset':'重置','↺ Reset':'↺ 重置',
+  'Semua':'全部','Terapkan':'应用','Filter':'筛选',
+  '-- Pilih Bucket --':'-- 选择组别 --','-- Pilih Agent --':'-- 选择坐席 --',
+  '-- Pilih TL --':'-- 选择团队长 --','-- Pilih Tanggal --':'-- 选择日期 --',
+  'Semua Bulan':'所有月份','Semua Tahun':'所有年份','Semua Aplikasi':'所有应用',
+  'Semua Kanal':'所有渠道','Semua Status':'所有状态','Semua Tanggal':'所有日期',
+  'Dari Tanggal':'开始日期','Sampai Tanggal':'结束日期','Rentang Tanggal':'日期范围',
+  'Pilih bulan dan tahun, lalu klik Tampilkan.':'选择月份和年份，然后点击显示。',
+  'Memuat data...':'加载数据中...','Tampilkan data dulu':'请先显示数据',
+
+  // ABSENSI
+  'Hadir':'出勤','Off':'休息','Izin':'请假','Sakit':'病假','Alpha':'旷工',
+  'Kehadiran':'出勤情况','Absensi':'考勤','hari kerja':'工作日',
+  'hari kerja hadir':'实际出勤天数','Off:':'休息:',
+
+  // PUNISHMENT
+  'Coaching':'辅导','Coaching II':'二次辅导',
+  'SP I':'第一警告','SP II':'第二警告','SP III':'第三警告',
+  'SP III Eliminasi':'第三警告-淘汰','SP III Terminasi (Aplikasi)':'第三警告-终止',
+  'Terminasi':'终止','Eliminasi':'淘汰','Pending':'待定','PENDING':'待定',
+  'Berulang':'重复违规','Waspada':'注意',
+
+  // KANAL
+  'CS':'客服',
+
+  // METRIK
+  'Payment':'还款额','Daily Payment':'当日还款','Total Payment':'总还款额',
+  'Payment Overtime':'超时还款','Rate':'还款率','Rate (%)':'还款率(%)',
+  'Rate Bayar':'还款率','Avg Rate':'平均还款率',
+  'OS Data Baru':'新数据OS','Total Data':'总数据量','Data Baru':'新数据',
+  'Data Bayar':'已还数据','PTP':'承诺还款','PTP Bayar':'已履行承诺',
+  'Alat WA':'WA工具数','Alat Gojek':'Gojek工具数',
+  'Sentuh WA':'WA联系','Respon WA':'WA回复',
+  'Sentuh Gojek':'Gojek联系','Respon Gojek':'Gojek回复',
+  'Sentuh WABA':'WABA联系','Call Manual':'手动拨号',
+  'Call Terhubung':'接通通话','WA Blokir':'WA封号','Autocall':'自动拨号',
+
+  // TEAM
+  'Supervisor':'主管','Team Leader':'团队长',
+  'Total Agent':'坐席总数','Agent Aktif':'活跃坐席',
+  'Top Agent':'优秀坐席','Belum ada setup':'暂无设置',
+  '+ Setup baru':'+ 新建设置','Nama setup':'设置名称',
+  'Setup tampilan baru':'新建显示设置','Simpan':'保存','Batal':'取消','Hapus':'删除',
+  'Pilih Metrik':'选择指标',
+  'Pilih TL (maks 5)':'选择团队长(最多5个)','Pilih TL':'选择团队长',
+  'Pilih minimal 2 TL untuk mulai compare':'请至少选择2位团队长开始比较',
+  'Pilih minimal 2 agent untuk mulai compare':'请至少选择2位坐席开始比较',
+  '0 dipilih':'已选0个','menang':'胜出','maks':'最多',
+
+  // COMPARE
+  'Compare':'对比','Compare TL':'团队长对比','Compare Agent':'坐席对比',
+  'Perbandingan Team Leader':'团队长比较','Perbandingan Agent':'坐席比较',
+  'Skor Metrik':'指标得分','Unggul':'领先','Seri 🤝':'平局 🤝',
+  'klik untuk radar chart ↩':'点击查看雷达图 ↩','klik untuk kembali ↩':'点击返回 ↩',
+  '🃏 Kartu':'🃏 卡片','📊 Chart':'📊 图表',
+  'Jumlah':'总量','Rata-rata/hari':'日均','Bar':'柱状图','Radar':'雷达图','Line':'折线图',
+
+  // ANALISIS
+  'Analisa':'分析','Progres':'进度','PROGRES':'进度',
+  'Perlu Perhatian':'需要关注',
+  '⚠ Perhatian Khusus Agent per Bucket':'⚠ 各组别特别关注坐席',
+  '⚠ Kendala & Perhatian':'⚠ 问题与关注',
+  'Pilih bucket di atas':'请在上方选择组别',
+  '← Pilih bucket lalu klik agent untuk lihat analisa':'← 选择组别后点击坐席查看分析',
+  'Per Minggu':'按周','Rentang':'范围','1 Hari':'单日',
+  'Kritis':'严重','Normal':'正常','Kembali':'返回','← Kembali':'← 返回',
+  'Detail lengkap agent →':'查看坐席详情 →',
+  '← Tidak ada data di rentang yang dipilih':'← 所选范围内暂无数据',
+  '🔄 Pergantian Agent':'🔄 坐席轮换',
+  '📋 Agent Banyak Catatan SPV':'📋 多次被主管备注坐席',
+
+  // VIOLATION
+  'Total Kasus':'案例总数','Masih Pending':'待处理','Selesai':'已完成',
+  'Total Denda':'总罚款','Avg Durasi':'平均处理时长',
+  'Terminate/Eliminasi':'终止/淘汰','Periode terpilih':'所选周期',
+  'dari total':'占总数','hari penyelesaian':'天处理时间',
+  'Punishment terberat':'最重处分',
+  'Breakdown Kanal Pengaduan':'投诉渠道分布',
+  'Grafik Analitik':'分析图表','Tren Kasus per Bulan':'每月案例趋势',
+  'Distribusi Kanal Pengaduan':'投诉渠道分布',
+  'Valid Ext. vs Valid Int.':'外部有效 vs 内部有效',
+  'Pergerakan Violation per Tanggal':'每日违规趋势',
+  'Top 10 Pelanggaran Terbanyak':'Top 10 最多违规',
+  'Top Aplikasi':'最多违规应用','Top Team Leader':'最多违规团队长',
+  'Top Agent Pelanggar':'最多违规坐席',
+  'Kanal Pengaduan':'投诉渠道','Status Eksternal':'外部状态',
+  'Status Internal':'内部状态','Punishment Eksternal':'外部处分',
+  'Punishment Internal':'内部处分','Tanggal Masuk':'受理日期',
+  'Tanggal Keluar':'完成日期','Tanggal Komplain':'投诉日期',
+  'Durasi (Hari)':'处理时长(天)','Isi Kasus':'案件内容',
+  'Nama QC':'QC姓名','Link Dokumen Pelaporan':'报告文件链接',
+  'Akumulasi periode':'周期累计',
+  'Jumlah Kasus':'案例数量',
+  'Avg Hari':'平均天数',
+
+  // STATUS
+  'VALID':'有效','INVALID':'无效',
+
+  // EXPORT / LAPORAN
+  'Laporan Pelanggaran Agent':'坐席违规报告',
+  'Dokumen ini bersifat internal dan rahasia':'本文件仅供内部使用，请保密',
+  'Ringkasan Eksekutif':'执行摘要','Print / Save PDF':'打印/保存PDF',
+  'Tutup':'关闭',
+
+  // UMUM
+  'Tidak ada data':'暂无数据','Tidak ada setup':'暂无设置',
+  'Angka':'数字','Kasus':'案例',
+  'Berhasil':'成功','Update':'更新','Baru':'新',
+  'hari':'天','bulan':'月','agent':'坐席','dari':'共',
+  '% dari total':'% 占总数',
+};
+
+// ── Engine ──────────────────────────────────────────────────
+let _tzLang = 'id';
+
+function tzT(key) {
+  if (!key) return key;
+  if (_tzLang === 'id') return key;
+  return TZ_DICT_ZH[key] || key;
+}
+
+function tzSetLang(lang) {
+  _tzLang = lang;
+  try { localStorage.setItem('tz_lang', lang); } catch(e){}
+  _tzApply();
+}
+
+function _tzApply() {
+  // 1. Static elements with data-tz
+  document.querySelectorAll('[data-tz]').forEach(el => {
+    const key = el.dataset.tz;
+    const tr = tzT(key);
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = tr;
+    else el.textContent = tr;
+  });
+  // 2. Dynamic text nodes — walk all text nodes and translate
+  _walkAndTranslate(document.body);
+  // 3. Toggle button state
+  document.querySelectorAll('.tz-lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === _tzLang);
+  });
+}
+
+// Walk text nodes and translate known strings
+const _SKIP_TAGS = new Set(['SCRIPT','STYLE','CODE','PRE','INPUT','TEXTAREA']);
+function _walkAndTranslate(root) {
+  if (!root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => {
+      const p = n.parentElement;
+      if (!p || _SKIP_TAGS.has(p.tagName)) return NodeFilter.FILTER_REJECT;
+      if (p.closest('script,style')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node => {
+    const orig = node._tzOrig || node.textContent;
+    if (!node._tzOrig) node._tzOrig = orig; // store original
+    if (_tzLang === 'id') { node.textContent = orig; return; }
+    // Try exact match first
+    if (TZ_DICT_ZH[orig.trim()]) { node.textContent = TZ_DICT_ZH[orig.trim()]; return; }
+    // Try replace within text (for mixed strings like "10 agent" → "10 坐席")
+    let text = orig;
+    Object.entries(TZ_DICT_ZH).forEach(([k,v]) => {
+      if (k.length > 2 && text.includes(k)) text = text.split(k).join(v);
+    });
+    if (text !== orig) node.textContent = text;
+  });
+}
+
+// ── Init ────────────────────────────────────────────────────
+function tzInit() {
+  try { _tzLang = localStorage.getItem('tz_lang') || 'id'; } catch(e){}
+  if (_tzLang === 'zh') setTimeout(_tzApply, 300);
+}
+
+// Expose re-translate for dynamic content (call after renderAll)
+function tzRetranslate() {
+  if (_tzLang === 'zh') setTimeout(()=>_walkAndTranslate(document.body), 50);
+}
+
+document.addEventListener("DOMContentLoaded",()=>tzInit());
 </script>
 </body>
 </html>

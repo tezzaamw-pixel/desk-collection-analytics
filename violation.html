@@ -324,6 +324,13 @@ select:focus{border-color:var(--accent);}
 .lb-badge-repeat{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--danger-bg);color:var(--danger);font-weight:700;margin-left:4px;vertical-align:middle;}
 .lb-badge-warn{display:inline-block;font-size:9px;padding:1px 5px;border-radius:6px;background:var(--warning-bg);color:var(--warning);font-weight:700;margin-left:4px;vertical-align:middle;}
 
+
+/* ── LANGUAGE TOGGLE ── */
+.tz-lang-wrap{display:flex;border:1px solid rgba(255,255,255,.2);border-radius:6px;overflow:hidden;}
+.tz-lang-btn{padding:4px 10px;font-size:11px;font-weight:600;background:transparent;border:none;cursor:pointer;color:rgba(255,255,255,.7);transition:all .15s;white-space:nowrap;}
+.tz-lang-btn:hover{background:rgba(255,255,255,.1);color:#fff;}
+.tz-lang-btn.active{background:rgba(255,255,255,.2);color:#fff;}
+
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
@@ -346,6 +353,10 @@ select:focus{border-color:var(--accent);}
       </div>
     </div>
     <div class="nav-live"><div class="nav-live-dot"></div>Live</div>
+        <div class="tz-lang-wrap">
+      <button class="tz-lang-btn active" data-lang="id" onclick="tzSetLang('id')" title="Bahasa Indonesia">🇮🇩 ID</button>
+      <button class="tz-lang-btn" data-lang="zh" onclick="tzSetLang('zh')" title="中文">🇨🇳 中文</button>
+    </div>
     <div class="theme-toggle">
       <button class="theme-btn active" id="btnLight" onclick="setTheme('light')">☀ Terang</button>
       <button class="theme-btn" id="btnDark" onclick="setTheme('dark')">🌙 Gelap</button>
@@ -1340,6 +1351,7 @@ function exportPDF() {
   </div>
 
 </div>
+
 </body>
 </html>`;
 
@@ -1406,6 +1418,7 @@ function resetFilter(){
 }
 
 function renderAll(){
+  setTimeout(tzRetranslate, 200);
   try{
     document.getElementById('loadingWrap').style.display='none';
     document.getElementById('contentWrap').style.display='block';
@@ -2807,6 +2820,216 @@ document.addEventListener('click',function(e){
   });
   if(!clickedInAny)closeAllMs();
 });
+</script>
+
+
+
+
+
+<script>
+/* ================================================================
+   TZ LANGUAGE ENGINE — Indonesia ↔ 中文
+   Inject di semua halaman System TZ Analytics
+   ================================================================ */
+
+const TZ_DICT_ZH = {
+  // NAVBAR & GLOBAL
+  'System TZ Analytics':'TZ 分析系统','Terang':'明亮','Gelap':'深色',
+  'Refresh':'刷新','↻ Refresh':'↻ 刷新','Live':'实时',
+  '⬇ Export ▾':'⬇ 导出 ▾','📄 Export PDF / Print':'📄 导出PDF/打印',
+  '📊 Export Excel (.xlsx)':'📊 导出Excel(.xlsx)',
+
+  // NAVIGASI
+  'Home':'主页','Tim':'团队','Agent':'坐席','Violation':'违规',
+  'Navigasi':'导航','Nama Aplikasi':'应用名称','Alat':'工具',
+  'Mode Presentasi':'演示模式',
+
+  // FILTER
+  'Bulan':'月份','Tahun':'年份','Aplikasi':'应用','Bucket':'组别',
+  'Tampilkan':'显示','Reset':'重置','↺ Reset':'↺ 重置',
+  'Semua':'全部','Terapkan':'应用','Filter':'筛选',
+  '-- Pilih Bucket --':'-- 选择组别 --','-- Pilih Agent --':'-- 选择坐席 --',
+  '-- Pilih TL --':'-- 选择团队长 --','-- Pilih Tanggal --':'-- 选择日期 --',
+  'Semua Bulan':'所有月份','Semua Tahun':'所有年份','Semua Aplikasi':'所有应用',
+  'Semua Kanal':'所有渠道','Semua Status':'所有状态','Semua Tanggal':'所有日期',
+  'Dari Tanggal':'开始日期','Sampai Tanggal':'结束日期','Rentang Tanggal':'日期范围',
+  'Pilih bulan dan tahun, lalu klik Tampilkan.':'选择月份和年份，然后点击显示。',
+  'Memuat data...':'加载数据中...','Tampilkan data dulu':'请先显示数据',
+
+  // ABSENSI
+  'Hadir':'出勤','Off':'休息','Izin':'请假','Sakit':'病假','Alpha':'旷工',
+  'Kehadiran':'出勤情况','Absensi':'考勤','hari kerja':'工作日',
+  'hari kerja hadir':'实际出勤天数','Off:':'休息:',
+
+  // PUNISHMENT
+  'Coaching':'辅导','Coaching II':'二次辅导',
+  'SP I':'第一警告','SP II':'第二警告','SP III':'第三警告',
+  'SP III Eliminasi':'第三警告-淘汰','SP III Terminasi (Aplikasi)':'第三警告-终止',
+  'Terminasi':'终止','Eliminasi':'淘汰','Pending':'待定','PENDING':'待定',
+  'Berulang':'重复违规','Waspada':'注意',
+
+  // KANAL
+  'CS':'客服',
+
+  // METRIK
+  'Payment':'还款额','Daily Payment':'当日还款','Total Payment':'总还款额',
+  'Payment Overtime':'超时还款','Rate':'还款率','Rate (%)':'还款率(%)',
+  'Rate Bayar':'还款率','Avg Rate':'平均还款率',
+  'OS Data Baru':'新数据OS','Total Data':'总数据量','Data Baru':'新数据',
+  'Data Bayar':'已还数据','PTP':'承诺还款','PTP Bayar':'已履行承诺',
+  'Alat WA':'WA工具数','Alat Gojek':'Gojek工具数',
+  'Sentuh WA':'WA联系','Respon WA':'WA回复',
+  'Sentuh Gojek':'Gojek联系','Respon Gojek':'Gojek回复',
+  'Sentuh WABA':'WABA联系','Call Manual':'手动拨号',
+  'Call Terhubung':'接通通话','WA Blokir':'WA封号','Autocall':'自动拨号',
+
+  // TEAM
+  'Supervisor':'主管','Team Leader':'团队长',
+  'Total Agent':'坐席总数','Agent Aktif':'活跃坐席',
+  'Top Agent':'优秀坐席','Belum ada setup':'暂无设置',
+  '+ Setup baru':'+ 新建设置','Nama setup':'设置名称',
+  'Setup tampilan baru':'新建显示设置','Simpan':'保存','Batal':'取消','Hapus':'删除',
+  'Pilih Metrik':'选择指标',
+  'Pilih TL (maks 5)':'选择团队长(最多5个)','Pilih TL':'选择团队长',
+  'Pilih minimal 2 TL untuk mulai compare':'请至少选择2位团队长开始比较',
+  'Pilih minimal 2 agent untuk mulai compare':'请至少选择2位坐席开始比较',
+  '0 dipilih':'已选0个','menang':'胜出','maks':'最多',
+
+  // COMPARE
+  'Compare':'对比','Compare TL':'团队长对比','Compare Agent':'坐席对比',
+  'Perbandingan Team Leader':'团队长比较','Perbandingan Agent':'坐席比较',
+  'Skor Metrik':'指标得分','Unggul':'领先','Seri 🤝':'平局 🤝',
+  'klik untuk radar chart ↩':'点击查看雷达图 ↩','klik untuk kembali ↩':'点击返回 ↩',
+  '🃏 Kartu':'🃏 卡片','📊 Chart':'📊 图表',
+  'Jumlah':'总量','Rata-rata/hari':'日均','Bar':'柱状图','Radar':'雷达图','Line':'折线图',
+
+  // ANALISIS
+  'Analisa':'分析','Progres':'进度','PROGRES':'进度',
+  'Perlu Perhatian':'需要关注',
+  '⚠ Perhatian Khusus Agent per Bucket':'⚠ 各组别特别关注坐席',
+  '⚠ Kendala & Perhatian':'⚠ 问题与关注',
+  'Pilih bucket di atas':'请在上方选择组别',
+  '← Pilih bucket lalu klik agent untuk lihat analisa':'← 选择组别后点击坐席查看分析',
+  'Per Minggu':'按周','Rentang':'范围','1 Hari':'单日',
+  'Kritis':'严重','Normal':'正常','Kembali':'返回','← Kembali':'← 返回',
+  'Detail lengkap agent →':'查看坐席详情 →',
+  '← Tidak ada data di rentang yang dipilih':'← 所选范围内暂无数据',
+  '🔄 Pergantian Agent':'🔄 坐席轮换',
+  '📋 Agent Banyak Catatan SPV':'📋 多次被主管备注坐席',
+
+  // VIOLATION
+  'Total Kasus':'案例总数','Masih Pending':'待处理','Selesai':'已完成',
+  'Total Denda':'总罚款','Avg Durasi':'平均处理时长',
+  'Terminate/Eliminasi':'终止/淘汰','Periode terpilih':'所选周期',
+  'dari total':'占总数','hari penyelesaian':'天处理时间',
+  'Punishment terberat':'最重处分',
+  'Breakdown Kanal Pengaduan':'投诉渠道分布',
+  'Grafik Analitik':'分析图表','Tren Kasus per Bulan':'每月案例趋势',
+  'Distribusi Kanal Pengaduan':'投诉渠道分布',
+  'Valid Ext. vs Valid Int.':'外部有效 vs 内部有效',
+  'Pergerakan Violation per Tanggal':'每日违规趋势',
+  'Top 10 Pelanggaran Terbanyak':'Top 10 最多违规',
+  'Top Aplikasi':'最多违规应用','Top Team Leader':'最多违规团队长',
+  'Top Agent Pelanggar':'最多违规坐席',
+  'Kanal Pengaduan':'投诉渠道','Status Eksternal':'外部状态',
+  'Status Internal':'内部状态','Punishment Eksternal':'外部处分',
+  'Punishment Internal':'内部处分','Tanggal Masuk':'受理日期',
+  'Tanggal Keluar':'完成日期','Tanggal Komplain':'投诉日期',
+  'Durasi (Hari)':'处理时长(天)','Isi Kasus':'案件内容',
+  'Nama QC':'QC姓名','Link Dokumen Pelaporan':'报告文件链接',
+  'Akumulasi periode':'周期累计',
+  'Jumlah Kasus':'案例数量',
+  'Avg Hari':'平均天数',
+
+  // STATUS
+  'VALID':'有效','INVALID':'无效',
+
+  // EXPORT / LAPORAN
+  'Laporan Pelanggaran Agent':'坐席违规报告',
+  'Dokumen ini bersifat internal dan rahasia':'本文件仅供内部使用，请保密',
+  'Ringkasan Eksekutif':'执行摘要','Print / Save PDF':'打印/保存PDF',
+  'Tutup':'关闭',
+
+  // UMUM
+  'Tidak ada data':'暂无数据','Tidak ada setup':'暂无设置',
+  'Angka':'数字','Kasus':'案例',
+  'Berhasil':'成功','Update':'更新','Baru':'新',
+  'hari':'天','bulan':'月','agent':'坐席','dari':'共',
+  '% dari total':'% 占总数',
+};
+
+// ── Engine ──────────────────────────────────────────────────
+let _tzLang = 'id';
+
+function tzT(key) {
+  if (!key) return key;
+  if (_tzLang === 'id') return key;
+  return TZ_DICT_ZH[key] || key;
+}
+
+function tzSetLang(lang) {
+  _tzLang = lang;
+  try { localStorage.setItem('tz_lang', lang); } catch(e){}
+  _tzApply();
+}
+
+function _tzApply() {
+  // 1. Static elements with data-tz
+  document.querySelectorAll('[data-tz]').forEach(el => {
+    const key = el.dataset.tz;
+    const tr = tzT(key);
+    if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') el.placeholder = tr;
+    else el.textContent = tr;
+  });
+  // 2. Dynamic text nodes — walk all text nodes and translate
+  _walkAndTranslate(document.body);
+  // 3. Toggle button state
+  document.querySelectorAll('.tz-lang-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.lang === _tzLang);
+  });
+}
+
+// Walk text nodes and translate known strings
+const _SKIP_TAGS = new Set(['SCRIPT','STYLE','CODE','PRE','INPUT','TEXTAREA']);
+function _walkAndTranslate(root) {
+  if (!root) return;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: n => {
+      const p = n.parentElement;
+      if (!p || _SKIP_TAGS.has(p.tagName)) return NodeFilter.FILTER_REJECT;
+      if (p.closest('script,style')) return NodeFilter.FILTER_REJECT;
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  const nodes = [];
+  while (walker.nextNode()) nodes.push(walker.currentNode);
+  nodes.forEach(node => {
+    const orig = node._tzOrig || node.textContent;
+    if (!node._tzOrig) node._tzOrig = orig; // store original
+    if (_tzLang === 'id') { node.textContent = orig; return; }
+    // Try exact match first
+    if (TZ_DICT_ZH[orig.trim()]) { node.textContent = TZ_DICT_ZH[orig.trim()]; return; }
+    // Try replace within text (for mixed strings like "10 agent" → "10 坐席")
+    let text = orig;
+    Object.entries(TZ_DICT_ZH).forEach(([k,v]) => {
+      if (k.length > 2 && text.includes(k)) text = text.split(k).join(v);
+    });
+    if (text !== orig) node.textContent = text;
+  });
+}
+
+// ── Init ────────────────────────────────────────────────────
+function tzInit() {
+  try { _tzLang = localStorage.getItem('tz_lang') || 'id'; } catch(e){}
+  if (_tzLang === 'zh') setTimeout(_tzApply, 300);
+}
+
+// Expose re-translate for dynamic content (call after renderAll)
+function tzRetranslate() {
+  if (_tzLang === 'zh') setTimeout(()=>_walkAndTranslate(document.body), 50);
+}
+
+document.addEventListener("DOMContentLoaded",()=>tzInit());
 </script>
 </body>
 </html>
