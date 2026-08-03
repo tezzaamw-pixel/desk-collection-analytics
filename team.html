@@ -447,6 +447,94 @@ select:focus{border-color:var(--accent);}
 .compare-metric-pill.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .compare-empty{color:var(--text3);font-size:12px;padding:24px;text-align:center;}
 
+/* ── COMPARE VIEW TOGGLE ── */
+.cmp-view-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-left:auto;}
+.cmp-view-btn{padding:5px 12px;font-size:11px;font-weight:600;color:var(--text2);background:var(--surface2);border:none;cursor:pointer;transition:all .12s;}
+.cmp-view-btn.active{background:var(--accent);color:#fff;}
+
+/* ── HEAD-TO-HEAD ── */
+.h2h-wrap{background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;}
+.h2h-header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:18px 20px 14px;gap:10px;background:linear-gradient(135deg,var(--surface2) 0%,var(--surface) 100%);}
+.h2h-player{display:flex;flex-direction:column;align-items:center;gap:6px;}
+.h2h-player.right{align-items:center;}
+.h2h-avatar{width:56px;height:56px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;box-shadow:0 4px 14px rgba(0,0,0,.25);}
+.h2h-name{font-size:13px;font-weight:700;text-align:center;max-width:120px;word-break:break-word;}
+.h2h-score-box{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.h2h-score{display:flex;align-items:center;gap:10px;font-size:28px;font-weight:800;}
+.h2h-score-sep{font-size:20px;color:var(--text3);font-weight:400;}
+.h2h-score-label{font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;}
+.h2h-row{display:grid;grid-template-columns:1fr 180px 1fr;align-items:center;padding:10px 20px;border-top:1px solid var(--border);}
+.h2h-row:nth-child(even){background:var(--surface2);}
+.h2h-val{font-size:13px;font-weight:700;}
+.h2h-val.left{text-align:right;}
+.h2h-val.right{text-align:left;}
+.h2h-val.winner{font-size:14px;}
+.h2h-metric-center{display:flex;flex-direction:column;align-items:center;gap:4px;}
+.h2h-metric-label{font-size:10px;font-weight:600;color:var(--text3);text-align:center;text-transform:uppercase;letter-spacing:.04em;}
+.h2h-bar-wrap{width:140px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;position:relative;}
+.h2h-bar-left{position:absolute;right:50%;top:0;height:100%;border-radius:3px 0 0 3px;transition:width .6s cubic-bezier(.4,0,.2,1);}
+.h2h-bar-right{position:absolute;left:50%;top:0;height:100%;border-radius:0 3px 3px 0;transition:width .6s cubic-bezier(.4,0,.2,1);}
+
+/* ── PLAYER CARDS ── */
+.cmp-cards-grid{display:flex;flex-wrap:wrap;gap:20px;justify-content:center;padding:8px 0 20px;}
+.player-card-outer{perspective:1000px;width:220px;flex-shrink:0;}
+.player-card-inner{position:relative;width:100%;transform-style:preserve-3d;transition:transform .55s cubic-bezier(.4,0,.2,1);cursor:pointer;}
+.player-card-outer.flipped .player-card-inner{transform:rotateY(180deg);}
+.player-card-face{width:100%;backface-visibility:hidden;border-radius:14px;overflow:hidden;}
+.player-card-face.player-card-front{position:relative;}
+.player-card-face.player-card-back{position:absolute;inset:0;transform:rotateY(180deg);min-height:100%;}
+
+/* Card face styles */
+.pcf-inner{width:100%;height:100%;display:flex;flex-direction:column;padding:14px 14px 10px;position:relative;}
+
+/* Top badge area */
+.pc-top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.pc-rank-badge{font-size:22px;line-height:1;}
+.pc-wins-badge{font-size:11px;font-weight:700;padding:3px 8px;border-radius:10px;background:rgba(255,255,255,.12);}
+
+/* Avatar + name */
+.pc-avatar{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:800;color:#fff;margin:0 auto 10px;box-shadow:0 4px 14px rgba(0,0,0,.35);}
+.pc-name{font-size:13px;font-weight:800;text-align:center;margin-bottom:12px;letter-spacing:.02em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* Metric rows */
+.pc-metrics{display:flex;flex-direction:column;gap:6px;flex:1;}
+.pc-metric-row{display:flex;align-items:center;justify-content:space-between;padding:5px 8px;border-radius:6px;background:rgba(255,255,255,.06);}
+.pc-metric-row.winner{background:rgba(255,255,255,.13);}
+.pc-metric-lbl{font-size:10px;font-weight:500;color:rgba(255,255,255,.55);flex:1;}
+.pc-metric-val{font-size:12px;font-weight:800;color:rgba(255,255,255,.9);}
+.pc-metric-val.winner{font-size:13px;}
+.pc-metric-crown{font-size:10px;margin-left:3px;}
+
+.pc-flip-hint{text-align:center;font-size:9px;opacity:.35;margin-top:8px;}
+.pc-radar-wrap{width:100%;height:100%;padding:10px;display:flex;flex-direction:column;}
+.pc-radar-title{font-size:10px;font-weight:700;text-align:center;margin-bottom:4px;opacity:.7;}
+
+/* Card rank borders/glows now in professional light theme above */
+
+/* ── CARD PROFESSIONAL LIGHT THEME ── */
+.pc-bg-rank1{background:linear-gradient(145deg,#1e3a5f 0%,#1d4ed8 100%);}
+.pc-bg-rank2{background:linear-gradient(145deg,#374151 0%,#4b5563 100%);}
+.pc-bg-rank3{background:linear-gradient(145deg,#7c3400 0%,#b45309 100%);}
+.pc-bg-rankn{background:linear-gradient(145deg,#f8fafc 0%,#e2e8f0 100%);}
+.pc-rank-1{border:2px solid #F59E0B;box-shadow:0 0 20px rgba(245,158,11,.5),0 6px 24px rgba(0,0,0,.2);}
+.pc-rank-2{border:2px solid #94A3B8;box-shadow:0 0 16px rgba(148,163,184,.45),0 6px 20px rgba(0,0,0,.15);}
+.pc-rank-3{border:2px solid #CD7C2F;box-shadow:0 0 16px rgba(205,124,47,.4),0 6px 20px rgba(0,0,0,.15);}
+.pc-rank-n{border:1px solid #cbd5e1;box-shadow:0 4px 14px rgba(0,0,0,.1);}
+.pc-text-light{color:#fff;}
+.pc-text-dark{color:#1e293b;}
+.pc-text-gold{color:#FCD34D;}
+.pc-text-silver{color:#e2e8f0;}
+.pc-text-bronze{color:#FDE68A;}
+
+/* ── DATA VIEW TOGGLE ── */
+.cmp-data-toggle{display:flex;border:1px solid rgba(255,255,255,.25);border-radius:8px;overflow:hidden;margin-bottom:12px;}
+.cmp-data-toggle.dark-bg{border-color:var(--border);}
+.cmp-data-btn{padding:5px 14px;font-size:11px;font-weight:600;background:transparent;border:none;cursor:pointer;transition:all .15s;color:var(--text2);}
+.cmp-data-btn.active{background:var(--accent);color:#fff;}
+.h2h-data-toggle{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.h2h-data-btn{padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);border:none;cursor:pointer;color:var(--text2);transition:all .15s;}
+.h2h-data-btn.active{background:var(--accent);color:#fff;}
+
 /* ── LOCK SCREEN ── */
 .lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
 .lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
@@ -651,6 +739,7 @@ let allRows=[], allBucketMap={}, currentModalSpv=null, currentModalEditIdx=null;
 let currentSpvView=null;
 
 function fmtRp(n){if(!n||n===0)return 'Rp 0';if(n>=1e9)return 'Rp '+(n/1e9).toFixed(2)+' M';if(n>=1e6)return 'Rp '+(n/1e6).toFixed(1)+' jt';if(n>=1e3)return 'Rp '+(n/1e3).toFixed(0)+' rb';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
+function fmtRpFull(n){if(!n||n===0)return 'Rp 0';return 'Rp '+Math.round(n).toLocaleString('id-ID');}
 function fmtNum(n){return n?Math.round(n).toLocaleString('id-ID'):'0';}
 function fmtRate(n){return n?(n*100).toFixed(2)+'%':'0%';}
 function fmtMetric(m,val){if(!m)return String(val);if(m.fmt==='rp')return fmtRp(val);if(m.fmt==='rate')return fmtRate(val);return fmtNum(val);}
@@ -723,19 +812,26 @@ function summarizeRows(rows){
   const r={};
   keys.forEach(k=>{r[k]=rows.reduce((a,x)=>a+(x[k]||0),0);});
 
-  // [FIX RATE AUTO] Jika kolom rate di sheet kosong/nol semua, derive otomatis dari jmlDataBayar/totalData
-  const rawRateSum=rows.reduce((a,x)=>a+(x.rate||0),0);
-  const tb=r.jmlDataBayar;
-  if(rawRateSum===0&&r.totalData>0){
-    // Derive: jumlah akun bayar dibagi total akun dihandle
-    r.avgRate=r.jmlDataBayar>0?r.jmlDataBayar/r.totalData:0;
+  // [FIX RATE] Kalkulasi rate yang benar
+  // rate per baris = desimal (0.0068 = 0.68%), disimpan dari normRate_
+  const rawRateSum = rows.reduce((a,x)=>a+(x.rate||0), 0);
+  const tb = r.jmlDataBayar;
+
+  if (rawRateSum > 0) {
+    // Ada data rate di sheet → weighted average by jmlDataBayar per baris
+    r.avgRate = tb > 0
+      ? rows.reduce((a,x)=>a+(x.rate*(x.jmlDataBayar||0)),0) / tb
+      : rows.reduce((a,x)=>a+(x.rate||0),0) / rows.length;
+  } else if (r.totalData > 0) {
+    // Rate kosong di sheet → derive dari jmlDataBayar / totalData
+    r.avgRate = r.jmlDataBayar > 0 ? r.jmlDataBayar / r.totalData : 0;
   } else {
-    r.avgRate=tb>0?rows.reduce((a,x)=>a+(x.rate*(x.jmlDataBayar||0)),0)/tb:rows.length>0?rows.reduce((a,x)=>a+(x.rate||0),0)/rows.length:0;
+    r.avgRate = 0;
   }
 
   // [ALAT] Count alat unik aktif (non-empty string)
-  r.jumlahAlatWA    = new Set(rows.map(x=>x.alatWA).filter(Boolean)).size;
-  r.jumlahAlatGojek = new Set(rows.map(x=>x.alatGojek).filter(Boolean)).size;
+  r.jumlahAlatWA    = rows.filter(x=>x.alatWA&&x.alatWA!=='—').length;
+  r.jumlahAlatGojek = rows.filter(x=>x.alatGojek&&x.alatGojek!=='—').length;
 
   // [DERIVED METRICS] Rasio penyentuhan — dihitung otomatis dari data yang ada
   r.rateResponWA      = r.sentuhWA>0    ? r.responWA/r.sentuhWA      : 0;
@@ -2040,25 +2136,27 @@ const CMP_MAX_TL = 5;
 const CMP_MAX_AGENT = 6;
 
 // Default metrik yang ditampilkan di chart utama
-const CMP_DEFAULT_METRICS = ['dailyPayment','avgRate','ptp','ptpBayar','sentuhWA','callManual','waBlokir','jumlahAlatWA','jumlahAlatGojek'];
+const CMP_DEFAULT_METRICS = ['absensiPct','osDataBaru','dailyPayment','cmpRate','jumlahAlatWA','sentuhWA','responWA','ptp','ptpBayar','waBlokir'];
 
-// Semua metrik yang bisa dipilih
+// Semua metrik yang bisa dipilih (cmpRate = auto-hitung dari payment/osDataBaru)
 const CMP_ALL_METRICS = [
-  {key:'dailyPayment',  label:'Payment',      fmt:'rp'},
-  {key:'avgRate',       label:'Rate (%)',      fmt:'rate'},
-  {key:'jmlDataBayar',  label:'Data Bayar',    fmt:'num'},
-  {key:'ptp',           label:'PTP',           fmt:'num'},
-  {key:'ptpBayar',      label:'PTP Bayar',     fmt:'num'},
+  {key:'absensiPct',    label:'Absensi',       fmt:'pct',   isSpecial:true},
+  {key:'osDataBaru',    label:'OS Data Baru',  fmt:'num', isNum:true, lowerIsBetter:true},
+  {key:'dailyPayment',  label:'Payment',       fmt:'rp'},
+  {key:'cmpRate',       label:'Rate (%)',      fmt:'rate2', isSpecial:true},
+  {key:'jumlahAlatWA',  label:'Alat WA',       fmt:'num'},
   {key:'sentuhWA',      label:'Sentuh WA',     fmt:'num'},
   {key:'responWA',      label:'Respon WA',     fmt:'num'},
+  {key:'ptp',           label:'PTP',           fmt:'num'},
+  {key:'ptpBayar',      label:'PTP Bayar',     fmt:'num'},
+  {key:'waBlokir',      label:'WA Blokir',     fmt:'num',  lowerIsBetter:true},
+  {key:'jmlDataBayar',  label:'Data Bayar',    fmt:'num'},
+  {key:'callManual',    label:'Call Manual',   fmt:'num'},
+  {key:'callTerhubung', label:'Call Terhubung',fmt:'num'},
   {key:'sentuhGojek',   label:'Sentuh Gojek',  fmt:'num'},
   {key:'responGojek',   label:'Respon Gojek',  fmt:'num'},
   {key:'sentuhWABA',    label:'Sentuh WABA',   fmt:'num'},
-  {key:'callManual',    label:'Call Manual',   fmt:'num'},
-  {key:'callTerhubung', label:'Call Terhubung',fmt:'num'},
-  {key:'waBlokir',      label:'WA Blokir',     fmt:'num'},
-  {key:'jumlahAlatWA',  label:'Alat WA',       fmt:'num'},
-  {key:'jumlahAlatGojek',label:'Alat Gojek',   fmt:'num'},
+  {key:'jumlahAlatGojek',label:'Alat Gojek',  fmt:'num'},
   {key:'totalData',     label:'Total Data',    fmt:'num'},
   {key:'dataBaru',      label:'Data Baru',     fmt:'num'},
   {key:'autocall',      label:'Autocall',      fmt:'num'},
@@ -2067,7 +2165,8 @@ const CMP_ALL_METRICS = [
 function getCmpState(safeSpvId) {
   if (!cmpState[safeSpvId]) cmpState[safeSpvId] = {
     tlList:[], agentList:[], activeTab:'tl', chartType:'bar',
-    activeMetrics:[...CMP_DEFAULT_METRICS], cmpCharts:[]
+    activeMetrics:[...CMP_DEFAULT_METRICS], cmpCharts:[],
+    viewMode:'card', dataView:'total'  // dataView: 'total' | 'avg'
   };
   return cmpState[safeSpvId];
 }
@@ -2230,23 +2329,99 @@ function renderCompareResult(safeSpvId, type, spv) {
   const resultEl = document.getElementById('cmpResult'+(type==='tl'?'TL':'Agent')+'-'+safeSpvId);
   if (!resultEl || list.length < 2) return;
 
-  // Build summaries
+  // Build summaries — include special fields
   const summaries = list.map((name,i) => {
     const rows = getRowsFor(spv, type, name);
     const s = summarizeRows(rows);
     const hadirCount = rows.filter(r=>r.absensi==='Hadir').length;
     const totalHari  = rows.length || 1;
     const absensiPct = Math.round(hadirCount/totalHari*100);
-    return { name, s, hadirCount, totalHari, absensiPct, color: CMP_COLORS[i%CMP_COLORS.length] };
+    // auto-hitung rate jika kosong: dailyPayment / osDataBaru * 100
+    // cmpRate: pakai avgRate dari summarizeRows
+    // Kalau avgRate=0 tapi ada jmlDataBayar, derive dari jmlDataBayar/totalData
+    const cmpRate = s.avgRate > 0 ? s.avgRate
+      : (s.jmlDataBayar > 0 && s.totalData > 0 ? s.jmlDataBayar / s.totalData : 0);
+    const osDataBaru = s.osDataBaru || 0;
+    return { name, s, hadirCount, totalHari, absensiPct, cmpRate, osDataBaru,
+      color: CMP_COLORS[i%CMP_COLORS.length] };
   });
 
-  // Active metrics
-  const metrics = CMP_ALL_METRICS.filter(m => st.activeMetrics.includes(m.key));
+  // Helper: get value for any metric key from summary
+  function getVal(sm, key) {
+    if (key==='absensiPct') return sm.absensiPct;
+    if (key==='cmpRate')    return sm.cmpRate;
+    if (key==='osDataBaru') return sm.osDataBaru;
+    return sm.s[key]||0;
+  }
 
-  // Metric picker HTML
+  // Helper: format value by fmt
+  function fmtVal(v, fmt) {
+    if (fmt==='pct')   return v+'%';
+    if (fmt==='rate2') return (v*100).toFixed(2)+'%';
+    if (fmt==='rp')    return fmtRpFull(v);
+    if (fmt==='rate')  return fmtRate(v);
+    return fmtNum(v);
+  }
+
+  // Calculate overall score (wins count) for each person
+  const activeMetricDefs = CMP_ALL_METRICS.filter(m => st.activeMetrics.includes(m.key));
+  summaries.forEach(sm => {
+    sm.wins = 0;
+    activeMetricDefs.forEach(m => {
+      const myVal = getVal(sm, m.key);
+      const best = m.lowerIsBetter
+        ? Math.min(...summaries.map(x=>getVal(x,m.key)))
+        : Math.max(...summaries.map(x=>getVal(x,m.key)));
+      if (myVal === best && best > 0) sm.wins++;
+    });
+    // overall rating 0-100
+    sm.overall = activeMetricDefs.length > 0
+      ? Math.round(sm.wins / activeMetricDefs.length * 100)
+      : 0;
+  });
+
+  // Sort by wins for ranking
+  const ranked = [...summaries].sort((a,b)=>b.wins-a.wins);
+  summaries.forEach(sm => {
+    sm.rank = ranked.findIndex(r=>r.name===sm.name) + 1;
+  });
+
+  // Helper: get value adjusted for display mode (total or avg per hari)
+  const isAvg = st.dataView === 'avg';
+  // Metrics that should NOT be averaged (ratios, counts-by-nature)
+  const NO_AVG = new Set(['absensiPct','cmpRate','jumlahAlatWA','jumlahAlatGojek']);
+  function getDisplayVal(sm, key) {
+    const raw = getVal(sm, key);
+    if (isAvg && !NO_AVG.has(key)) {
+      const days = sm.totalHari || 1;
+      return raw / days;
+    }
+    return raw;
+  }
+  function fmtDisplay(v, fmt) {
+    return fmtVal(v, fmt);
+  }
+
+  // Metric picker + view toggles
   const pickerHtml = `
     <div class="compare-metric-picker">
-      <div class="compare-metric-picker-title">📌 Pilih Metrik yang Ditampilkan</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div class="compare-metric-picker-title" style="margin-bottom:0">📌 Pilih Metrik</div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <div class="h2h-data-toggle">
+            <button class="h2h-data-btn ${!isAvg?'active':''}"
+              onclick="setDataView('${safeSpvId}','${type}','total')">Jumlah</button>
+            <button class="h2h-data-btn ${isAvg?'active':''}"
+              onclick="setDataView('${safeSpvId}','${type}','avg')">Rata-rata/hari</button>
+          </div>
+          <div class="cmp-view-toggle dark-bg">
+            <button class="cmp-view-btn ${st.viewMode==='card'?'active':''}"
+              onclick="setCmpViewMode('${safeSpvId}','${type}','card')">🃏 Kartu</button>
+            <button class="cmp-view-btn ${st.viewMode==='chart'?'active':''}"
+              onclick="setCmpViewMode('${safeSpvId}','${type}','chart')">📊 Chart</button>
+          </div>
+        </div>
+      </div>
       <div class="compare-metric-grid">
         ${CMP_ALL_METRICS.map(m=>`
           <div class="compare-metric-pill ${st.activeMetrics.includes(m.key)?'active':''}"
@@ -2254,79 +2429,249 @@ function renderCompareResult(safeSpvId, type, spv) {
             ${escH(m.label)}
           </div>`).join('')}
       </div>
+      ${isAvg?`<div style="font-size:10px;color:var(--accent);margin-top:6px">⚡ Mode rata-rata per hari — berlaku untuk metrik aktivitas. Absensi, Rate, dan Alat tetap total.</div>`:''}
     </div>`;
 
-  // Chart type toggle
-  const toggleHtml = `
-    <div class="compare-chart-controls">
-      <div class="compare-chart-title">📊 ${type==='tl'?'Perbandingan Team Leader':'Perbandingan Agent'}</div>
-      <div class="compare-chart-toggle">
-        <button class="compare-chart-btn ${st.chartType==='bar'?'active':''}"
-          onclick="setCmpChartType('${safeSpvId}','${type}','bar',this.closest('.compare-chart-toggle'))">Bar</button>
-        <button class="compare-chart-btn ${st.chartType==='radar'?'active':''}"
-          onclick="setCmpChartType('${safeSpvId}','${type}','radar',this.closest('.compare-chart-toggle'))">Radar</button>
-      </div>
-    </div>`;
-
-  // Summary table
-  const tableHtml = `
-    <div style="overflow-x:auto;margin-bottom:14px">
-      <table style="width:100%;border-collapse:collapse;font-size:11px">
-        <thead>
-          <tr style="background:var(--surface2)">
-            <th style="padding:7px 10px;text-align:left;border-bottom:1px solid var(--border);font-weight:600;color:var(--text3)">Metrik</th>
-            ${summaries.map(sm=>`<th style="padding:7px 10px;text-align:right;border-bottom:1px solid var(--border);font-weight:700;color:${sm.color}">${escH(sm.name.split(' ')[0])}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          <tr style="background:var(--surface2)">
-            <td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text3);font-weight:600">Absensi (Hadir)</td>
-            ${summaries.map(sm=>`<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:600;color:${sm.absensiPct>=80?'var(--success)':sm.absensiPct>=60?'var(--warning)':'var(--danger)'}">${sm.absensiPct}%</td>`).join('')}
-          </tr>
-          ${metrics.map(m=>`
-            <tr>
-              <td style="padding:6px 10px;border-bottom:1px solid var(--border);color:var(--text3);font-weight:600">${escH(m.label)}</td>
-              ${summaries.map(sm=>{
-                const val = m.key==='avgRate' ? sm.s[m.key] : (sm.s[m.key]||0);
-                const fmt = m.fmt==='rp' ? fmtRp(val) : m.fmt==='rate' ? fmtRate(val) : fmtNum(val);
-                // Highlight max
-                const maxVal = Math.max(...summaries.map(x=>x.s[m.key]||0));
-                const isMax = (sm.s[m.key]||0)===maxVal && maxVal>0;
-                return `<td style="padding:6px 10px;border-bottom:1px solid var(--border);text-align:right;font-weight:${isMax?'700':'400'};color:${isMax?'var(--accent)':'var(--text)'}">${fmt}</td>`;
-              }).join('')}
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>`;
-
-  // Charts HTML — satu chart per metrik
-  const chartsHtml = `<div class="compare-charts-grid" id="cmpChartsGrid-${safeSpvId}">
-    <!-- Khusus: Absensi chart -->
-    <div class="compare-chart-card">
-      <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">Absensi (% Hadir)</div>
-      <div class="compare-chart-wrap"><canvas id="cmpChart-absensi-${safeSpvId}"></canvas></div>
-    </div>
-    ${metrics.map(m=>`
+  if (st.viewMode === 'chart') {
+    // CHART MODE — existing bar/radar charts
+    const toggleHtml = `
+      <div class="compare-chart-controls">
+        <div class="compare-chart-title">📊 ${type==='tl'?'Perbandingan Team Leader':'Perbandingan Agent'}</div>
+        <div class="compare-chart-toggle">
+          <button class="compare-chart-btn ${st.chartType==='bar'?'active':''}"
+            onclick="setCmpChartType('${safeSpvId}','${type}','bar',this.closest('.compare-chart-toggle'))">Bar</button>
+          <button class="compare-chart-btn ${st.chartType==='radar'?'active':''}"
+            onclick="setCmpChartType('${safeSpvId}','${type}','radar',this.closest('.compare-chart-toggle'))">Radar</button>
+        </div>
+      </div>`;
+    const chartsHtml = `<div class="compare-charts-grid" id="cmpChartsGrid-${safeSpvId}">
       <div class="compare-chart-card">
-        <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">${escH(m.label)}</div>
-        <div class="compare-chart-wrap"><canvas id="cmpChart-${m.key}-${safeSpvId}"></canvas></div>
-      </div>`).join('')}
-  </div>`;
+        <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">Absensi (% Hadir)</div>
+        <div class="compare-chart-wrap"><canvas id="cmpChart-absensi-${safeSpvId}"></canvas></div>
+      </div>
+      ${activeMetricDefs.filter(m=>m.key!=='absensiPct').map(m=>`
+        <div class="compare-chart-card">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">${escH(m.label)}</div>
+          <div class="compare-chart-wrap"><canvas id="cmpChart-${m.key}-${safeSpvId}"></canvas></div>
+        </div>`).join('')}
+    </div>`;
+    resultEl.innerHTML = pickerHtml + toggleHtml + chartsHtml;
+    setTimeout(() => buildCmpCharts(safeSpvId, summaries, activeMetricDefs, st, getVal), 50);
+    return;
+  }
 
-  resultEl.innerHTML = pickerHtml + toggleHtml + tableHtml + chartsHtml;
+  // CARD MODE
+  if (list.length === 2) {
+    // HEAD-TO-HEAD
+    const [A, B] = summaries;
+    let scoreA=0, scoreB=0;
+    const rowsHtml = activeMetricDefs.map(m => {
+      const va = getDisplayVal(A, m.key), vb = getDisplayVal(B, m.key);
+      const winA = m.lowerIsBetter ? va < vb : va > vb;
+      const winB = m.lowerIsBetter ? vb < va : vb > va;
+      const tie  = va === vb;
+      if (winA) scoreA++; else if (winB) scoreB++;
+      const pctA = (va+vb)>0 ? va/(va+vb)*50 : 25;
+      const pctB = (va+vb)>0 ? vb/(va+vb)*50 : 25;
+      return `
+        <div class="h2h-row">
+          <div class="h2h-val left ${winA&&!tie?'winner':''}" style="color:${winA&&!tie?A.color:'var(--text)'}">
+            ${fmtDisplay(va,m.fmt)}
+          </div>
+          <div class="h2h-metric-center">
+            <div class="h2h-metric-label">${escH(m.label)}</div>
+            <div class="h2h-bar-wrap">
+              <div class="h2h-bar-left" style="width:0%;background:${A.color}" data-w="${pctA}"></div>
+              <div class="h2h-bar-right" style="width:0%;background:${B.color}" data-w="${pctB}"></div>
+            </div>
+          </div>
+          <div class="h2h-val right ${winB&&!tie?'winner':''}" style="color:${winB&&!tie?B.color:'var(--text)'}">
+            ${fmtDisplay(vb,m.fmt)}
+          </div>
+        </div>`;
+    }).join('');
 
-  // Build charts after DOM ready
-  setTimeout(() => buildCmpCharts(safeSpvId, summaries, metrics, st), 50);
+    resultEl.innerHTML = pickerHtml + `
+      <div class="h2h-wrap">
+        <div class="h2h-header">
+          <div class="h2h-player">
+            <div class="h2h-avatar" style="background:${A.color}">${A.name.slice(0,2).toUpperCase()}</div>
+            <div class="h2h-name" style="color:${A.color}">${escH(A.name)}</div>
+          </div>
+          <div class="h2h-score-box">
+            <div class="h2h-score-label">Skor Metrik</div>
+            <div class="h2h-score">
+              <span style="color:${A.color}">${scoreA}</span>
+              <span class="h2h-score-sep">—</span>
+              <span style="color:${B.color}">${scoreB}</span>
+            </div>
+            <div style="font-size:10px;color:var(--text3)">${scoreA===scoreB?'Seri 🤝':scoreA>scoreB?A.name.split(' ')[0]+' Unggul 🏆':B.name.split(' ')[0]+' Unggul 🏆'}</div>
+          </div>
+          <div class="h2h-player">
+            <div class="h2h-avatar" style="background:${B.color}">${B.name.slice(0,2).toUpperCase()}</div>
+            <div class="h2h-name" style="color:${B.color}">${escH(B.name)}</div>
+          </div>
+        </div>
+        ${rowsHtml}
+      </div>`;
+
+    // Animate bars
+    setTimeout(() => {
+      resultEl.querySelectorAll('.h2h-bar-left,.h2h-bar-right').forEach(el => {
+        el.style.width = el.dataset.w + '%';
+      });
+    }, 60);
+
+  } else {
+    // PLAYER CARDS (3-5)
+    const rankColors = ['#F59E0B','#94A3B8','#CD7C2F'];
+    const rankClass  = i => i===0?'pc-rank-1':i===1?'pc-rank-2':i===2?'pc-rank-3':'pc-rank-n';
+    const rankEmoji  = i => i===0?'🥇':i===1?'🥈':i===2?'🥉':'';
+    const rankTextCls= i => i===0?'pc-text-gold':i===1?'pc-text-silver':i===2?'pc-text-bronze':'';
+
+    // winnerMap using getDisplayVal
+    const winnerMap = {};
+    activeMetricDefs.forEach(m => {
+      const vals = ranked.map(x => getDisplayVal(x, m.key));
+      const best = m.lowerIsBetter ? Math.min(...vals) : Math.max(...vals);
+      winnerMap[m.key] = best > 0 ? best : null;
+    });
+
+    // Card color scheme per rank — professional light
+    const CARD_SCHEMES = [
+      { bg:'pc-bg-rank1', textMain:'#fff', textSub:'rgba(255,255,255,.7)', metricBg:'rgba(255,255,255,.12)', winnerBg:'rgba(255,255,255,.22)', rankColor:'#FCD34D' },
+      { bg:'pc-bg-rank2', textMain:'#fff', textSub:'rgba(255,255,255,.65)', metricBg:'rgba(255,255,255,.1)', winnerBg:'rgba(255,255,255,.2)', rankColor:'#e2e8f0' },
+      { bg:'pc-bg-rank3', textMain:'#fff', textSub:'rgba(255,255,255,.65)', metricBg:'rgba(255,255,255,.1)', winnerBg:'rgba(255,255,255,.2)', rankColor:'#FDE68A' },
+      { bg:'pc-bg-rankn', textMain:'#1e293b', textSub:'#64748b', metricBg:'rgba(0,0,0,.04)', winnerBg:'rgba(29,96,200,.1)', rankColor:'#1d60c8' },
+    ];
+
+    const cardsHtml = ranked.map((sm, ri) => {
+      const scheme = CARD_SCHEMES[ri] || CARD_SCHEMES[3];
+      const radarCanvasId = `cmpRadar-${sm.name.replace(/[^a-zA-Z0-9]/g,'_')}-${safeSpvId}`;
+
+      const metricsHtml = activeMetricDefs.map(m => {
+        const val = getDisplayVal(sm, m.key);
+        const isWinner = winnerMap[m.key] !== null && val === winnerMap[m.key];
+        return `
+          <div class="pc-metric-row" style="background:${isWinner?scheme.winnerBg:scheme.metricBg}">
+            <span class="pc-metric-lbl" style="color:${scheme.textSub}">${escH(m.label)}</span>
+            <span class="pc-metric-val ${isWinner?'winner':''}" style="color:${isWinner?scheme.rankColor:scheme.textMain}">${fmtDisplay(val, m.fmt)}</span>
+            ${isWinner?`<span class="pc-metric-crown" style="color:${scheme.rankColor}">★</span>`:''}
+          </div>`;
+      }).join('');
+
+      return `
+        <div class="player-card-outer" onclick="this.classList.toggle('flipped')">
+          <div class="player-card-inner">
+            <!-- FRONT -->
+            <div class="player-card-face player-card-front ${scheme.bg} ${rankClass(ri)}">
+              <div class="pcf-inner">
+                <div class="pc-top-bar">
+                  <span class="pc-rank-badge">${rankEmoji(ri)||`<span style="font-size:14px;font-weight:800;color:${scheme.textSub}">${ri+1}</span>`}</span>
+                  <span class="pc-wins-badge" style="color:${scheme.rankColor};background:rgba(0,0,0,.15)">${sm.wins} menang</span>
+                </div>
+                <div class="pc-avatar" style="background:${sm.color}">${sm.name.slice(0,2).toUpperCase()}</div>
+                <div class="pc-name" style="color:${scheme.rankColor}">${escH(sm.name)}</div>
+                <div class="pc-metrics">${metricsHtml}</div>
+                <div class="pc-flip-hint" style="color:${scheme.textSub}">klik untuk radar chart ↩</div>
+              </div>
+            </div>
+            <!-- BACK (Radar) -->
+            <div class="player-card-face player-card-back ${scheme.bg} ${rankClass(ri)}">
+              <div class="pc-radar-wrap">
+                <div class="pc-radar-title" style="color:${scheme.rankColor}">${escH(sm.name)} — Radar</div>
+                <canvas id="${radarCanvasId}" style="flex:1;min-height:0"></canvas>
+                <div class="pc-flip-hint" style="color:${scheme.textSub}">klik untuk kembali ↩</div>
+              </div>
+            </div>
+          </div>
+        </div>`;
+    }).join('');
+
+    resultEl.innerHTML = pickerHtml + `<div class="cmp-cards-grid">${cardsHtml}</div>`;
+
+    // Sync card back height to front after DOM renders
+    setTimeout(() => {
+      resultEl.querySelectorAll('.player-card-outer').forEach(outer => {
+        const front = outer.querySelector('.player-card-front');
+        const back  = outer.querySelector('.player-card-back');
+        if (front && back) {
+          const h = front.offsetHeight;
+          outer.querySelector('.player-card-inner').style.height = h + 'px';
+          back.style.height = h + 'px';
+        }
+      });
+      buildCardRadars(safeSpvId, ranked, activeMetricDefs, getDisplayVal, fmtVal, st);
+    }, 80);
+  }
+}
+
+// ── Build radar charts on card backs ─────────────────────────
+function buildCardRadars(safeSpvId, ranked, metrics, getVal, fmtVal, st) {
+  const DL = (typeof ChartDataLabels !== 'undefined') ? ChartDataLabels : null;
+  const cc = getChartColors();
+  const labels = metrics.map(m=>m.label.slice(0,8));
+
+  ranked.forEach((sm) => {
+    const canvasId = `cmpRadar-${sm.name.replace(/[^a-zA-Z0-9]/g,'_')}-${safeSpvId}`;
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return;
+    const vals = metrics.map(m=>getVal(sm,m.key));    // Normalize to 0-100 for radar
+    const maxVals = metrics.map((_,i)=>Math.max(...ranked.map(x=>getVal(x,metrics[i].key)))||1);
+    const normalized = vals.map((v,i)=>Math.round(v/maxVals[i]*100));
+    try {
+      const ch = new Chart(ctx.getContext('2d'), {
+        type: 'radar',
+        data: {
+          labels,
+          datasets: [{
+            data: normalized,
+            backgroundColor: sm.color+'44',
+            borderColor: sm.color,
+            borderWidth: 2,
+            pointBackgroundColor: sm.color,
+            pointRadius: 3,
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            datalabels: { display: false },
+            tooltip: {
+              callbacks: {
+                label: ctx2 => ` ${fmtVal(vals[ctx2.dataIndex],metrics[ctx2.dataIndex].fmt)}`
+              }
+            }
+          },
+          scales: {
+            r: {
+              min: 0, max: 100,
+              ticks: { display: false, stepSize: 25 },
+              grid: { color: sm.color+'33' },
+              pointLabels: { color: '#94a3b8', font: { size: 8 } }
+            }
+          }
+        },
+        plugins: DL ? [DL] : [],
+      });
+      st.cmpCharts.push(ch);
+    } catch(e) {}
+  });
 }
 
 // ── Build all compare charts ──────────────────────────────────
-function buildCmpCharts(safeSpvId, summaries, metrics, st) {
+function buildCmpCharts(safeSpvId, summaries, metrics, st, getValFn) {
   destroyCmpCharts(st);
   const cc = getChartColors();
   const DL = (typeof ChartDataLabels !== 'undefined') ? ChartDataLabels : null;
   const names = summaries.map(s=>s.name.split(' ')[0]);
   const colors = summaries.map(s=>s.color);
   const type = st.chartType;
+
+  // Use provided getValFn or fallback to s[key]
+  const getV = getValFn || ((sm,key)=>sm.s[key]||0);
 
   function makeChart(canvasId, label, dataArr, fmt) {
     const ctx = document.getElementById(canvasId);
@@ -2335,8 +2680,10 @@ function buildCmpCharts(safeSpvId, summaries, metrics, st) {
     // Formatter berdasarkan format type
     const fmtLabel = v => {
       if (v === 0) return '0';
-      if (fmt==='rp') return fmtRpShort(v);
-      if (fmt==='rate') return (v*100).toFixed(2)+'%';
+      if (fmt==='rp')    return fmtRpShort(v); // chart label singkat ok
+      if (fmt==='rate')  return (v*100).toFixed(2)+'%';
+      if (fmt==='rate2') return (v*100).toFixed(2)+'%';
+      if (fmt==='pct')   return v+'%';
       return fmtNum(v);
     };
 
@@ -2418,11 +2765,11 @@ function buildCmpCharts(safeSpvId, summaries, metrics, st) {
   }
 
   // Absensi chart
-  makeChart('cmpChart-absensi-'+safeSpvId, 'Absensi %', summaries.map(s=>s.absensiPct), 'num');
+  makeChart('cmpChart-absensi-'+safeSpvId, 'Absensi %', summaries.map(s=>s.absensiPct||0), 'num');
 
-  // Metric charts
-  metrics.forEach(m => {
-    makeChart('cmpChart-'+m.key+'-'+safeSpvId, m.label, summaries.map(s=>s.s[m.key]||0), m.fmt);
+  // Metric charts — skip absensiPct (already shown above)
+  metrics.filter(m=>m.key!=='absensiPct').forEach(m => {
+    makeChart('cmpChart-'+m.key+'-'+safeSpvId, m.label, summaries.map(s=>getV(s,m.key)), m.fmt);
   });
 }
 
@@ -2454,6 +2801,20 @@ function toggleCmpMetric(safeSpvId, type, key, el) {
   if (idx>=0) { if(st.activeMetrics.length<=1) return; st.activeMetrics.splice(idx,1); el.classList.remove('active'); }
   else { st.activeMetrics.push(key); el.classList.add('active'); }
   renderCompareResult(safeSpvId, type, spv);
+}
+
+// ── Switch data view total/avg ────────────────────────────────
+function setDataView(safeSpvId, type, mode) {
+  const st = getCmpState(safeSpvId);
+  st.dataView = mode;
+  renderCompareResult(safeSpvId, type, spvFromId(safeSpvId));
+}
+
+// ── Switch view mode card/chart ───────────────────────────────
+function setCmpViewMode(safeSpvId, type, mode) {
+  const st = getCmpState(safeSpvId);
+  st.viewMode = mode;
+  renderCompareResult(safeSpvId, type, spvFromId(safeSpvId));
 }
 
 // ── Switch bar/radar ──────────────────────────────────────────
@@ -3314,12 +3675,6 @@ function toggleNavGroup(groupId){
   const toggle=el.previousElementSibling&&el.previousElementSibling.querySelector('.pres-nav-toggle');
   el.classList.toggle('collapsed');
   if(toggle)toggle.classList.toggle('collapsed');
-}
-
-// Format angka: selalu penuh untuk payment
-function fmtRpFull(v){
-  if(!v||v===0)return'Rp 0';
-  return'Rp '+Math.round(v).toLocaleString('id-ID');
 }
 
 // ================================================================
