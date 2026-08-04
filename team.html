@@ -588,6 +588,10 @@ select:focus{border-color:var(--accent);}
 .bsm-individual td:nth-child(2){min-width:170px;}
 .bsm-individual th:nth-child(2){min-width:170px;}
 
+.bsm-tl-group-header td{background:var(--accent-bg)!important;}
+.bsm-tl-group-header:hover td{background:var(--accent-bg)!important;}
+[data-theme="dark"] .bsm-tl-group-header td{background:#1a2540!important;}
+
 /* ── BUCKET SUMMARY BUTTON ── */
 .btn-bucket-summary{margin-left:auto;padding:3px 10px;font-size:11px;font-weight:600;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;}
 .btn-bucket-summary:hover{background:var(--accent);color:#fff;}
@@ -609,15 +613,17 @@ select:focus{border-color:var(--accent);}
 .bsm-table td:nth-child(2),.bsm-table td:nth-child(3){text-align:left;}
 .bsm-table tr:hover td{background:var(--surface2);}
 /* Freeze first 4 columns — td */
+/* Payment mode freeze: Rank+TL+Agent+Hadir+TotalPayment (5 cols) */
 .bsm-table td:nth-child(1){position:sticky;left:0;z-index:2;background:var(--surface);min-width:44px;text-align:center;}
 .bsm-table td:nth-child(2){position:sticky;left:44px;z-index:2;background:var(--surface);min-width:110px;}
 .bsm-table td:nth-child(3){position:sticky;left:154px;z-index:2;background:var(--surface);min-width:160px;}
-.bsm-table td:nth-child(4){position:sticky;left:314px;z-index:2;background:var(--surface);min-width:130px;border-right:2px solid var(--border);}
-/* Freeze first 4 columns — th (sticky both top AND left, highest z-index) */
+.bsm-table td:nth-child(4){position:sticky;left:314px;z-index:2;background:var(--surface);min-width:60px;text-align:center;}
+.bsm-table td:nth-child(5){position:sticky;left:374px;z-index:2;background:var(--surface);min-width:140px;border-right:2px solid var(--border);}
 .bsm-table th:nth-child(1){position:sticky;top:0;left:0;z-index:5;background:var(--navy);min-width:44px;text-align:center;}
 .bsm-table th:nth-child(2){position:sticky;top:0;left:44px;z-index:5;background:var(--navy);min-width:110px;}
 .bsm-table th:nth-child(3){position:sticky;top:0;left:154px;z-index:5;background:var(--navy);min-width:160px;}
-.bsm-table th:nth-child(4){position:sticky;top:0;left:314px;z-index:5;background:var(--navy);min-width:130px;border-right:2px solid rgba(255,255,255,.2);}
+.bsm-table th:nth-child(4){position:sticky;top:0;left:314px;z-index:5;background:var(--navy);min-width:60px;text-align:center;}
+.bsm-table th:nth-child(5){position:sticky;top:0;left:374px;z-index:5;background:var(--navy);min-width:140px;border-right:2px solid rgba(255,255,255,.2);}
 /* Payment cells */
 .bsm-pay-cell{text-align:center;min-width:90px;}
 .bsm-pay-0{background:#fee2e2 !important;color:#991b1b;font-weight:600;}
@@ -732,6 +738,7 @@ select:focus{border-color:var(--accent);}
         <select class="bsm-date-select" id="bsmDateSelect" onchange="setBsmDate(this.value)">
           <option value="">Semua Tanggal</option>
         </select>
+        <button class="bsm-view-btn" id="bsmGroupBtn" onclick="toggleBsmGroup()" style="margin-left:8px;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s">👥 Group</button>
         <div class="bsm-view-toggle" id="bsmViewToggle">
           <button class="bsm-view-btn active" data-view="total" onclick="setBsmView('total')">Jumlah</button>
           <button class="bsm-view-btn" data-view="avg" onclick="setBsmView('avg')">Rata-rata/hari</button>
@@ -1123,38 +1130,42 @@ document.addEventListener('click', e => {
   const dd = document.getElementById('bkSetupDropdown');
   if (dd && !dd.contains(e.target)) dd.classList.remove('open');
 });
-let _bsmState = { bucket:'', spv:'', mode:'payment', date:'', view:'total' };
+let _bsmState = { bucket:'', spv:'', mode:'payment', date:'', view:'total', grouped:false };
 
 function openBucketSummary(bucket, spv) {
   const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
   if (!rows.length) { alert('Tidak ada data untuk bucket ini.'); return; }
-  _bsmState = { bucket, spv, mode:'payment', date:'', view:'total' };
-  // Reset toggles
+  _bsmState = { bucket, spv, mode:'payment', date:'', view:'total', grouped:false };
   document.querySelectorAll('.bsm-mode-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.mode==='payment'));
   document.querySelectorAll('.bsm-view-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.view==='total'));
-  // Populate date dropdown
+  const gb = document.getElementById('bsmGroupBtn');
+  if (gb) { gb.style.background='var(--surface2)'; gb.style.color='var(--text2)'; gb.style.borderColor='var(--border)'; gb.textContent='👥 Group'; }
   const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
   const sel = document.getElementById('bsmDateSelect');
   if (sel) {
     sel.innerHTML = '<option value="">Semua Tanggal</option>' +
       allDates.map(d => {
-        const day = parseInt(d.split('-')[2]);
-        return `<option value="${d}">${day} ${_bsmState.bucket||''}</option>`;
-      }).join('');
-    // Better label: show day number + day name
-    sel.innerHTML = '<option value="">Semua Tanggal</option>' +
-      allDates.map(d => {
         const dt = new Date(d);
         const dayNames = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
-        const day = dt.getDate();
-        const dayName = dayNames[dt.getDay()];
-        return `<option value="${d}">${day} (${dayName})</option>`;
+        return `<option value="${d}">${dt.getDate()} (${dayNames[dt.getDay()]})</option>`;
       }).join('');
     sel.value = '';
   }
   document.getElementById('modalBucketSummary').classList.add('open');
+  _renderBucketSummary();
+}
+
+function toggleBsmGroup() {
+  _bsmState.grouped = !_bsmState.grouped;
+  const btn = document.getElementById('bsmGroupBtn');
+  if (btn) {
+    btn.style.background = _bsmState.grouped ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = _bsmState.grouped ? '#fff' : 'var(--text2)';
+    btn.style.borderColor = _bsmState.grouped ? 'var(--accent)' : 'var(--border)';
+    btn.textContent = _bsmState.grouped ? '👥 Ungroup' : '👥 Group';
+  }
   _renderBucketSummary();
 }
 
@@ -1221,6 +1232,7 @@ function _renderBucketSummary() {
 
   const agents = Object.values(byAgent).sort((a,b)=>b.total-a.total);
   function rankCls(i){ return i===0?'bsm-r1':i===1?'bsm-r2':i===2?'bsm-r3':'bsm-rn'; }
+  const tlRankCls = i => i===0?'bsm-r1':i===1?'bsm-r2':i===2?'bsm-r3':'bsm-rn';
 
   // Avg divisor = hari kerja agent (exclude Off)
   function getHariKerja(a) {
@@ -1283,13 +1295,71 @@ function _renderBucketSummary() {
       </tr>`;
     }).join('');
 
+    // ── GROUP mode: agents dikelompokkan per TL ──
+    let bodyHtml = tableRows;
+    if (_bsmState.grouped) {
+      // Group agents by TL, sort TL by total payment desc
+      const byTL = {};
+      agents.forEach(a => {
+        if (!byTL[a.tl]) byTL[a.tl] = [];
+        byTL[a.tl].push(a);
+      });
+      const tlGroups = Object.entries(byTL)
+        .map(([tl, agts]) => ({tl, agts, total: agts.reduce((s,a)=>s+a.total,0)}))
+        .sort((a,b)=>b.total-a.total);
+
+      bodyHtml = tlGroups.map((g, gi) => {
+        // TL header row — pakai accent-bg agar terbaca di mode terang maupun gelap
+        const tlTotal = 'Rp '+Math.round(g.total).toLocaleString('id-ID');
+        const tlRow = `<tr class="bsm-tl-group-header">
+          <td colspan="2" style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--accent)">
+            <span class="bsm-rank-badge ${tlRankCls(gi)}" style="margin-right:6px">${gi+1}</span>
+            <span style="font-weight:700;font-size:12px;color:var(--accent)">${escH(g.tl)}</span>
+          </td>
+          <td style="border-bottom:2px solid var(--accent)"></td>
+          <td style="text-align:center;border-bottom:2px solid var(--accent)"></td>
+          <td style="text-align:center;font-weight:700;border-right:2px solid var(--border);border-bottom:2px solid var(--accent);color:var(--accent)">${tlTotal}</td>
+          ${allDates.map(()=>`<td style="border-bottom:2px solid var(--accent)"></td>`).join('')}
+        </tr>`;
+
+        // Agent rows within this TL
+        const agentRows = g.agts.map((a, ai) => {
+          const _abs = calcAbsensi(a._rows);
+          const totalDisplay = fmtView(a.total, a, 'rp');
+          const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
+          const dayCells = allDates.map(d => {
+            const day = parseInt(d.split('-')[2]);
+            const info = a.days[day];
+            if (!info) return `<td class="bsm-pay-cell" style="color:var(--text3);text-align:center">—</td>`;
+            if (info.absensi==='Off') return `<td class="bsm-off-cell" style="text-align:center">Off</td>`;
+            const cls = payClass(info.payment, info.absensi);
+            let display;
+            if (info.payment>0) display='Rp '+Math.round(info.payment).toLocaleString('id-ID');
+            else display = info.absensi==='Alpha'?'<span style="color:#991b1b">Alpha</span>'
+              : info.absensi==='Izin'?'<span style="color:#6b7280">Izin</span>'
+              : info.absensi==='Sakit'?'<span style="color:#6b7280">Sakit</span>':'0';
+            return `<td class="${cls}" style="text-align:center">${display}</td>`;
+          }).join('');
+          return `<tr>
+            <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
+            <td style="font-weight:600;color:var(--accent);padding-left:16px">${escH(g.tl)}</td>
+            <td><span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500">${escH(a.ag)}</span>${moveBadge}</td>
+            <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
+            <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
+            ${dayCells}
+          </tr>`;
+        }).join('');
+        return tlRow + agentRows;
+      }).join('');
+    }
+
     tableHtml = `<table class="bsm-table">
       <thead><tr>
         <th style="text-align:center">Rank</th><th>Team Leader</th><th>Agent</th>
         <th style="text-align:center">Hadir</th>
         <th style="text-align:center;border-right:2px solid rgba(255,255,255,.2)">Total Payment${escH(viewLabel)}</th>
         ${dayHeaders}
-      </tr></thead><tbody>${tableRows}</tbody></table>`;
+      </tr></thead><tbody>${bodyHtml}</tbody></table>`;
 
   } else {
     // Individual mode — gunakan setup bucket jika ada, fallback ke SPV default
@@ -1346,6 +1416,61 @@ function _renderBucketSummary() {
       </tr>`;
     }).join('');
 
+    let indBodyHtml = tableRows;
+
+    // ── GROUP mode untuk Individual ──
+    if (_bsmState.grouped) {
+      const byTLInd = {};
+      agents.forEach(a => { if (!byTLInd[a.tl]) byTLInd[a.tl]=[]; byTLInd[a.tl].push(a); });
+      const tlGroupsInd = Object.entries(byTLInd)
+        .map(([tl,agts])=>({tl,agts,total:agts.reduce((s,a)=>s+a.total,0)}))
+        .sort((a,b)=>b.total-a.total);
+
+      indBodyHtml = tlGroupsInd.map((g, gi) => {
+        const tlTotal = 'Rp '+Math.round(g.total).toLocaleString('id-ID');
+        // TL header row
+        const tlHeaderRow = `<tr class="bsm-tl-group-header">
+          <td colspan="2" style="text-align:left;padding:7px 10px;border-bottom:2px solid var(--accent)">
+            <span class="bsm-rank-badge ${tlRankCls(gi)}" style="margin-right:6px">${gi+1}</span>
+            <span style="font-weight:700;font-size:12px;color:var(--accent)">${escH(g.tl)}</span>
+          </td>
+          <td style="border-bottom:2px solid var(--accent)"></td>
+          <td style="border-bottom:2px solid var(--accent)"></td>
+          <td style="text-align:center;font-weight:700;border-right:2px solid var(--border);border-bottom:2px solid var(--accent);color:var(--accent)">${tlTotal}</td>
+          ${setupCols.map(()=>`<td style="border-bottom:2px solid var(--accent)"></td>`).join('')}
+        </tr>`;
+
+        const agentRowsInd = g.agts.map((a, ai) => {
+          const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
+          const _abs = calcAbsensi(a._rows);
+          const s = summarizeRows(a._rows);
+          const agentRate = s.osDataBaru>0 ? s.dailyPayment/s.osDataBaru : (s.avgRate||0);
+          const rateDisplay = (agentRate*100).toFixed(2)+'%';
+          const metricCells = setupCols.map(m => {
+            const val = m.key==='absensiPct'?_abs.pct:m.key==='cmpRate'?agentRate:(s[m.key]||0);
+            return `<td style="text-align:center">${fmtView(val,a,m.fmt)}</td>`;
+          }).join('');
+          const tlAgentCellInd = `<td>
+            <div style="font-size:10px;color:var(--text3);font-weight:500;margin-bottom:1px">
+              <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(g.tl)}
+            </div>
+            <div style="font-weight:600;color:var(--text)">
+              <span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}">${escH(a.ag)}</span>${moveBadge}
+            </div>
+          </td>`;
+          return `<tr>
+            <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
+            ${tlAgentCellInd}
+            <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
+            <td style="text-align:center;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
+            <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
+            ${metricCells}
+          </tr>`;
+        }).join('');
+        return tlHeaderRow + agentRowsInd;
+      }).join('');
+    }
+
     tableHtml = `<div style="font-size:11px;color:var(--text3);padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">
         Setup aktif: <b style="color:var(--accent)">${setupLabel}</b>${date?` &nbsp;·&nbsp; <b style="color:var(--warning)">Tanggal: ${new Date(date).getDate()}</b>`:''}</div>
       <table class="bsm-table bsm-individual">
@@ -1356,7 +1481,7 @@ function _renderBucketSummary() {
           <th style="text-align:center">Rate</th>
           <th style="text-align:center;border-right:2px solid rgba(255,255,255,.2)">Payment${escH(viewLabel)}</th>
           ${colHeaders}
-        </tr></thead><tbody>${tableRows}</tbody></table>`;
+        </tr></thead><tbody>${indBodyHtml}</tbody></table>`;
   }
 
   document.getElementById('bsmTableWrap').innerHTML = tableHtml;
