@@ -339,7 +339,21 @@ async function doSearch(){
 
     renderAll(agentData,bulan,tahun);
   }catch(e){
-    document.getElementById('result').innerHTML=`<div class="state-box"><div class="icon">⚠️</div><p>${escH(e.message)}</p></div>`;
+    const isOffline = e.message==='Failed to fetch'||e.message.includes('NetworkError')||e.message.includes('fetch');
+    document.getElementById('result').innerHTML = isOffline
+      ? `<div class="state-box">
+          <div class="icon">📡</div>
+          <p style="font-weight:600;margin-bottom:8px">Tidak dapat memuat data</p>
+          <p style="font-size:13px;line-height:1.6">
+            • Kamu membuka file ini <b>secara offline</b><br>
+            • Koneksi internet terputus<br>
+            • Server sedang tidak tersedia
+          </p>
+          <p style="font-size:12px;color:var(--accent);margin-top:10px">
+            💡 Buka melalui <b>desk-collection-analytics.vercel.app</b>
+          </p>
+        </div>`
+      : `<div class="state-box"><div class="icon">⚠️</div><p>${escH(e.message)}</p></div>`;
   }
   btn.disabled=false;btn.textContent='🔍 Cari';
 }

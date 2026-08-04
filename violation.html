@@ -859,7 +859,21 @@ async function loadData(){
     populateAplikasiFilter();
     renderAll();
   }catch(e){
-    document.getElementById('loadingWrap').innerHTML='<div style="color:var(--danger);font-size:13px">⚠ Gagal memuat: '+e.message+'</div>';
+    const isOffline = e.message==='Failed to fetch'||e.message.includes('NetworkError')||e.message.includes('fetch');
+    document.getElementById('loadingWrap').innerHTML = isOffline
+      ? `<div style="text-align:center;padding:40px 20px">
+          <div style="font-size:36px;margin-bottom:12px">📡</div>
+          <div style="font-weight:600;margin-bottom:8px;color:var(--text)">Tidak dapat memuat data</div>
+          <div style="font-size:13px;color:var(--text3);line-height:1.6;max-width:320px;margin:0 auto">
+            • Kamu membuka file ini <b>secara offline</b><br>
+            • Koneksi internet terputus<br>
+            • Server sedang tidak tersedia
+          </div>
+          <div style="font-size:12px;color:var(--accent);margin-top:12px">
+            💡 Buka melalui <b>desk-collection-analytics.vercel.app</b>
+          </div>
+        </div>`
+      : `<div style="color:var(--danger);font-size:13px">⚠ Gagal memuat: ${e.message}</div>`;
   }
 }
 

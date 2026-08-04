@@ -553,6 +553,68 @@ select:focus{border-color:var(--accent);}
 .cmp-ms-item.selected .cmp-ms-cb{background:var(--accent);border-color:var(--accent);color:#fff;}
 .cmp-ms-footer{padding:6px 14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--text3);position:sticky;bottom:0;background:var(--surface);}
 
+.bsm-mode-btn.active{background:var(--accent)!important;color:#fff!important;}
+/* Individual mode: 5 freeze cols (Rank+TL+Agent+Hadir+TotalPay) */
+.bsm-individual td:nth-child(4){position:sticky;left:314px;z-index:2;background:var(--surface);min-width:70px;text-align:center;}
+.bsm-individual td:nth-child(5){position:sticky;left:384px;z-index:2;background:var(--surface);min-width:130px;border-right:2px solid var(--border);}
+.bsm-individual th:nth-child(4){position:sticky;top:0;left:314px;z-index:5;background:var(--navy);min-width:70px;text-align:center;}
+.bsm-individual th:nth-child(5){position:sticky;top:0;left:384px;z-index:5;background:var(--navy);min-width:130px;border-right:2px solid rgba(255,255,255,.2);}
+
+/* ── BUCKET SUMMARY BUTTON ── */
+.btn-bucket-summary{margin-left:auto;padding:3px 10px;font-size:11px;font-weight:600;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;}
+.btn-bucket-summary:hover{background:var(--accent);color:#fff;}
+
+/* ── BUCKET SUMMARY MODAL ── */
+#modalBucketSummary{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;}
+#modalBucketSummary.open{display:flex;}
+.bsm-modal{background:var(--surface);border-radius:var(--radius);width:95vw;max-width:1200px;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);}
+.bsm-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.bsm-title{font-size:15px;font-weight:700;flex:1;}
+.bsm-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);padding:2px 8px;}
+.bsm-close:hover{color:var(--text);}
+.bsm-body{overflow:hidden;flex:1;display:flex;flex-direction:column;}
+/* Freeze table layout */
+.bsm-table-wrap{overflow:auto;flex:1;position:relative;}
+.bsm-table{border-collapse:collapse;font-size:12px;white-space:nowrap;}
+.bsm-table th{padding:8px 10px;background:var(--navy);color:#fff;font-weight:600;font-size:11px;position:sticky;top:0;z-index:3;}
+.bsm-table td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.bsm-table tr:hover td{background:var(--surface2);}
+/* Freeze first 4 columns — td */
+.bsm-table td:nth-child(1){position:sticky;left:0;z-index:2;background:var(--surface);min-width:44px;text-align:center;}
+.bsm-table td:nth-child(2){position:sticky;left:44px;z-index:2;background:var(--surface);min-width:110px;}
+.bsm-table td:nth-child(3){position:sticky;left:154px;z-index:2;background:var(--surface);min-width:160px;}
+.bsm-table td:nth-child(4){position:sticky;left:314px;z-index:2;background:var(--surface);min-width:130px;border-right:2px solid var(--border);}
+/* Freeze first 4 columns — th (sticky both top AND left, highest z-index) */
+.bsm-table th:nth-child(1){position:sticky;top:0;left:0;z-index:5;background:var(--navy);min-width:44px;text-align:center;}
+.bsm-table th:nth-child(2){position:sticky;top:0;left:44px;z-index:5;background:var(--navy);min-width:110px;}
+.bsm-table th:nth-child(3){position:sticky;top:0;left:154px;z-index:5;background:var(--navy);min-width:160px;}
+.bsm-table th:nth-child(4){position:sticky;top:0;left:314px;z-index:5;background:var(--navy);min-width:130px;border-right:2px solid rgba(255,255,255,.2);}
+/* Payment cells */
+.bsm-pay-cell{text-align:center;min-width:90px;}
+.bsm-pay-0{background:#fee2e2 !important;color:#991b1b;font-weight:600;}
+.bsm-pay-low{background:#fef3c7 !important;color:#92400e;}
+.bsm-pay-ok{background:#f0fdf4 !important;color:#166534;}
+.bsm-pay-high{background:#dcfce7 !important;color:#14532d;font-weight:700;}
+[data-theme="dark"] .bsm-pay-0{background:#450a0a !important;color:#fca5a5;}
+[data-theme="dark"] .bsm-pay-low{background:#422006 !important;color:#fde68a;}
+[data-theme="dark"] .bsm-pay-ok{background:#052e16 !important;color:#86efac;}
+[data-theme="dark"] .bsm-pay-high{background:#14532d !important;color:#4ade80;}
+.bsm-rank-badge{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;font-size:11px;font-weight:800;}
+.bsm-r1{background:#fef3c7;color:#92400e;}
+.bsm-r2{background:#f1f5f9;color:#475569;}
+.bsm-r3{background:#fef2e2;color:#9a3412;}
+.bsm-rn{background:var(--surface2);color:var(--text3);}
+.bsm-off-cell{background:var(--surface2) !important;color:var(--text3);text-align:center;font-size:10px;}
+.bsm-footer{padding:10px 20px;border-top:1px solid var(--border);font-size:11px;color:var(--text3);flex-shrink:0;display:flex;gap:16px;align-items:center;}
+.bsm-legend{display:flex;align-items:center;gap:5px;}
+.bsm-legend-dot{width:12px;height:12px;border-radius:3px;}
+
+/* ── AGENT MOVE BADGE ── */
+.agent-move-badge{display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;background:#fff7ed;border:1px solid #fed7aa;cursor:help;vertical-align:middle;margin-left:4px;font-size:11px;flex-shrink:0;transition:background .15s;}
+.agent-move-badge:hover{background:#ffedd5;}
+.agent-move-tooltip{position:fixed;background:var(--navy);color:#fff;font-size:11px;padding:7px 11px;border-radius:6px;box-shadow:0 4px 16px rgba(0,0,0,.25);z-index:9999;pointer-events:none;max-width:220px;line-height:1.5;display:none;}
+.agent-move-tooltip.show{display:block;}
+
 /* ── LOCK SCREEN ── */
 .lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
 .lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
@@ -592,6 +654,33 @@ select:focus{border-color:var(--accent);}
     </div>
   </div>
 </nav>
+
+<!-- BUCKET SUMMARY MODAL -->
+<div id="modalBucketSummary" onclick="if(event.target===this)closeBucketSummary()">
+  <div class="bsm-modal">
+    <div class="bsm-head">
+      <div class="bsm-title" id="bsmTitle">📊 Summary Bucket</div>
+      <div style="display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-right:8px">
+        <button class="bsm-mode-btn active" data-mode="payment" onclick="setBsmMode('payment')" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">💰 Payment</button>
+        <button class="bsm-mode-btn" data-mode="individual" onclick="setBsmMode('individual')" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">👤 Individual</button>
+      </div>
+      <button class="bsm-close" onclick="closeBucketSummary()">✕</button>
+    </div>
+    <div class="bsm-body">
+      <div class="bsm-table-wrap" id="bsmTableWrap"></div>
+    </div>
+    <div class="bsm-footer">
+      <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#fee2e2"></div> 0 Payment</div>
+      <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#fef3c7"></div> Payment rendah</div>
+      <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#f0fdf4"></div> Payment ada</div>
+      <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#dcfce7"></div> Payment tinggi</div>
+      <span style="margin-left:auto">OFF = hari libur terjadwal</span>
+    </div>
+  </div>
+</div>
+
+<!-- AGENT MOVE TOOLTIP -->
+<div class="agent-move-tooltip" id="agentMoveTooltip"></div>
 
 <!-- LOCK SCREEN TIM -->
 <div class="lock-overlay" id="lockOverlay">
@@ -765,6 +854,9 @@ function getActiveIdx(spv){try{const r=localStorage.getItem('dca_active_'+spv);i
 function setActiveIdx(spv,i){localStorage.setItem('dca_active_'+spv,String(i));}
 
 let allRows=[], allBucketMap={}, currentModalSpv=null, currentModalEditIdx=null;
+let prevMonthRows=[]; // data bulan lalu untuk deteksi perpindahan agent
+let _prevAgentMap={}; // agentName → {aplikasi, bucket} bulan lalu
+
 // VIEW STATE: null = kartu SPV, string = detail satu SPV
 let currentSpvView=null;
 
@@ -842,8 +934,280 @@ async function loadData(){
     // Enable tombol presentasi setelah data berhasil dimuat
     const presBtn=document.getElementById('btnOpenPresentation');
     if(presBtn)presBtn.disabled=false;
-  }catch(e){document.getElementById('content').innerHTML='<div class="state-box"><div class="icon">⚠️</div><p>'+escH(e.message)+'</p></div>';}
+    // Fetch data bulan lalu di background untuk deteksi perpindahan agent
+    _fetchPrevMonthData(bulan, tahun);
+  }catch(e){
+    const isOffline = e.message==='Failed to fetch' || e.message.includes('NetworkError') || e.message.includes('fetch');
+    const msg = isOffline
+      ? `<div class="state-box">
+          <div class="icon">📡</div>
+          <p style="font-weight:600;margin-bottom:8px">Tidak dapat memuat data</p>
+          <p style="font-size:13px;color:var(--text3);max-width:360px;line-height:1.6">
+            Kemungkinan penyebab:<br>
+            • Kamu membuka file ini <b>secara offline</b> (langsung dari HP/laptop)<br>
+            • Koneksi internet terputus<br>
+            • Server Google Apps Script sedang tidak tersedia
+          </p>
+          <p style="font-size:12px;color:var(--accent);margin-top:12px">
+            💡 Buka melalui <b>desk-collection-analytics.vercel.app</b> untuk akses penuh
+          </p>
+        </div>`
+      : `<div class="state-box"><div class="icon">⚠️</div><p>${escH(e.message)}</p></div>`;
+    document.getElementById('content').innerHTML = msg;
+  }
   btn.disabled=false;btn.textContent='Tampilkan';
+}
+
+// ── Bucket Summary Modal ─────────────────────────────────────
+let _bsmState = { bucket:'', spv:'', mode:'payment' };
+
+function openBucketSummary(bucket, spv) {
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+  if (!rows.length) { alert('Tidak ada data untuk bucket ini.'); return; }
+  _bsmState = { bucket, spv, mode:'payment' };
+  // Reset toggle buttons
+  document.querySelectorAll('.bsm-mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode==='payment'));
+  document.getElementById('modalBucketSummary').classList.add('open');
+  _renderBucketSummary();
+}
+
+function setBsmMode(mode) {
+  _bsmState.mode = mode;
+  document.querySelectorAll('.bsm-mode-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode===mode));
+  _renderBucketSummary();
+}
+
+function _renderBucketSummary() {
+  const {bucket, spv, mode} = _bsmState;
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+  const bulan = document.getElementById('selBulan').value;
+  const tahun = document.getElementById('selTahun').value;
+
+  document.getElementById('bsmTitle').textContent =
+    `📊 Summary Bucket ${bucket} — ${bulan} ${tahun}`;
+
+  // Build per-agent aggregated data
+  const byAgent = {};
+  rows.forEach(r => {
+    const ag = r.agent||'?';
+    const tl = r.teamLeader||'—';
+    if (!byAgent[ag]) byAgent[ag] = {ag, tl, total:0, days:{}, s:{}, _rows:[], aplikasi:r.aplikasi||''};
+    byAgent[ag].total += (r.dailyPayment||0);
+    byAgent[ag]._rows.push(r);
+    ALL_METRICS.forEach(m => {
+      byAgent[ag].s[m.key] = (byAgent[ag].s[m.key]||0) + (r[m.key]||0);
+    });
+    if (r.tanggal) {
+      const day = parseInt(r.tanggal.split('-')[2]);
+      byAgent[ag].days[day] = { payment: r.dailyPayment||0, absensi: r.absensi||'' };
+    }
+  });
+
+  const agents = Object.values(byAgent).sort((a,b)=>b.total-a.total);
+  function rankCls(i){ return i===0?'bsm-r1':i===1?'bsm-r2':i===2?'bsm-r3':'bsm-rn'; }
+
+  let tableHtml = '';
+
+  if (mode === 'payment') {
+    // ── MODE PAYMENT: per tanggal ──
+    const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))]
+      .sort((a,b)=>new Date(a)-new Date(b));
+    const maxPay = Math.max(...agents.map(a=>a.total), 1);
+    const tLow = maxPay*0.1, tOk = maxPay*0.3;
+
+    function payClass(pay, absensi) {
+      if (absensi==='Off') return 'bsm-off-cell';
+      if (pay===0) return 'bsm-pay-cell bsm-pay-0';
+      if (pay<tLow) return 'bsm-pay-cell bsm-pay-low';
+      if (pay<tOk)  return 'bsm-pay-cell bsm-pay-ok';
+      return 'bsm-pay-cell bsm-pay-high';
+    }
+
+    const dayHeaders = allDates.map(d =>
+      `<th class="bsm-pay-cell" style="text-align:center">${parseInt(d.split('-')[2])}</th>`).join('');
+
+    const tableRows = agents.map((a,i) => {
+      const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
+      const dayCells = allDates.map(d => {
+        const day = parseInt(d.split('-')[2]);
+        const info = a.days[day];
+        if (!info) return `<td class="bsm-pay-cell" style="color:var(--text3);text-align:center">—</td>`;
+        if (info.absensi==='Off') return `<td class="bsm-off-cell" style="text-align:center">Off</td>`;
+        const cls = payClass(info.payment, info.absensi);
+        let display;
+        if (info.payment>0) {
+          display = 'Rp '+Math.round(info.payment).toLocaleString('id-ID');
+        } else {
+          display = info.absensi==='Alpha'?'<span style="color:#991b1b">Alpha</span>'
+            : info.absensi==='Izin' ?'<span style="color:#6b7280">Izin</span>'
+            : info.absensi==='Sakit'?'<span style="color:#6b7280">Sakit</span>'
+            : '0';
+        }
+        return `<td class="${cls}" style="text-align:center">${display}</td>`;
+      }).join('');
+      return `<tr>
+        <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
+        <td style="font-weight:600;color:var(--accent)">${escH(a.tl)}</td>
+        <td><span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500">${escH(a.ag)}</span>${moveBadge}</td>
+        <td class="${payClass(a.total,'')}" style="font-weight:700;border-right:2px solid var(--border);text-align:right">Rp ${Math.round(a.total).toLocaleString('id-ID')}</td>
+        ${dayCells}
+      </tr>`;
+    }).join('');
+
+    tableHtml = `<table class="bsm-table">
+      <thead><tr>
+        <th style="text-align:center">Rank</th><th>Team Leader</th><th>Agent</th>
+        <th style="text-align:right;border-right:2px solid rgba(255,255,255,.2)">Total Payment</th>
+        ${dayHeaders}
+      </tr></thead><tbody>${tableRows}</tbody></table>`;
+
+  } else {
+    // ── MODE INDIVIDUAL: total metrik setup aktif ──
+    const setups = getSetups(spv);
+    const activeIdx = parseInt(localStorage.getItem('dca_active_setup_'+spv)||'0');
+    const activeSetup = setups[activeIdx]||null;
+    const setupCols = activeSetup
+      ? activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean)
+      : ALL_METRICS.slice(0,8);
+
+    const colHeaders = setupCols.map(m=>`<th style="text-align:right">${m.label}</th>`).join('');
+    const setupLabel = activeSetup ? escH(activeSetup.name) : 'Default';
+
+    const tableRows = agents.map((a,i) => {
+      const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
+      const _abs = calcAbsensi(a._rows);
+      // Pakai summarizeRows agar jumlahAlatWA, jumlahAlatGojek, avgRate dihitung benar
+      const s = summarizeRows(a._rows);
+      const metricCells = setupCols.map(m => {
+        const val = m.key==='absensiPct' ? _abs.pct
+          : m.key==='cmpRate' ? (s.avgRate||0)
+          : (s[m.key]||0);
+        const display = m.fmt==='rp'
+          ? 'Rp '+Math.round(val).toLocaleString('id-ID')
+          : (m.fmt==='pct'||m.fmt==='rate'||m.fmt==='rate2') ? (val*100).toFixed(2)+'%'
+          : Math.round(val).toLocaleString('id-ID');
+        return `<td style="text-align:center">${display}</td>`;
+      }).join('');
+      return `<tr>
+        <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
+        <td style="font-weight:600;color:var(--accent)">${escH(a.tl)}</td>
+        <td><span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500">${escH(a.ag)}</span>${moveBadge}</td>
+        <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
+        <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(a.total).toLocaleString('id-ID')}</td>
+        ${metricCells}
+      </tr>`;
+    }).join('');
+
+    tableHtml = `<div style="font-size:11px;color:var(--text3);padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">
+        Setup aktif: <b style="color:var(--accent)">${setupLabel}</b></div>
+      <table class="bsm-table bsm-individual">
+        <thead><tr>
+          <th style="text-align:center">Rank</th><th>Team Leader</th><th>Agent</th>
+          <th style="text-align:center">Hadir</th>
+          <th style="text-align:right;border-right:2px solid rgba(255,255,255,.2)">Total Payment</th>
+          ${colHeaders}
+        </tr></thead><tbody>${tableRows}</tbody></table>`;
+  }
+
+  document.getElementById('bsmTableWrap').innerHTML = tableHtml;
+}
+
+function closeBucketSummary() {
+  document.getElementById('modalBucketSummary').classList.remove('open');
+}
+
+
+// ── Agent Move Badge ─────────────────────────────────────────
+// Returns 🔄 badge if agent pindah aplikasi:
+// - Bulan lalu di aplikasi berbeda, ATAU
+// - Bulan ini muncul di >1 aplikasi (pindah di pertengahan bulan)
+function getAgentMoveBadge(agentName, currentAplikasi, appsBulanIni) {
+  if (!agentName) return '';
+
+  let prevApp='', prevBkt='', tooltipDetail='';
+
+  // Case 1: pindah dalam bulan ini (multi-app)
+  if (appsBulanIni && appsBulanIni.length > 1) {
+    const others = appsBulanIni.filter(a=>a!==currentAplikasi);
+    prevApp = others.join(', ');
+    tooltipDetail = `Pindah aplikasi dalam bulan ini:<br>
+      Dari: <b>${escH(prevApp)}</b><br>
+      Ke: <b>${escH(currentAplikasi)}</b>`;
+  }
+  // Case 2: pindah dari bulan lalu
+  else if (_prevAgentMap[agentName]) {
+    const prev = _prevAgentMap[agentName];
+    if (!prev.aplikasi || prev.aplikasi === currentAplikasi) return '';
+    prevApp = prev.aplikasi;
+    prevBkt = prev.bucket||'';
+    tooltipDetail = `Bulan lalu: <b>${escH(prevApp)}</b>${prevBkt?' · Bucket '+escH(prevBkt):''}<br>
+      Bulan ini: <b>${escH(currentAplikasi)}</b>`;
+  }
+  else return '';
+
+  const safeAgent  = agentName.replace(/'/g,"\\'");
+  const safeDetail = tooltipDetail.replace(/'/g,"\\'").replace(/\n/g,'');
+  return `<span class="agent-move-badge"
+    onmouseenter="showMoveTooltipRaw(event,'${safeDetail}')"
+    onmouseleave="hideMoveTooltip()"
+    onclick="showMoveTooltipRaw(event,'${safeDetail}')"
+    title="Pindah dari ${escH(prevApp)}">🔄</span>`;
+}
+
+function showMoveTooltipRaw(e, htmlContent) {
+  const tt = document.getElementById('agentMoveTooltip');
+  if (!tt) return;
+  tt.innerHTML = `<b>🔄 Perpindahan Project</b><br>${htmlContent}`;
+  tt.classList.add('show');
+  const x = e.clientX + 10, y = e.clientY + 10;
+  const w = tt.offsetWidth || 200;
+  tt.style.left = (x + w > window.innerWidth ? x - w - 14 : x) + 'px';
+  tt.style.top  = (y + 80 > window.innerHeight ? y - 90 : y) + 'px';
+}
+
+function hideMoveTooltip() {
+  const tt = document.getElementById('agentMoveTooltip');
+  if (tt) tt.classList.remove('show');
+}
+
+// Re-render badges setelah prevMonthData tersedia (inject ke DOM langsung)
+function _renderAgentMoveBadges() {
+  document.querySelectorAll('[data-agent-name]').forEach(el => {
+    const agentName = el.dataset.agentName;
+    const currApp   = el.dataset.agentApp;
+    if (!agentName || !currApp) return;
+    const existing = el.querySelector('.agent-move-badge');
+    if (existing) existing.remove();
+    // Hanya re-render badge bulan lalu (multi-app sudah dirender saat buildTLRow)
+    const badge = getAgentMoveBadge(agentName, currApp);
+    if (badge) el.insertAdjacentHTML('beforeend', badge);
+  });
+}
+
+// ── Fetch bulan lalu di background ───────────────────────────
+function _fetchPrevMonthData(bulan, tahun) {
+  const BULAN_LIST=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const idx = BULAN_LIST.indexOf(bulan);
+  let prevBulan, prevTahun;
+  if (idx === 0) { prevBulan = BULAN_LIST[11]; prevTahun = String(parseInt(tahun)-1); }
+  else           { prevBulan = BULAN_LIST[idx-1]; prevTahun = tahun; }
+  fetchJSON(API_URL+'?action=agentdata&bulan='+prevBulan+'&tahun='+prevTahun)
+    .then(d => {
+      if (d && d.success) {
+        prevMonthRows = d.rows || [];
+        // Build lookup: agentName → {aplikasi, bucket}
+        _prevAgentMap = {};
+        prevMonthRows.forEach(r => {
+          if (!r.agent) return;
+          if (!_prevAgentMap[r.agent]) _prevAgentMap[r.agent] = {aplikasi: r.aplikasi||'', bucket: r.bucket||''};
+        });
+        // Re-render badges setelah data prev bulan tersedia
+        _renderAgentMoveBadges();
+      }
+    })
+    .catch(() => {}); // silent fail — fitur opsional
 }
 
 function renderSidebar(rows,bulan,tahun){
@@ -875,8 +1239,10 @@ function summarizeRows(rows){
   }
 
   // [ALAT] Count alat unik aktif (non-empty string)
-  r.jumlahAlatWA    = rows.filter(x=>x.alatWA&&x.alatWA!=='—').length;
-  r.jumlahAlatGojek = rows.filter(x=>x.alatGojek&&x.alatGojek!=='—').length;
+  // jumlahAlatWA/Gojek: sum nilai per baris (bukan count baris)
+  // alatWA berisi angka jumlah kartu/alat per hari
+  r.jumlahAlatWA    = rows.reduce((a,x)=>a+(x.alatWA||0),0);
+  r.jumlahAlatGojek = rows.reduce((a,x)=>a+(x.alatGojek||0),0);
 
   // [DERIVED METRICS] Rasio penyentuhan — dihitung otomatis dari data yang ada
   r.rateResponWA      = r.sentuhWA>0    ? r.responWA/r.sentuhWA      : 0;
@@ -1051,10 +1417,13 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     }).join('');
 
     const bkCount=new Set(Object.values(byBucket[bk]).flat().map(r=>r.agent)).size;
+    const allBkRows=Object.values(byBucket[bk]).flat();
+    const safeBk=escA(bk); const safeSpv2=escA(spv);
     return `<div class="bucket-group">
       <div class="bucket-header">
         <span class="bucket-label">${escH(bk)}</span>
         <span class="bucket-badge">${Object.keys(byBucket[bk]).length} TL · ${bkCount} agent</span>
+        <button class="btn-bucket-summary" onclick="openBucketSummary('${safeBk}','${safeSpv2}')" title="Lihat summary ranking bucket">📊 Summary</button>
       </div>
       ${tlRows}
     </div>`;
@@ -1968,10 +2337,19 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
     }
     // Dot catatan SPV
     const catatanDot=a.hasCatatan?`<span class="catatan-dot" title="Ada catatan SPV"></span>`:'';
+    // Badge perpindahan project
+    const currAplikasi = (a.rows&&a.rows[0]&&a.rows[0].aplikasi)||'';
+    // Deteksi pindah dalam bulan ini (>1 aplikasi berbeda)
+    const appsBulanIni = [...new Set(a.rows.map(r=>r.aplikasi).filter(Boolean))];
+    const multiApp = appsBulanIni.length > 1;
+    // Badge: pindah bulan lalu ATAU pindah dalam bulan ini
+    const moveBadge = multiApp
+      ? getAgentMoveBadge(a.ag, currAplikasi, appsBulanIni)
+      : getAgentMoveBadge(a.ag, currAplikasi);
 
     return `<tr class="agent-row ${rotasiClass}" data-agent="${escH(a.ag)}" data-spv="${escH(spv)}">
       <td><span style="display:inline-flex;align-items:center;justify-content:center;width:18px;height:18px;border-radius:50%;font-size:10px;font-weight:700;margin-right:6px;flex-shrink:0;background:var(--surface2);color:var(--text3)">${j+1}</span>
-        <span class="agent-link" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${catatanDot}${rotasiLabel}
+        <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(currAplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${catatanDot}${rotasiLabel}${moveBadge}
       </td>
       <td><span class="absensi-pill ${hadir}">${a.hadir}/${a.hariKerja??a.total}</span></td>
       <td class="num" style="white-space:nowrap">${fmtRpFull(a.s.dailyPayment)}</td>
@@ -4051,6 +4429,7 @@ function initPresCharts(slideIdx){
 // Tutup presentasi dengan ESC
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&document.getElementById('presOverlay').classList.contains('open'))closePresentation();
+  if(e.key==='Escape'&&document.getElementById('modalBucketSummary').classList.contains('open'))closeBucketSummary();
   if(document.getElementById('presOverlay').classList.contains('open')){
     if(e.key==='ArrowRight')presNavigate(1);
     if(e.key==='ArrowLeft')presNavigate(-1);

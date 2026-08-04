@@ -310,7 +310,21 @@ async function loadData(){
 
     document.getElementById('navTimestamp').textContent='Update: '+new Date().toLocaleDateString('id-ID')+', '+new Date().toLocaleTimeString('id-ID');
   }catch(e){
-    document.getElementById('statGrid').innerHTML='<div class="state-box" style="grid-column:1/-1"><div class="icon">⚠️</div><p>'+e.message+'</p><p style="font-size:12px;margin-top:6px">Klik Refresh untuk coba lagi.</p></div>';
+    const isOffline = e.message==='Failed to fetch'||e.message.includes('NetworkError')||e.message.includes('fetch');
+    document.getElementById('statGrid').innerHTML = isOffline
+      ? `<div class="state-box" style="grid-column:1/-1">
+          <div class="icon">📡</div>
+          <p style="font-weight:600;margin-bottom:8px">Tidak dapat memuat data</p>
+          <p style="font-size:13px;line-height:1.6">
+            • Kamu membuka file ini <b>secara offline</b><br>
+            • Koneksi internet terputus<br>
+            • Server sedang tidak tersedia
+          </p>
+          <p style="font-size:12px;color:var(--accent);margin-top:10px">
+            💡 Buka melalui <b>desk-collection-analytics.vercel.app</b>
+          </p>
+        </div>`
+      : `<div class="state-box" style="grid-column:1/-1"><div class="icon">⚠️</div><p>${e.message}</p><p style="font-size:12px;margin-top:6px">Klik Refresh untuk coba lagi.</p></div>`;
   }
   btn.disabled=false;btn.textContent='↻ Refresh';
 }
