@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Rank Board — System TZ Analytics</title>
+<style>
+:root{
+  --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
+  --border:#e4e7ec;--text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --accent:#1d60c8;--accent-bg:#eef3fd;
+  --success:#16a34a;--success-bg:#f0fdf4;
+  --warning:#d97706;--warning-bg:#fffbeb;
+  --danger:#dc2626;--danger-bg:#fef2f2;
+  --gold:#f59e0b;--silver:#94a3b8;--bronze:#cd7c2f;
+  --radius:10px;--radius-sm:6px;--shadow:0 1px 4px rgba(0,0,0,.08);
+  --sidebar-w:220px;
+}
+[data-theme="dark"]{
+  --navy:#0f1523;--bg:#0a0d14;--surface:#131825;--surface2:#1a2035;
+  --border:#252d42;--text:#f1f3f9;--text2:#9aa5be;--text3:#4a5568;
+  --accent:#4a8cf7;--accent-bg:#1a2540;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);font-size:14px;}
+
+/* NAVBAR */
+.navbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 calc(var(--sidebar-w)+20px);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,.3);}
+.nav-left{display:flex;align-items:center;gap:10px;}
+.nav-logo-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.nav-title{font-size:15px;font-weight:700;color:#fff;}
+.nav-page{font-size:13px;color:rgba(255,255,255,.5);margin-left:4px;}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.tz-lang-wrap{display:flex;border:1px solid rgba(255,255,255,.2);border-radius:6px;overflow:hidden;}
+.tz-lang-btn{padding:4px 10px;font-size:11px;font-weight:600;background:transparent;border:none;cursor:pointer;color:rgba(255,255,255,.7);}
+.tz-lang-btn.active{background:rgba(255,255,255,.2);color:#fff;}
+.theme-toggle{display:flex;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);border-radius:var(--radius-sm);overflow:hidden;}
+.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,.5);cursor:pointer;border:none;background:none;}
+.theme-btn.active{color:#fff;background:rgba(255,255,255,.15);}
+
+/* SIDEBAR */
+.sidebar{position:fixed;top:52px;left:0;width:var(--sidebar-w);height:calc(100vh - 52px);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;z-index:100;padding:14px 10px;}
+.sidebar-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;padding:0 6px;margin:10px 0 6px;}
+.sidebar-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;text-decoration:none;margin-bottom:2px;transition:all .15s;}
+.sidebar-item:hover{background:var(--surface2);color:var(--text);}
+.sidebar-item.active{background:var(--accent-bg);color:var(--accent);}
+.sidebar-item .icon{font-size:15px;width:18px;text-align:center;}
+.sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
+
+/* MAIN */
+.main{margin-left:var(--sidebar-w);margin-top:52px;padding:24px;min-height:calc(100vh - 52px);}
+
+/* TOP BAR */
+.top-bar{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;}
+.top-bar-title{font-size:18px;font-weight:700;color:var(--text);}
+.top-bar-right{display:flex;gap:8px;align-items:center;}
+.btn{padding:7px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;border:none;transition:all .15s;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{opacity:.9;}
+.btn-secondary{background:var(--surface);color:var(--text2);border:1px solid var(--border);}
+.btn-secondary:hover{border-color:var(--accent);color:var(--accent);}
+.btn-danger{background:var(--danger-bg);color:var(--danger);border:1px solid #fca5a5;}
+.btn-danger:hover{background:var(--danger);color:#fff;}
+.btn-sm{padding:4px 10px;font-size:11px;}
+
+/* RANK CARDS GRID */
+.cards-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(380px,1fr));gap:20px;}
+
+/* RANK CARD */
+.rank-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+.rank-card-header{padding:14px 16px;border-bottom:1px solid var(--border);display:flex;align-items:flex-start;justify-content:space-between;gap:10px;}
+.rank-card-title{font-size:15px;font-weight:700;color:var(--text);}
+.rank-card-meta{font-size:11px;color:var(--text3);margin-top:3px;}
+.rank-card-badge{padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;}
+.badge-daily{background:#dbeafe;color:#1d4ed8;}
+.badge-monthly{background:#d1fae5;color:#065f46;}
+.rank-card-actions{display:flex;gap:6px;flex-shrink:0;}
+.icon-btn{width:28px;height:28px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface2);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text2);transition:all .12s;}
+.icon-btn:hover{border-color:var(--accent);color:var(--accent);}
+.icon-btn.danger:hover{border-color:var(--danger);color:var(--danger);}
+
+/* RANK TABLE */
+.rank-table-wrap{overflow-x:auto;}
+.rank-table{width:100%;border-collapse:collapse;font-size:12px;}
+.rank-table th{padding:8px 10px;text-align:left;font-weight:600;color:var(--text3);font-size:10px;text-transform:uppercase;letter-spacing:.04em;background:var(--surface2);border-bottom:1px solid var(--border);}
+.rank-table td{padding:8px 10px;border-bottom:1px solid var(--border);}
+.rank-table tr:last-child td{border-bottom:none;}
+.rank-table tr:hover td{background:var(--surface2);}
+
+/* BUCKET HEADER ROW */
+.bucket-row td{background:var(--navy);color:#fff;font-weight:700;font-size:11px;letter-spacing:.06em;padding:5px 10px;}
+[data-theme="dark"] .bucket-row td{background:#1e2d4a;}
+
+/* RANK BADGES */
+.rank-1{background:#fef3c7;color:#92400e;font-weight:800;border-radius:4px;padding:1px 6px;}
+.rank-2{background:#f1f5f9;color:#475569;font-weight:700;border-radius:4px;padding:1px 6px;}
+.rank-3{background:#fef2e2;color:#9a3412;font-weight:700;border-radius:4px;padding:1px 6px;}
+.rank-n{background:var(--surface2);color:var(--text2);font-weight:600;border-radius:4px;padding:1px 6px;}
+
+/* GAP */
+.gap-pos{color:var(--success);font-weight:600;}
+.gap-neg{color:var(--danger);font-weight:600;}
+.gap-zero{color:var(--text3);}
+
+/* RATE */
+.rate-high{color:var(--success);font-weight:700;}
+.rate-mid{color:var(--warning);font-weight:600;}
+.rate-low{color:var(--danger);font-weight:600;}
+
+/* EDN highlight */
+.edn-row td{background:var(--accent-bg);}
+.edn-row td:first-child{border-left:3px solid var(--accent);}
+
+/* CARD FOOTER */
+.rank-card-footer{padding:8px 14px;background:var(--surface2);border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;font-size:10px;color:var(--text3);}
+
+/* EMPTY STATE */
+.empty-state{text-align:center;padding:60px 20px;color:var(--text3);}
+.empty-state-icon{font-size:48px;margin-bottom:12px;}
+.empty-state-text{font-size:14px;margin-bottom:16px;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:500;align-items:center;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:var(--surface);border-radius:var(--radius);width:560px;max-width:95vw;max-height:90vh;overflow-y:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+.modal-head{padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.modal-head-title{font-size:15px;font-weight:700;}
+.modal-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);padding:2px 6px;}
+.modal-close:hover{color:var(--text);}
+.modal-body{padding:20px;}
+.modal-footer{padding:14px 20px;border-top:1px solid var(--border);display:flex;gap:8px;justify-content:flex-end;}
+
+/* FORM */
+.form-group{margin-bottom:14px;}
+.form-label{font-size:12px;font-weight:600;color:var(--text2);margin-bottom:5px;display:block;}
+.form-input{width:100%;padding:8px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:13px;outline:none;}
+.form-input:focus{border-color:var(--accent);}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-hint{font-size:11px;color:var(--text3);margin-top:4px;}
+.form-section{font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin:18px 0 10px;padding-top:14px;border-top:1px solid var(--border);}
+
+/* VENDOR LIST BUILDER */
+.vendor-list{display:flex;flex-direction:column;gap:6px;margin-bottom:8px;}
+.vendor-item{display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);}
+.vendor-item input{flex:1;border:none;background:transparent;color:var(--text);font-size:12px;outline:none;}
+.vendor-color{width:18px;height:18px;border-radius:50%;border:2px solid rgba(0,0,0,.1);cursor:pointer;flex-shrink:0;}
+.vendor-edn-badge{font-size:10px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:10px;font-weight:600;}
+.vendor-del{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:2px;}
+.vendor-del:hover{color:var(--danger);}
+
+/* BUCKET LIST */
+.bucket-tags{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.bucket-tag{display:flex;align-items:center;gap:4px;padding:3px 8px 3px 10px;border-radius:20px;background:var(--accent-bg);color:var(--accent);font-size:11px;font-weight:600;border:1px solid #bfdbfe;}
+.bucket-tag-del{background:none;border:none;cursor:pointer;color:var(--accent);font-size:13px;padding:0;opacity:.7;}
+.bucket-tag-del:hover{opacity:1;}
+
+/* UPDATE MODAL */
+.update-section{margin-bottom:16px;}
+.update-section-title{font-size:12px;font-weight:700;color:var(--navy);background:var(--accent-bg);padding:6px 10px;border-radius:var(--radius-sm);margin-bottom:8px;}
+[data-theme="dark"] .update-section-title{background:var(--surface2);color:var(--accent);}
+.update-row{display:grid;gap:8px;margin-bottom:6px;align-items:center;}
+.update-vendor-label{font-size:11px;font-weight:600;color:var(--text2);padding-top:2px;}
+.update-input{padding:6px 8px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:12px;outline:none;width:100%;}
+.update-input:focus{border-color:var(--accent);}
+.update-col-header{font-size:10px;font-weight:700;color:var(--text3);text-align:center;text-transform:uppercase;}
+.editor-name-wrap{margin-bottom:14px;padding:10px 12px;background:var(--surface2);border-radius:var(--radius-sm);border:1px solid var(--border);}
+
+/* BUCKET-VENDOR NESTED BUILDER */
+.bv-block{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);margin-bottom:10px;overflow:hidden;}
+.bv-bucket-header{display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--navy);color:#fff;font-size:12px;font-weight:700;}
+[data-theme="dark"] .bv-bucket-header{background:#1e2d4a;}
+.bv-bucket-name{flex:1;background:transparent;border:none;color:#fff;font-size:12px;font-weight:700;outline:none;}
+.bv-bucket-name::placeholder{color:rgba(255,255,255,.4);}
+.bv-bucket-del{background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:4px;cursor:pointer;padding:2px 7px;font-size:13px;}
+.bv-bucket-del:hover{background:var(--danger);}
+.bv-vendors{padding:8px 10px;display:flex;flex-direction:column;gap:5px;}
+.bv-vendor-row{display:flex;align-items:center;gap:7px;padding:5px 8px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);}
+.bv-vendor-color{width:18px;height:18px;border-radius:50%;border:2px solid rgba(0,0,0,.1);cursor:pointer;flex-shrink:0;}
+.bv-vendor-name{flex:1;border:none;background:transparent;color:var(--text);font-size:12px;outline:none;}
+.bv-vendor-tim{font-size:9px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:10px;font-weight:600;flex-shrink:0;}
+.bv-vendor-del{background:none;border:none;cursor:pointer;color:var(--text3);font-size:14px;padding:2px 4px;}
+.bv-vendor-del:hover{color:var(--danger);}
+.bv-add-vendor{display:flex;align-items:center;gap:6px;padding:5px 8px;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;border-radius:var(--radius-sm);border:1px dashed var(--accent);background:var(--accent-bg);}
+.bv-add-vendor:hover{background:var(--accent);color:#fff;}
+
+/* MOBILE */
+@media(max-width:768px){
+  .sidebar{display:none;}
+  .navbar{padding-left:20px;}
+  .main{margin-left:0;padding:16px;}
+  .cards-grid{grid-template-columns:1fr;}
+}
+</style>
+</head>
+<body>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="nav-left">
+    <a href="index.html" style="text-decoration:none;display:flex;align-items:center;gap:8px">
+      <span class="nav-logo-badge">TZ</span>
+      <span class="nav-title">System TZ Analytics</span>
+    </a>
+    <span class="nav-page">🏆 Rank Board</span>
+  </div>
+  <div class="nav-right">
+    <div class="tz-lang-wrap">
+      <button class="tz-lang-btn active" data-lang="id" onclick="setThemeLang('id')">🇮🇩 ID</button>
+      <button class="tz-lang-btn" data-lang="zh" onclick="setThemeLang('zh')">🇨🇳 中文</button>
+    </div>
+    <div class="theme-toggle">
+      <button class="theme-btn active" id="btnLight" onclick="setTheme('light')">☀ Terang</button>
+      <button class="theme-btn" id="btnDark" onclick="setTheme('dark')">🌙 Gelap</button>
+    </div>
+  </div>
+</nav>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="sidebar-label">Navigasi</div>
+  <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
+  <a class="sidebar-item" href="team.html"><span class="icon">👥</span> Tim</a>
+  <a class="sidebar-item" href="agent.html"><span class="icon">👤</span> Agent</a>
+  <a class="sidebar-item" href="violation.html"><span class="icon">⚠️</span> Violation</a>
+  <a class="sidebar-item active" href="rank.html"><span class="icon">🏆</span> Rank Board</a>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-label">Rank Cards</div>
+  <div id="sidebarRankList"></div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="top-bar">
+    <div>
+      <div class="top-bar-title">🏆 Rank Board</div>
+      <div style="font-size:12px;color:var(--text3);margin-top:3px">Perbandingan performa vendor per aplikasi</div>
+    </div>
+    <div class="top-bar-right">
+      <button class="btn btn-secondary" onclick="exportAll()">📊 Export</button>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Buat Kartu</button>
+    </div>
+  </div>
+
+  <div class="cards-grid" id="cardsGrid">
+    <div class="empty-state" id="emptyState">
+      <div class="empty-state-icon">🏆</div>
+      <div class="empty-state-text">Belum ada kartu rank.<br>Klik <strong>+ Buat Kartu</strong> untuk mulai.</div>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Buat Kartu Pertama</button>
+    </div>
+  </div>
+</main>
+
+<!-- MODAL: BUAT / EDIT KARTU -->
+<div class="modal-overlay" id="modalCreate" onclick="if(event.target===this)closeCreateModal()">
+  <div class="modal">
+    <div class="modal-head">
+      <div class="modal-head-title" id="modalCreateTitle">Buat Kartu Rank Baru</div>
+      <button class="modal-close" onclick="closeCreateModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Nama Kartu *</label>
+        <input class="form-input" id="cardName" placeholder="contoh: Rank PINJAMIN">
+        <div class="form-hint">Nama aplikasi atau kategori yang dibandingkan</div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label class="form-label">Tipe Periode</label>
+          <select class="form-input" id="cardPeriod">
+            <option value="daily">Daily</option>
+            <option value="monthly">Monthly / Akumulasi</option>
+            <option value="both">Daily + Monthly</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Nama Tim Kamu (EDN)</label>
+          <input class="form-input" id="cardTeamName" placeholder="EDN" value="EDN">
+          <div class="form-hint">Akan dihighlight otomatis</div>
+        </div>
+      </div>
+
+      <div class="form-section">Bucket &amp; Vendor</div>
+      <div class="form-hint" style="margin-bottom:10px">Tambah bucket dulu, lalu tambahkan vendor di dalam setiap bucket.</div>
+      <div id="bucketVendorList"></div>
+      <div style="display:flex;gap:8px;margin-top:6px">
+        <input class="form-input" id="bucketInput" placeholder="Nama bucket baru (contoh: B1, NPA, C03)" style="flex:1"
+          onkeydown="if(event.key==='Enter'){event.preventDefault();addBucket();}">
+        <button class="btn btn-secondary btn-sm" onclick="addBucket()">+ Tambah Bucket</button>
+      </div>
+
+      <div class="form-section">Kolom yang Ditampilkan</div>
+      <div class="form-row">
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="colOS" checked> OS / Allocated
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="colPayment" checked> Payment
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="colRate" checked> Rate (%)
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="colRank" checked> Rank
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="colGap" checked> Gap
+        </label>
+        <label style="display:flex;align-items:center;gap:8px;font-size:12px;cursor:pointer">
+          <input type="checkbox" id="colHariKerja"> Hari Kerja
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeCreateModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveCard()">Simpan Kartu</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: UPDATE DATA -->
+<div class="modal-overlay" id="modalUpdate" onclick="if(event.target===this)closeUpdateModal()">
+  <div class="modal" style="width:640px">
+    <div class="modal-head">
+      <div class="modal-head-title" id="modalUpdateTitle">Update Data</div>
+      <button class="modal-close" onclick="closeUpdateModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="editor-name-wrap">
+        <label class="form-label" style="margin-bottom:4px">Nama Pengedit</label>
+        <input class="form-input" id="editorName" placeholder="Masukkan nama kamu"
+          style="background:var(--surface);border-color:var(--border)">
+        <div class="form-hint">Akan tersimpan sebagai pengedit terakhir</div>
+      </div>
+      <div id="updateFormBody"></div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeUpdateModal()">Batal</button>
+      <button class="btn btn-primary" onclick="saveUpdate()">💾 Simpan Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: KONFIRMASI HAPUS -->
+<div class="modal-overlay" id="modalDelete" onclick="if(event.target===this)closeDeleteModal()">
+  <div class="modal" style="width:380px">
+    <div class="modal-head">
+      <div class="modal-head-title">Hapus Kartu</div>
+      <button class="modal-close" onclick="closeDeleteModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--text2)">Yakin ingin menghapus kartu <strong id="deleteCardName"></strong>? Data tidak dapat dipulihkan.</p>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeDeleteModal()">Batal</button>
+      <button class="btn btn-danger" onclick="confirmDelete()">Hapus</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================================================================
+// STATE
+// ================================================================
+const STORAGE_KEY = 'tz_rank_cards';
+const EDITOR_KEY  = 'tz_rank_editor';
+const VENDOR_COLORS = ['#1d60c8','#dc2626','#d97706','#059669','#7c3aed','#0891b2','#db2777'];
+
+let cards = [];
+let editingId    = null;
+let deletingId   = null;
+let updateCardId = null;
+// tempBuckets: [{name:string, vendors:[{name,color}]}]
+let tempBuckets  = [];
+
+// ================================================================
+// PERSISTENCE
+// ================================================================
+function loadCards() {
+  try { cards = JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]'); } catch(e){ cards=[]; }
+}
+function saveCards() {
+  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(cards)); } catch(e){}
+}
+function genId() { return 'card_'+Date.now()+'_'+Math.random().toString(36).slice(2,7); }
+
+// ================================================================
+// RENDER
+// ================================================================
+function renderAll() {
+  loadCards();
+  renderSidebar();
+  renderCards();
+}
+
+function renderSidebar() {
+  const el = document.getElementById('sidebarRankList');
+  if (!cards.length) { el.innerHTML='<div style="padding:4px 6px;font-size:11px;color:var(--text3)">Belum ada kartu</div>'; return; }
+  el.innerHTML = cards.map(c=>`
+    <a class="sidebar-item" href="#card-${c.id}" onclick="document.getElementById('card-${c.id}')?.scrollIntoView({behavior:'smooth'});return false;">
+      <span class="icon">📊</span>
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(c.name)}</span>
+    </a>`).join('');
+}
+
+function renderCards() {
+  const grid = document.getElementById('cardsGrid');
+  if (!cards.length) {
+    grid.innerHTML = `<div class="empty-state" id="emptyState">
+      <div class="empty-state-icon">🏆</div>
+      <div class="empty-state-text">Belum ada kartu rank.<br>Klik <strong>+ Buat Kartu</strong> untuk mulai.</div>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Buat Kartu Pertama</button>
+    </div>`;
+    return;
+  }
+  grid.innerHTML = cards.map(c => renderCard(c)).join('');
+}
+
+function renderCard(c) {
+  const periodBadge = c.period==='daily'
+    ? '<span class="rank-card-badge badge-daily">Daily</span>'
+    : c.period==='monthly'
+    ? '<span class="rank-card-badge badge-monthly">Monthly</span>'
+    : '<span class="rank-card-badge badge-daily">Daily</span><span class="rank-card-badge badge-monthly" style="margin-left:4px">Monthly</span>';
+
+  const updatedInfo = c.lastUpdated
+    ? `Update: ${c.lastUpdatedBy||'—'} · ${new Date(c.lastUpdated).toLocaleString('id-ID',{day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}`
+    : 'Belum ada data';
+
+  // Build table per bucket per period
+  let tableHtml = buildDataTable(c, c.period === 'both' ? 'daily' : c.period);
+  let tableMonthly = '';
+  if (c.period === 'both') {
+    tableMonthly = `
+      <div style="padding:6px 14px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--surface2);border-top:1px solid var(--border)">📅 Monthly / Akumulasi</div>
+      ${buildDataTable(c, 'monthly')}`;
+  }
+
+  return `
+  <div class="rank-card" id="card-${c.id}">
+    <div class="rank-card-header">
+      <div>
+        <div class="rank-card-title">${escH(c.name)}</div>
+        <div class="rank-card-meta">${c.buckets.length} bucket · ${c.buckets.reduce((a,b)=>a+(b.vendors?.length||0),0)} vendor</div>
+      </div>
+      <div style="display:flex;align-items:flex-start;gap:8px">
+        ${periodBadge}
+        <div class="rank-card-actions">
+          <button class="icon-btn" onclick="openUpdateModal('${c.id}')" title="Update data">✏️</button>
+          <button class="icon-btn" onclick="openEditModal('${c.id}')" title="Edit struktur">⚙️</button>
+          <button class="icon-btn danger" onclick="openDeleteModal('${c.id}')" title="Hapus">🗑️</button>
+        </div>
+      </div>
+    </div>
+    ${c.period === 'both' ? `<div style="padding:6px 14px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;background:var(--surface2)">📅 Daily</div>` : ''}
+    <div class="rank-table-wrap">${tableHtml}</div>
+    ${tableMonthly ? `<div class="rank-table-wrap">${tableMonthly}</div>` : ''}
+    <div class="rank-card-footer">
+      <span>${updatedInfo}</span>
+      <span style="color:var(--accent);font-weight:600">${c.teamName||'EDN'}</span>
+    </div>
+  </div>`;
+}
+
+function buildDataTable(c, period) {
+  const cols = [];
+  if (c.cols?.os !== false) cols.push({key:'os', label:'OS / Allocated'});
+  if (c.cols?.payment !== false) cols.push({key:'payment', label:'Payment'});
+  if (c.cols?.hariKerja) cols.push({key:'hariKerja', label:'Hari Kerja'});
+  if (c.cols?.rate !== false) cols.push({key:'rate', label:'Rate %'});
+  if (c.cols?.rank !== false) cols.push({key:'rank', label:'Rank'});
+  if (c.cols?.gap !== false) cols.push({key:'gap', label:'Gap'});
+
+  const data = c.data?.[period] || {};
+
+  let rows = '';
+  (c.buckets||[]).forEach(bucketObj => {
+    const bucket = typeof bucketObj==='string' ? bucketObj : bucketObj.name;
+    const bucketVendors = typeof bucketObj==='string' ? (c.vendors||[]) : (bucketObj.vendors||[]);
+    rows += `<tr class="bucket-row"><td colspan="${1+cols.length}" style="padding:5px 10px">📂 ${escH(bucket)}</td></tr>`;
+    bucketVendors.forEach(v => {
+      const d = data[bucket]?.[v.name] || {};
+      const isTeam = v.name === (c.teamName||'EDN');
+      const rankNum = parseInt(d.rank)||0;
+      const rankCls = rankNum===1?'rank-1':rankNum===2?'rank-2':rankNum===3?'rank-3':'rank-n';
+      const gapRaw = String(d.gap||'');
+      const gapSign = gapRaw.startsWith('-') ? -1 : 1;
+      const gapVal = d.gap ? gapSign * parseFloat(gapRaw.replace(/[^0-9.]/g,''))||0 : 0;
+      const gapCls = gapVal>0?'gap-pos':gapVal<0?'gap-neg':'gap-zero';
+      const rateVal = d.rate ? parseFloat(d.rate) : 0;
+      const rateCls = rateVal>=5?'rate-high':rateVal>=2?'rate-mid':'rate-low';
+
+      const cells = cols.map(col => {
+        let val = d[col.key]||'—';
+        let cls = '';
+        if (col.key==='rank') { cls=rankCls; val=val==='—'?'—':`<span class="${rankCls}">${val}</span>`; return `<td style="text-align:center">${val}</td>`; }
+        if (col.key==='gap') return `<td class="${gapCls}" style="text-align:right">${escH(String(val))}</td>`;
+        if (col.key==='rate') return `<td class="${rateCls}" style="text-align:right">${escH(String(val))}${val!=='—'?'%':''}</td>`;
+        // Auto-format angka: OS dan Payment tampil dengan Rp + pemisah ribuan
+        if ((col.key==='os'||col.key==='payment') && val!=='—') {
+          const num = parseFloat(String(val).replace(/[^0-9.]/g,''));
+          if (!isNaN(num) && num > 0) {
+            const isRp = String(val).includes('Rp') || num > 9999;
+            const fmtd = isRp ? 'Rp '+Math.round(num).toLocaleString('id-ID') : escH(String(val));
+            return `<td style="text-align:right">${fmtd}</td>`;
+          }
+        }
+        return `<td style="text-align:right">${escH(String(val))}</td>`;
+      }).join('');
+
+      rows += `<tr class="${isTeam?'edn-row':''}">
+        <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${v.color||'#999'};margin-right:6px"></span>${escH(v.name)}${isTeam?` <span style="font-size:9px;background:var(--accent);color:#fff;padding:0 4px;border-radius:3px">TIM</span>`:''}</td>
+        ${cells}
+      </tr>`;
+    });
+  });
+
+  if (!rows) rows = `<tr><td colspan="${1+cols.length}" style="text-align:center;padding:20px;color:var(--text3)">Belum ada data — klik ✏️ untuk update</td></tr>`;
+
+  return `<table class="rank-table">
+    <thead><tr>
+      <th>Vendor / Tim</th>
+      ${cols.map(c=>`<th style="text-align:right">${c.label}</th>`).join('')}
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+// ================================================================
+// CREATE / EDIT MODAL
+// ================================================================
+function _resetForm(teamName='EDN') {
+  document.getElementById('cardPeriod').value = 'daily';
+  document.getElementById('cardTeamName').value = teamName;
+  document.getElementById('colOS').checked = true;
+  document.getElementById('colPayment').checked = true;
+  document.getElementById('colRate').checked = true;
+  document.getElementById('colRank').checked = true;
+  document.getElementById('colGap').checked = true;
+  document.getElementById('colHariKerja').checked = false;
+}
+
+function openCreateModal() {
+  editingId = null;
+  tempBuckets = [];
+  document.getElementById('cardName').value = '';
+  document.getElementById('modalCreateTitle').textContent = 'Buat Kartu Rank Baru';
+  _resetForm();
+  renderBucketVendorList();
+  document.getElementById('modalCreate').classList.add('open');
+}
+
+function openEditModal(id) {
+  const c = cards.find(x=>x.id===id);
+  if (!c) return;
+  editingId = id;
+  // Normalize: support old flat format (buckets:string[]) and new nested format
+  tempBuckets = c.buckets.map(b =>
+    typeof b === 'string'
+      ? {name:b, vendors: (c.vendors||[]).map(v=>({...v}))}
+      : {name:b.name, vendors:(b.vendors||[]).map(v=>({...v}))}
+  );
+  document.getElementById('cardName').value = c.name;
+  document.getElementById('modalCreateTitle').textContent = 'Edit Kartu — '+c.name;
+  _resetForm(c.teamName||'EDN');
+  document.getElementById('cardPeriod').value = c.period;
+  document.getElementById('colOS').checked = c.cols?.os !== false;
+  document.getElementById('colPayment').checked = c.cols?.payment !== false;
+  document.getElementById('colRate').checked = c.cols?.rate !== false;
+  document.getElementById('colRank').checked = c.cols?.rank !== false;
+  document.getElementById('colGap').checked = c.cols?.gap !== false;
+  document.getElementById('colHariKerja').checked = !!c.cols?.hariKerja;
+  renderBucketVendorList();
+  document.getElementById('modalCreate').classList.add('open');
+}
+
+function closeCreateModal() {
+  document.getElementById('modalCreate').classList.remove('open');
+}
+
+// ── Render nested bucket-vendor builder ──
+function renderBucketVendorList() {
+  const el = document.getElementById('bucketVendorList');
+  const teamName = document.getElementById('cardTeamName')?.value || 'EDN';
+  if (!tempBuckets.length) {
+    el.innerHTML = '<div style="padding:12px;text-align:center;color:var(--text3);font-size:12px;border:1px dashed var(--border);border-radius:var(--radius-sm)">Belum ada bucket. Tambahkan bucket di bawah.</div>';
+    return;
+  }
+  el.innerHTML = tempBuckets.map((b,bi)=>`
+    <div class="bv-block">
+      <div class="bv-bucket-header">
+        <span style="font-size:13px;margin-right:2px">📂</span>
+        <input class="bv-bucket-name" value="${escH(b.name)}" placeholder="Nama bucket"
+          oninput="tempBuckets[${bi}].name=this.value.toUpperCase();this.value=this.value.toUpperCase()">
+        <button class="bv-bucket-del" onclick="tempBuckets.splice(${bi},1);renderBucketVendorList()" title="Hapus bucket">🗑️</button>
+      </div>
+      <div class="bv-vendors" id="bvVendors_${bi}">
+        ${(b.vendors||[]).map((v,vi)=>`
+          <div class="bv-vendor-row">
+            <input type="color" class="bv-vendor-color" value="${v.color||'#1d60c8'}"
+              oninput="tempBuckets[${bi}].vendors[${vi}].color=this.value">
+            <input type="text" class="bv-vendor-name" value="${escH(v.name)}" placeholder="Nama vendor"
+              oninput="tempBuckets[${bi}].vendors[${vi}].name=this.value">
+            ${v.name===teamName?'<span class="bv-vendor-tim">TIM</span>':''}
+            <button class="bv-vendor-del" onclick="tempBuckets[${bi}].vendors.splice(${vi},1);renderBucketVendorList()"
+              ${(b.vendors||[]).length<=1?'disabled':''}>×</button>
+          </div>`).join('')}
+        <div class="bv-add-vendor" onclick="addVendorToBucket(${bi})">
+          + Tambah Vendor
+        </div>
+      </div>
+    </div>`).join('');
+}
+
+function addVendorToBucket(bi) {
+  if (!tempBuckets[bi].vendors) tempBuckets[bi].vendors = [];
+  const usedColors = tempBuckets[bi].vendors.map(v=>v.color);
+  const color = VENDOR_COLORS.find(c=>!usedColors.includes(c)) || VENDOR_COLORS[tempBuckets[bi].vendors.length % VENDOR_COLORS.length];
+  tempBuckets[bi].vendors.push({name:'', color});
+  renderBucketVendorList();
+}
+
+function addBucket() {
+  const inp = document.getElementById('bucketInput');
+  const val = inp.value.trim().toUpperCase();
+  if (!val) return;
+  if (tempBuckets.find(b=>b.name===val)) { inp.value=''; inp.focus(); return; }
+  const teamName = document.getElementById('cardTeamName')?.value || 'EDN';
+  // Auto-add tim as first vendor
+  tempBuckets.push({name:val, vendors:[{name:teamName, color:VENDOR_COLORS[0]},{name:'', color:VENDOR_COLORS[1]}]});
+  inp.value = '';
+  renderBucketVendorList();
+  inp.focus();
+}
+
+function saveCard() {
+  const name = document.getElementById('cardName').value.trim();
+  const period = document.getElementById('cardPeriod').value;
+  const teamName = document.getElementById('cardTeamName').value.trim()||'EDN';
+
+  // Sync live input values (oninput may not fire for all)
+  document.querySelectorAll('.bv-bucket-name').forEach((inp,i)=>{
+    if (tempBuckets[i]) tempBuckets[i].name = inp.value.trim().toUpperCase();
+  });
+  document.querySelectorAll('.bv-vendor-name').forEach(inp=>{
+    const bi = parseInt(inp.closest('.bv-block')?.querySelector('.bv-bucket-name')?.dataset?.bi??-1);
+  });
+
+  const buckets = tempBuckets.filter(b=>b.name.trim() && b.vendors?.some(v=>v.name.trim()));
+
+  if (!name) { alert('Nama kartu wajib diisi'); return; }
+  if (!buckets.length) { alert('Minimal 1 bucket dengan minimal 1 vendor'); return; }
+
+  const cols = {
+    os: document.getElementById('colOS').checked,
+    payment: document.getElementById('colPayment').checked,
+    rate: document.getElementById('colRate').checked,
+    rank: document.getElementById('colRank').checked,
+    gap: document.getElementById('colGap').checked,
+    hariKerja: document.getElementById('colHariKerja').checked,
+  };
+
+  if (editingId) {
+    const idx = cards.findIndex(x=>x.id===editingId);
+    if (idx>=0) cards[idx] = {...cards[idx], name, period, teamName, buckets, cols};
+  } else {
+    cards.push({id:genId(), name, period, teamName, buckets, cols, data:{}, lastUpdated:null, lastUpdatedBy:null});
+  }
+  saveCards();
+  closeCreateModal();
+  renderAll();
+}
+
+// ================================================================
+// DELETE
+// ================================================================
+function openDeleteModal(id) {
+  deletingId = id;
+  const c = cards.find(x=>x.id===id);
+  document.getElementById('deleteCardName').textContent = c?.name||'';
+  document.getElementById('modalDelete').classList.add('open');
+}
+function closeDeleteModal() { document.getElementById('modalDelete').classList.remove('open'); }
+function confirmDelete() {
+  cards = cards.filter(x=>x.id!==deletingId);
+  saveCards(); closeDeleteModal(); renderAll();
+}
+
+// ================================================================
+// UPDATE DATA MODAL
+// ================================================================
+function openUpdateModal(id) {
+  updateCardId = id;
+  const c = cards.find(x=>x.id===id);
+  if (!c) return;
+
+  // Restore editor name
+  const savedEditor = localStorage.getItem(EDITOR_KEY)||'';
+  document.getElementById('editorName').value = savedEditor;
+  document.getElementById('modalUpdateTitle').textContent = 'Update Data — '+c.name;
+
+  const periods = c.period==='both' ? ['daily','monthly'] : [c.period];
+  const cols = [];
+  if (c.cols?.os !== false) cols.push({key:'os', label:'OS / Allocated', placeholder:'Rp 375.883.953'});
+  if (c.cols?.hariKerja) cols.push({key:'hariKerja', label:'Hari Kerja', placeholder:'12'});
+  if (c.cols?.payment !== false) cols.push({key:'payment', label:'Payment', placeholder:'Rp 18.429.396'});
+  if (c.cols?.rate !== false) cols.push({key:'rate', label:'Rate (%)', placeholder:'4,90'});
+  if (c.cols?.rank !== false) cols.push({key:'rank', label:'Rank', placeholder:'1'});
+  if (c.cols?.gap !== false) cols.push({key:'gap', label:'Gap', placeholder:'Rp 10.923.801'});
+
+  let html = '';
+  periods.forEach(period => {
+    html += `<div class="update-section">
+      <div class="update-section-title">${period==='daily'?'📅 Daily':'📅 Monthly / Akumulasi'}</div>`;
+
+    c.buckets.forEach(bucketObj => {
+      const bucket = typeof bucketObj==='string' ? bucketObj : bucketObj.name;
+      const bucketVendors = typeof bucketObj==='string' ? (c.vendors||[]) : (bucketObj.vendors||[]);
+      html += `<div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;padding:4px 8px;background:var(--surface2);border-radius:4px">📂 ${escH(bucket)}</div>
+        <div style="display:grid;grid-template-columns:${cols.map(()=>'1fr').join(' ')};gap:4px;margin-bottom:3px;padding:0 4px">
+          <div style="font-size:9px;font-weight:700;color:var(--text3);text-align:center">VENDOR</div>
+          ${cols.map(col=>`<div style="font-size:9px;font-weight:700;color:var(--text3);text-align:center">${col.label.toUpperCase()}</div>`).join('')}
+        </div>`;
+
+      bucketVendors.filter(v=>v.name).forEach(v => {
+        const d = c.data?.[period]?.[bucket]?.[v.name]||{};
+        const isTeam = v.name===(c.teamName||'EDN');
+        html += `<div style="display:grid;grid-template-columns:${cols.map(()=>'1fr').join(' ')};gap:4px;margin-bottom:4px;align-items:center;${isTeam?'background:var(--accent-bg);padding:4px;border-radius:4px':''}">
+          <div style="font-size:11px;font-weight:600;color:${isTeam?'var(--accent)':'var(--text2)'};padding:0 4px;display:flex;align-items:center;gap:4px">
+            <span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${v.color||'#999'};flex-shrink:0"></span>
+            ${escH(v.name)}
+          </div>
+          ${cols.map(col=>`<input class="update-input"
+            data-period="${period}" data-bucket="${escH(bucket)}" data-vendor="${escH(v.name)}" data-col="${col.key}"
+            value="${escH(String(d[col.key]||''))}"
+            placeholder="${col.placeholder}"
+            ${(col.key==='os'||col.key==='payment')?'oninput="liveCalcRate(this)"':''}
+            ${col.key==='rate'?'oninput="this._manualEdit=this.value.trim()!==\'\'"':''}>`).join('')}
+        </div>`;
+      });
+      html += `</div>`;
+    });
+    html += `</div>`;
+  });
+
+  document.getElementById('updateFormBody').innerHTML = html;
+  document.getElementById('modalUpdate').classList.add('open');
+}
+
+function liveCalcRate(inp) {
+  const {period, bucket, vendor} = inp.dataset;
+  const wrap = inp.closest('[style*="grid"]');
+  if (!wrap) return;
+  const osInp   = wrap.querySelector(`.update-input[data-period="${period}"][data-bucket="${bucket}"][data-vendor="${vendor}"][data-col="os"]`);
+  const payInp  = wrap.querySelector(`.update-input[data-period="${period}"][data-bucket="${bucket}"][data-vendor="${vendor}"][data-col="payment"]`);
+  const rateInp = wrap.querySelector(`.update-input[data-period="${period}"][data-bucket="${bucket}"][data-vendor="${vendor}"][data-col="rate"]`);
+  if (!osInp||!payInp||!rateInp) return;
+  if (rateInp._manualEdit) return;
+  const os  = parseFloat(String(osInp.value||'').replace(/[^0-9.]/g,''));
+  const pay = parseFloat(String(payInp.value||'').replace(/[^0-9.]/g,''));
+  if (os > 0 && pay >= 0) {
+    rateInp.value = (pay/os*100).toFixed(2);
+    rateInp.style.color = 'var(--accent)';
+  }
+  // Live gap: Payment EDN - (Rate vendor × OS EDN)
+  const teamNameLive = document.getElementById('cardTeamName')?.value || 'EDN';
+  if (vendor !== teamNameLive) {
+    const ednOSInp  = document.querySelector(`#updateFormBody .update-input[data-period="${period}"][data-bucket="${bucket}"][data-vendor="${teamNameLive}"][data-col="os"]`);
+    const ednPayInp = document.querySelector(`#updateFormBody .update-input[data-period="${period}"][data-bucket="${bucket}"][data-vendor="${teamNameLive}"][data-col="payment"]`);
+    const gapInp    = wrap.querySelector(`.update-input[data-period="${period}"][data-bucket="${bucket}"][data-vendor="${vendor}"][data-col="gap"]`);
+    if (ednOSInp && ednPayInp && gapInp) {
+      const ednOS  = parseFloat(String(ednOSInp.value||'').replace(/[^0-9.]/g,''))||0;
+      const ednPay = parseFloat(String(ednPayInp.value||'').replace(/[^0-9.]/g,''))||0;
+      if (ednOS > 0 && ednPay > 0 && os > 0 && pay > 0) {
+        const vendorRate = pay / os;
+        const vendorPayIfSameOS = vendorRate * ednOS;
+        const gap = ednPay - vendorPayIfSameOS;
+        const abs = Math.abs(Math.round(gap));
+        gapInp.value = (gap < 0 ? '-' : '+') + 'Rp ' + abs.toLocaleString('id-ID');
+        gapInp.style.color = gap >= 0 ? 'var(--success)' : 'var(--danger)';
+      }
+    }
+  }
+}
+
+function closeUpdateModal() { document.getElementById('modalUpdate').classList.remove('open'); }
+
+function saveUpdate() {
+  const c = cards.find(x=>x.id===updateCardId);
+  if (!c) return;
+  const editorName = document.getElementById('editorName').value.trim()||'Unknown';
+  localStorage.setItem(EDITOR_KEY, editorName);
+
+  if (!c.data) c.data = {};
+
+  document.querySelectorAll('#updateFormBody .update-input').forEach(inp => {
+    const {period, bucket, vendor, col} = inp.dataset;
+    const val = inp.value.trim();
+    if (!c.data[period]) c.data[period] = {};
+    if (!c.data[period][bucket]) c.data[period][bucket] = {};
+    if (!c.data[period][bucket][vendor]) c.data[period][bucket][vendor] = {};
+    if (val) c.data[period][bucket][vendor][col] = val;
+    else delete c.data[period][bucket][vendor][col];
+  });
+
+  // ── Auto-hitung Rate (Payment / OS * 100) per bucket per vendor ──
+  Object.keys(c.data).forEach(period => {
+    Object.keys(c.data[period]).forEach(bucket => {
+      const bucketData = c.data[period][bucket];
+      Object.keys(bucketData).forEach(vendor => {
+        const d = bucketData[vendor];
+        // Hitung rate jika OS dan Payment ada, tapi rate belum diisi manual
+        const osRaw = String(d.os||'').replace(/[^0-9.]/g,'');
+        const payRaw = String(d.payment||'').replace(/[^0-9.]/g,'');
+        const osNum = parseFloat(osRaw);
+        const payNum = parseFloat(payRaw);
+        if (osNum > 0 && payNum >= 0 && !d._rateManual) {
+          const rate = (payNum / osNum * 100).toFixed(2);
+          d.rate = rate;
+          // Update input field display
+          const inp = document.querySelector(
+            `#updateFormBody .update-input[data-period="${period}"][data-bucket="${bucket}"][data-vendor="${vendor}"][data-col="rate"]`
+          );
+          if (inp && !inp._manualEdit) inp.value = rate;
+        }
+      });
+    });
+  });
+
+  // ── Auto-hitung Rank per bucket berdasarkan Rate tertinggi ──
+  Object.keys(c.data).forEach(period => {
+    Object.keys(c.data[period]).forEach(bucket => {
+      const bucketObj = c.buckets.find(b=>(typeof b==='string'?b:b.name)===bucket);
+      const vendors = typeof bucketObj==='string' ? (c.vendors||[]) : (bucketObj?.vendors||[]);
+      if (!vendors.length) return;
+      // Kumpulkan payment & rate per vendor di bucket ini
+      const vendorStats = vendors
+        .map(v => ({
+          name: v.name,
+          rate: parseFloat(String(c.data[period]?.[bucket]?.[v.name]?.rate||'0').replace(',','.'))||0,
+          payment: parseFloat(String(c.data[period]?.[bucket]?.[v.name]?.payment||'0').replace(/[^0-9.]/g,''))||0,
+        }))
+        .filter(x=>x.rate>0||x.payment>0)
+        .sort((a,b)=>b.rate-a.rate);
+      // Assign rank
+      vendorStats.forEach((vr,i) => {
+        if (c.data[period]?.[bucket]?.[vr.name])
+          c.data[period][bucket][vr.name].rank = String(i+1);
+      });
+      // ── Auto-hitung Gap per vendor ──
+      // Rumus: Gap = Payment EDN - (Rate vendor × OS EDN)
+      // Basis perbandingan = OS EDN (apple-to-apple comparison)
+      // Positif = EDN unggul, Negatif = EDN tertinggal dari vendor tsb
+
+      // Cari data EDN (teamName)
+      const teamName = c.teamName || 'EDN';
+      const ednData = c.data[period]?.[bucket]?.[teamName];
+      const ednOS      = ednData ? parseFloat(String(ednData.os     ||'0').replace(/[^0-9.]/g,''))||0 : 0;
+      const ednPayment = ednData ? parseFloat(String(ednData.payment||'0').replace(/[^0-9.]/g,''))||0 : 0;
+
+      vendorStats.forEach((vr, i) => {
+        if (!c.data[period]?.[bucket]?.[vr.name]) return;
+        // EDN tidak perlu gap terhadap dirinya sendiri
+        if (vr.name === teamName) {
+          // Gap EDN = Payment EDN - (Rate vendor_rank1 × OS EDN)
+          // Jika EDN rank 1: gap vs vendor rank2
+          // Jika EDN bukan rank 1: gap vs vendor rank 1
+          const compareVendor = i === 0 ? vendorStats[1] : vendorStats[0];
+          if (!compareVendor || ednOS === 0) {
+            c.data[period][bucket][vr.name].gap = '—';
+            return;
+          }
+          const compareRate = compareVendor.rate / 100; // rate dalam desimal
+          const comparePayIfSameOS = compareRate * ednOS;
+          const gap = ednPayment - comparePayIfSameOS;
+          const absGap = Math.abs(Math.round(gap));
+          c.data[period][bucket][vr.name].gap = (gap < 0 ? '-' : '+') + 'Rp ' + absGap.toLocaleString('id-ID');
+        } else {
+          // Gap vendor lain vs EDN: Payment EDN - (Rate vendor × OS EDN)
+          if (ednOS === 0 || ednPayment === 0) {
+            c.data[period][bucket][vr.name].gap = '—';
+            return;
+          }
+          const vendorRate = vr.rate / 100; // rate dalam desimal
+          const vendorPayIfSameOS = vendorRate * ednOS;
+          const gap = ednPayment - vendorPayIfSameOS;
+          // gap positif = EDN unggul dari vendor ini
+          // gap negatif = EDN tertinggal dari vendor ini
+          const absGap = Math.abs(Math.round(gap));
+          c.data[period][bucket][vr.name].gap = (gap < 0 ? '-' : '+') + 'Rp ' + absGap.toLocaleString('id-ID');
+        }
+      });
+    });
+  });
+
+  c.lastUpdated = Date.now();
+  c.lastUpdatedBy = editorName;
+  saveCards();
+  closeUpdateModal();
+  renderAll();
+}
+
+// ================================================================
+// EXPORT
+// ================================================================
+function exportAll() {
+  const data = JSON.stringify(cards, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'rank_board_'+new Date().toISOString().slice(0,10)+'.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ================================================================
+// THEME & LANG
+// ================================================================
+function setTheme(t) {
+  document.documentElement.setAttribute('data-theme', t==='dark'?'dark':'');
+  localStorage.setItem('tz_theme', t);
+  document.getElementById('btnLight').classList.toggle('active', t==='light');
+  document.getElementById('btnDark').classList.toggle('active', t==='dark');
+}
+function setThemeLang(l) {
+  document.querySelectorAll('.tz-lang-btn').forEach(b=>b.classList.toggle('active',b.dataset.lang===l));
+}
+
+// ================================================================
+// UTILS
+// ================================================================
+function escH(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// ESC key
+document.addEventListener('keydown', e => {
+  if (e.key==='Escape') {
+    closeCreateModal(); closeUpdateModal(); closeDeleteModal();
+  }
+});
+
+// ── INIT ──
+(function(){
+  const t = localStorage.getItem('tz_theme')||'light';
+  setTheme(t);
+  renderAll();
+})();
+</script>
+</body>
+</html>
