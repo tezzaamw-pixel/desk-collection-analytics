@@ -115,6 +115,16 @@ select:focus{border-color:var(--accent);}
 .bucket-header{padding:8px 18px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
 .bucket-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
 .bucket-badge{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--border);color:var(--text2);font-weight:500;}
+.btn-bucket-setup{padding:2px 8px;font-size:10px;font-weight:600;background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;}
+.btn-bucket-setup:hover{border-color:var(--accent);color:var(--accent);}
+.btn-bucket-setup.has-custom{color:var(--accent);border-color:var(--accent);background:var(--accent-bg);}
+/* Bucket setup dropdown */
+.bk-setup-dropdown{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:400;min-width:200px;padding:4px 0;display:none;}
+.bk-setup-dropdown.open{display:block;}
+.bk-setup-item{padding:7px 14px;font-size:12px;cursor:pointer;display:flex;align-items:center;gap:8px;color:var(--text);}
+.bk-setup-item:hover{background:var(--surface2);}
+.bk-setup-item.active{color:var(--accent);font-weight:600;}
+.bk-setup-item .check{width:14px;text-align:center;font-size:11px;}
 
 /* TL ROW */
 .tl-row{border-bottom:1px solid var(--border);}
@@ -701,6 +711,9 @@ select:focus{border-color:var(--accent);}
   </div>
 </nav>
 
+<!-- BUCKET SETUP DROPDOWN -->
+<div class="bk-setup-dropdown" id="bkSetupDropdown"></div>
+
 <!-- BUCKET SUMMARY MODAL -->
 <div id="modalBucketSummary" onclick="if(event.target===this)closeBucketSummary()">
   <div class="bsm-modal">
@@ -908,6 +921,41 @@ const ALL_METRICS=[
 function getSetups(spv){try{const r=localStorage.getItem('dca_setups_'+spv);if(r)return JSON.parse(r);}catch(e){}return[];}
 function saveSetups(spv,s){localStorage.setItem('dca_setups_'+spv,JSON.stringify(s));}
 function getActiveIdx(spv){try{const r=localStorage.getItem('dca_active_'+spv);if(r!==null)return parseInt(r);}catch(e){}return 0;}
+
+// ── Bucket Setup per Bucket ───────────────────────────────────
+// Storage: dca_bucket_setup_{spv} = { "NPA": setupIndex, "S1-3": setupIndex, ... }
+// setupIndex = index ke array getSetups(spv), atau -1 = pakai default SPV
+function getBucketSetupMap(spv){
+  try{const r=localStorage.getItem('dca_bucket_setup_'+spv);if(r)return JSON.parse(r);}catch(e){}
+  return {};
+}
+function saveBucketSetupMap(spv,map){
+  localStorage.setItem('dca_bucket_setup_'+spv,JSON.stringify(map));
+}
+function getBucketSetup(spv, bucket) {
+  // Returns {setup, idx} — setup = null means use SPV default
+  const setups = getSetups(spv);
+  const map = getBucketSetupMap(spv);
+  const idx = map[bucket]??-1;
+  if (idx === -1 || idx >= setups.length) return {setup: null, idx: -1};
+  return {setup: setups[idx], idx};
+}
+function setBucketSetup(spv, bucket, setupIdx) {
+  const map = getBucketSetupMap(spv);
+  if (setupIdx === -1) delete map[bucket];
+  else map[bucket] = setupIdx;
+  saveBucketSetupMap(spv, map);
+}
+// When a setup is deleted, clean up any bucket assignments pointing to it
+function cleanBucketSetupRefs(spv, deletedIdx) {
+  const map = getBucketSetupMap(spv);
+  let changed = false;
+  Object.keys(map).forEach(bk => {
+    if (map[bk] === deletedIdx) { delete map[bk]; changed = true; }
+    else if (map[bk] > deletedIdx) { map[bk]--; changed = true; } // shift down
+  });
+  if (changed) saveBucketSetupMap(spv, map);
+}
 function setActiveIdx(spv,i){localStorage.setItem('dca_active_'+spv,String(i));}
 
 let allRows=[], allBucketMap={}, currentModalSpv=null, currentModalEditIdx=null;
@@ -1015,7 +1063,66 @@ async function loadData(){
   btn.disabled=false;btn.textContent='Tampilkan';
 }
 
-// ── Bucket Summary Modal ─────────────────────────────────────
+// ── Bucket Setup Dropdown ─────────────────────────────────────
+let _bkSetupState = {bucket:'', spv:''};
+
+function openBkSetupDropdown(e, bucket, spv) {
+  e.stopPropagation();
+  _bkSetupState = {bucket, spv};
+  const dd = document.getElementById('bkSetupDropdown');
+  const setups = getSetups(spv);
+  const {idx: currentIdx} = getBucketSetup(spv, bucket);
+
+  if (!setups.length) {
+    dd.innerHTML = '<div class="bk-setup-item" style="color:var(--text3)">Belum ada setup tersimpan.<br>Buat setup dulu di atas.</div>';
+  } else {
+    dd.innerHTML = `
+      <div class="bk-setup-item ${currentIdx===-1?'active':''}" onclick="applyBkSetup(-1)">
+        <span class="check">${currentIdx===-1?'✓':''}</span>
+        <span>Default (Setup SPV)</span>
+      </div>
+      <div style="height:1px;background:var(--border);margin:3px 0"></div>
+      ${setups.map((st,i)=>`
+        <div class="bk-setup-item ${currentIdx===i?'active':''}" onclick="applyBkSetup(${i})">
+          <span class="check">${currentIdx===i?'✓':''}</span>
+          <span>${escH(st.name)}</span>
+        </div>`).join('')}`;
+  }
+
+  // Position dropdown near button
+  const rect = e.currentTarget.getBoundingClientRect();
+  const spaceBelow = window.innerHeight - rect.bottom;
+  dd.style.left = rect.left + 'px';
+  dd.style.minWidth = Math.max(rect.width, 200) + 'px';
+  if (spaceBelow < 160) {
+    dd.style.top = (rect.top - dd.offsetHeight - 4) + 'px';
+    dd.style.bottom = 'auto';
+  } else {
+    dd.style.top = (rect.bottom + 4) + 'px';
+    dd.style.bottom = 'auto';
+  }
+  dd.classList.add('open');
+}
+
+function applyBkSetup(setupIdx) {
+  const {bucket, spv} = _bkSetupState;
+  setBucketSetup(spv, bucket, setupIdx);
+  document.getElementById('bkSetupDropdown').classList.remove('open');
+  // Re-render SPV block
+  const spvEl = document.getElementById('spvblock-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16));
+  if (spvEl) {
+    const rows = spvAgentDataCache[spv]||[];
+    const bulan = document.getElementById('selBulan').value;
+    const tahun = document.getElementById('selTahun').value;
+    spvEl.innerHTML = buildSPVBlock(spv, rows, bulan, tahun);
+  }
+}
+
+// Close dropdown on outside click
+document.addEventListener('click', e => {
+  const dd = document.getElementById('bkSetupDropdown');
+  if (dd && !dd.contains(e.target)) dd.classList.remove('open');
+});
 let _bsmState = { bucket:'', spv:'', mode:'payment', date:'', view:'total' };
 
 function openBucketSummary(bucket, spv) {
@@ -1185,15 +1292,19 @@ function _renderBucketSummary() {
       </tr></thead><tbody>${tableRows}</tbody></table>`;
 
   } else {
-    // Individual mode
+    // Individual mode — gunakan setup bucket jika ada, fallback ke SPV default
+    const {setup: bkSetup} = getBucketSetup(spv, bucket);
     const setups = getSetups(spv);
     const activeIdx = parseInt(localStorage.getItem('dca_active_setup_'+spv)||'0');
     const activeSetup = setups[activeIdx]||null;
+    const effectiveSetup = bkSetup || activeSetup; // bucket setup takes priority
     // Fix 1: pakai urutan dari setup (activeSetup.metrics), bukan sort ulang
-    const setupCols = activeSetup
-      ? activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean)
+    const setupCols = effectiveSetup
+      ? effectiveSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean)
       : ALL_METRICS.slice(0,8);
-    const setupLabel = activeSetup ? escH(activeSetup.name) : 'Default';
+    const setupLabel = bkSetup ? `${escH(bkSetup.name)} <span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:3px">Bucket</span>`
+      : effectiveSetup ? `${escH(effectiveSetup.name)} <span style="font-size:9px;background:var(--surface2);color:var(--text3);padding:1px 5px;border-radius:3px">SPV</span>`
+      : 'Default';
 
     // Fix 2: Rate dihitung dari dailyPayment / osDataBaru per agent
     // Kolom header: Rank | TL+Agent (merged) | Hadir | Rate | Payment | ...setupCols
@@ -1553,19 +1664,26 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       return{tl,s:ts,rows:byBucket[bk][tl],agentCount:new Set(byBucket[bk][tl].map(r=>r.agent)).size};
     }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
 
+    // Get setup for this bucket (custom or fallback to SPV default)
+    const {setup: bkSetup, idx: bkSetupIdx} = getBucketSetup(spv, bk);
+    const effectiveSetup = bkSetup || activeSetup; // fallback to SPV active setup
+
     const tlRows=tlsInBucket.map((t,rankInBucket)=>{
-      // ID unik berdasarkan counter — tidak akan pernah bentrok
       const tlId='tl'+String(++tlCounter).padStart(4,'0');
-      return buildTLRow(t,rankInBucket,spv,bulan,tahun,activeSetup,bk,tlId);
+      return buildTLRow(t,rankInBucket,spv,bulan,tahun,effectiveSetup,bk,tlId);
     }).join('');
 
     const bkCount=new Set(Object.values(byBucket[bk]).flat().map(r=>r.agent)).size;
-    const allBkRows=Object.values(byBucket[bk]).flat();
     const safeBk=escA(bk); const safeSpv2=escA(spv);
+    const hasCustom = bkSetupIdx !== -1;
+    const setupLabel = hasCustom ? escH(bkSetup.name) : 'Default';
     return `<div class="bucket-group">
       <div class="bucket-header">
         <span class="bucket-label">${escH(bk)}</span>
         <span class="bucket-badge">${Object.keys(byBucket[bk]).length} TL · ${bkCount} agent</span>
+        <button class="btn-bucket-setup ${hasCustom?'has-custom':''}"
+          onclick="openBkSetupDropdown(event,'${safeBk}','${safeSpv2}')"
+          title="Setup kolom untuk bucket ini">⚙ ${setupLabel}</button>
         <button class="btn-bucket-summary" onclick="openBucketSummary('${safeBk}','${safeSpv2}')" title="Lihat summary ranking bucket">📊 Summary</button>
       </div>
       ${tlRows}
@@ -2669,6 +2787,8 @@ function deleteSetup(spv,idx){
   saveSetups(spv,setups);
   const active=getActiveIdx(spv);
   if(active>=setups.length)setActiveIdx(spv,Math.max(0,setups.length-1));
+  // Clean up bucket setup refs that point to deleted/shifted index
+  cleanBucketSetupRefs(spv, idx);
   // Re-render hanya detail SPV saat ini
   if(currentSpvView===spv){
     const filtered=getFilteredRows();
