@@ -577,16 +577,16 @@ select:focus{border-color:var(--accent);}
 .bsm-view-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-left:auto;}
 .bsm-view-btn{padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer;transition:all .15s;}
 .bsm-view-btn.active{background:var(--accent);color:#fff;}
-/* Individual mode: Rank(1) + TL/Agent(2) + Hadir(3) + Rate(4) + Payment(5) */
-.bsm-individual td:nth-child(3){position:sticky;left:210px;z-index:2;background:var(--surface);min-width:65px;text-align:center;}
-.bsm-individual td:nth-child(4){position:sticky;left:275px;z-index:2;background:var(--surface);min-width:70px;text-align:center;}
-.bsm-individual td:nth-child(5){position:sticky;left:345px;z-index:2;background:var(--surface);min-width:140px;border-right:2px solid var(--border);}
-.bsm-individual th:nth-child(3){position:sticky;top:0;left:210px;z-index:5;background:var(--navy);min-width:65px;text-align:center;}
-.bsm-individual th:nth-child(4){position:sticky;top:0;left:275px;z-index:5;background:var(--navy);min-width:70px;text-align:center;}
-.bsm-individual th:nth-child(5){position:sticky;top:0;left:345px;z-index:5;background:var(--navy);min-width:140px;border-right:2px solid rgba(255,255,255,.2);}
-/* TL/Agent merged col width */
-.bsm-individual td:nth-child(2){min-width:170px;}
-.bsm-individual th:nth-child(2){min-width:170px;}
+/* Individual mode: Rank(1)+TL/Agent(2)+Hadir(3)+Rate(4)+Payment(5) all frozen */
+/* Hadir dan Rate dipersempit agar tidak makan tempat */
+.bsm-individual td:nth-child(2){position:sticky;left:44px;z-index:2;background:var(--surface);min-width:170px;}
+.bsm-individual th:nth-child(2){position:sticky;top:0;left:44px;z-index:5;background:var(--navy);min-width:170px;}
+.bsm-individual td:nth-child(3){position:sticky;left:214px;z-index:2;background:var(--surface);width:52px;min-width:52px;max-width:52px;text-align:center;}
+.bsm-individual th:nth-child(3){position:sticky;top:0;left:214px;z-index:5;background:var(--navy);width:52px;min-width:52px;max-width:52px;text-align:center;}
+.bsm-individual td:nth-child(4){position:sticky;left:266px;z-index:2;background:var(--surface);width:64px;min-width:64px;max-width:64px;text-align:center;}
+.bsm-individual th:nth-child(4){position:sticky;top:0;left:266px;z-index:5;background:var(--navy);width:64px;min-width:64px;max-width:64px;text-align:center;}
+.bsm-individual td:nth-child(5){position:sticky;left:330px;z-index:2;background:var(--surface);min-width:130px;border-right:2px solid var(--border);text-align:center;}
+.bsm-individual th:nth-child(5){position:sticky;top:0;left:330px;z-index:5;background:var(--navy);min-width:130px;border-right:2px solid rgba(255,255,255,.2);text-align:center;}
 
 .bsm-tl-group-header td{background:var(--accent-bg)!important;}
 .bsm-tl-group-header:hover td{background:var(--accent-bg)!important;}
@@ -1409,8 +1409,8 @@ function _renderBucketSummary() {
       return `<tr>
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
         ${tlAgentCell}
-        <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
-        <td style="text-align:center;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
+        <td style="text-align:center;width:52px">${_abs.hadir}/${_abs.hariKerja}</td>
+        <td style="text-align:center;width:64px;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
         <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
         ${metricCells}
       </tr>`;
@@ -1434,8 +1434,8 @@ function _renderBucketSummary() {
             <span class="bsm-rank-badge ${tlRankCls(gi)}" style="margin-right:6px">${gi+1}</span>
             <span style="font-weight:700;font-size:12px;color:var(--accent)">${escH(g.tl)}</span>
           </td>
-          <td style="border-bottom:2px solid var(--accent)"></td>
-          <td style="border-bottom:2px solid var(--accent)"></td>
+          <td style="width:52px;border-bottom:2px solid var(--accent)"></td>
+          <td style="width:64px;border-bottom:2px solid var(--accent)"></td>
           <td style="text-align:center;font-weight:700;border-right:2px solid var(--border);border-bottom:2px solid var(--accent);color:var(--accent)">${tlTotal}</td>
           ${setupCols.map(()=>`<td style="border-bottom:2px solid var(--accent)"></td>`).join('')}
         </tr>`;
@@ -1461,8 +1461,8 @@ function _renderBucketSummary() {
           return `<tr>
             <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
             ${tlAgentCellInd}
-            <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
-            <td style="text-align:center;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
+            <td style="text-align:center;width:52px">${_abs.hadir}/${_abs.hariKerja}</td>
+            <td style="text-align:center;width:64px;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
             <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
             ${metricCells}
           </tr>`;
@@ -1477,8 +1477,8 @@ function _renderBucketSummary() {
         <thead><tr>
           <th style="text-align:center">Rank</th>
           <th>TL / Agent</th>
-          <th style="text-align:center">Hadir</th>
-          <th style="text-align:center">Rate</th>
+          <th style="text-align:center;width:52px;min-width:52px">Hadir</th>
+          <th style="text-align:center;width:64px;min-width:64px">Rate</th>
           <th style="text-align:center;border-right:2px solid rgba(255,255,255,.2)">Payment${escH(viewLabel)}</th>
           ${colHeaders}
         </tr></thead><tbody>${indBodyHtml}</tbody></table>`;
@@ -1799,6 +1799,7 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     }).join('');
 
     const bkCount=new Set(Object.values(byBucket[bk]).flat().map(r=>r.agent)).size;
+    const bkTotalPayment = fmtRpFull(Object.values(byBucket[bk]).flat().reduce((s,r)=>s+(r.dailyPayment||0),0));
     const safeBk=escA(bk); const safeSpv2=escA(spv);
     const hasCustom = bkSetupIdx !== -1;
     const setupLabel = hasCustom ? escH(bkSetup.name) : 'Default';
@@ -1809,6 +1810,7 @@ function buildSPVBlock(spv,rows,bulan,tahun){
         <button class="btn-bucket-setup ${hasCustom?'has-custom':''}"
           onclick="openBkSetupDropdown(event,'${safeBk}','${safeSpv2}')"
           title="Setup kolom untuk bucket ini">⚙ ${setupLabel}</button>
+        <span style="font-size:11px;font-weight:700;color:var(--accent);margin-left:auto;margin-right:8px">${bkTotalPayment}</span>
         <button class="btn-bucket-summary" onclick="openBucketSummary('${safeBk}','${safeSpv2}')" title="Lihat summary ranking bucket">📊 Summary</button>
       </div>
       ${tlRows}
@@ -2785,7 +2787,7 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
       ${tlSetupTabs?`<div class="tl-setup-tabs" onclick="event.stopPropagation()">${tlSetupTabs}</div>`:''}
       <div class="tl-stats">
         <div class="tl-stat"><span class="sk">Agent</span><span class="sv">${t.agentCount}</span></div>
-        <div class="tl-stat"><span class="sk">Payment</span><span class="sv">${fmtRp(t.s.dailyPayment)}</span></div>
+        <div class="tl-stat"><span class="sk">Payment</span><span class="sv">${fmtRpFull(t.s.dailyPayment)}</span></div>
         <div class="tl-stat"><span class="sk">Rate</span><span class="sv">${fmtRate(t.s.avgRate)}</span></div>
         ${extraStat}
       </div>
