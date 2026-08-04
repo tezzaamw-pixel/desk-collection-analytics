@@ -2138,6 +2138,35 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
   if(catatanCount>=5){score+=15;issues.push({type:'catatan',group:'Kedisiplinan',level:'kritis',label:'Sangat banyak catatan SPV',detail:`${catatanCount} hari ada catatan — cek rincian di data harian`,pct:0});}
   else if(catatanCount>=3){score+=8;issues.push({type:'catatan',group:'Kedisiplinan',level:'waspada',label:'Banyak catatan SPV',detail:`${catatanCount} hari ada catatan dari SPV`,pct:0});}
 
+  // ── KELOMPOK E: PERPINDAHAN & KONSISTENSI ────────────────────
+  // Zonk berturut-turut (hadir ≥3 hari berturut payment Rp 0)
+  const hadirRows=agentRows.filter(r=>r.absensi==='Hadir').sort((x,y)=>(x.tanggal||'').localeCompare(y.tanggal||''));
+  let maxZonkStreak=0,zonkStreak=0;
+  const zonkDays=[];let streakStart=null;
+  hadirRows.forEach(r=>{
+    if((r.dailyPayment||0)===0){
+      if(zonkStreak===0)streakStart=r.tanggal;
+      zonkStreak++;
+      if(zonkStreak>maxZonkStreak){maxZonkStreak=zonkStreak;}
+    } else {zonkStreak=0;streakStart=null;}
+  });
+  if(maxZonkStreak>=3){
+    score+=maxZonkStreak*5;
+    issues.push({type:'zonkStreak',group:'Konsistensi',level:maxZonkStreak>=5?'kritis':'waspada',
+      label:`${maxZonkStreak} hari hadir berturut tanpa payment`,
+      detail:`Terpanjang ${maxZonkStreak} hari hadir tapi payment Rp 0 — kemungkinan kendala akun atau strategi`,pct:0});
+  }
+
+  // Pindah project (dari _prevAgentMap)
+  const agCurrApp=agentRows[0]?.aplikasi||'';
+  const prevAppData=_prevAgentMap[agentName];
+  if(prevAppData&&prevAppData.aplikasi&&prevAppData.aplikasi!==agCurrApp){
+    score+=5;
+    issues.push({type:'pindahProject',group:'Perpindahan',level:'waspada',
+      label:'Agent pindah dari project lain',
+      detail:`Bulan lalu di ${prevAppData.aplikasi}${prevAppData.bucket?' bucket '+prevAppData.bucket:''}, bulan ini di ${agCurrApp} — perlu adaptasi strategi`,pct:0});
+  }
+
   score=Math.min(score,100);
 
   // ── SARAN TINDAK LANJUT ─────────────────────────────────────
@@ -2154,6 +2183,8 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
   if(types.includes('ptp'))saranList.push(`Follow-up PTP yang belum bayar sebelum jatuh tempo, catat alasan di sistem`);
   if(types.includes('nolPayment'))saranList.push(`Identifikasi hari hadir tanpa payment — apakah akun sudah disentuh atau hanya absen teknis?`);
   if(types.includes('catatan'))saranList.push(`Jadwalkan sesi 1-on-1 segera, buat action plan tertulis dan pantau progres harian`);
+  if(types.includes('zonkStreak'))saranList.push(`Cek kendala spesifik pada hari-hari tanpa payment — evaluasi kualitas akun yang dipegang dan strategi pendekatan`);
+  if(types.includes('pindahProject'))saranList.push(`Agent baru pindah perlu mentoring khusus — kenalkan karakteristik bucket baru dan target minimalnya`);
   if(saranList.length===0)saranList.push('Performa baik! Pertahankan dan jadikan benchmark tim.');
   if(score>=60)saranList.push('⚠ Risiko tinggi — pertimbangkan monitoring harian & eskalasi ke manajemen jika tidak ada perbaikan dalam 3 hari.');
 
@@ -2213,6 +2244,115 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
     const ptpReal=s.ptpBayar/s.ptp;
     if(ptpReal<0.3)insights.push({dot:'dot-warn',text:`Realisasi PTP bucket rendah: ${fmtNum(s.ptpBayar)} bayar dari ${fmtNum(s.ptp)} PTP (${Math.round(ptpReal*100)}%) — perlu follow-up lebih ketat`});
   }
+
+  // ── POIN BARU ────────────────────────────────────────────────
+
+  // 8. Agent zonk berhari-hari (hadir ≥3 hari berturut tapi Rp 0)
+  const zonkAgents=[];
+  ranked.forEach(a=>{
+    const sortedRows=a.rows.filter(r=>r.absensi==='Hadir').sort((x,y)=>(x.tanggal||'').localeCompare(y.tanggal||''));
+    let maxStreak=0,streak=0;
+    sortedRows.forEach(r=>{
+      if((r.dailyPayment||0)===0){streak++;maxStreak=Math.max(maxStreak,streak);}
+      else streak=0;
+    });
+    if(maxStreak>=3)zonkAgents.push({ag:a.ag,streak:maxStreak});
+  });
+  if(zonkAgents.length>0){
+    const worst=zonkAgents.sort((a,b)=>b.streak-a.streak);
+    insights.push({dot:'dot-red',text:`<b>${worst.length} agent</b> hadir berturut-turut tanpa payment: ${worst.slice(0,3).map(a=>`${a.ag} (${a.streak} hari)`).join(', ')}${worst.length>3?'...':''} — evaluasi kendala penagihan`});
+  }
+
+  // 9. Agent pindah project bulan ini
+  const pindahAgents=ranked.filter(a=>{
+    // Cek dari _prevAgentMap (data bulan lalu)
+    const prev=_prevAgentMap[a.ag];
+    if(!prev) return false;
+    const currAplikasi=a.rows[0]?.aplikasi||'';
+    return prev.aplikasi && prev.aplikasi!==currAplikasi;
+  });
+  // Atau pindah dalam bulan ini (>1 aplikasi)
+  const multiAppAgents=ranked.filter(a=>{
+    const apps=new Set(a.rows.map(r=>r.aplikasi).filter(Boolean));
+    return apps.size>1;
+  });
+  const allPindah=[...new Set([...pindahAgents.map(a=>a.ag),...multiAppAgents.map(a=>a.ag)])];
+  if(allPindah.length>0){
+    insights.push({dot:'dot-blue',text:`<b>${allPindah.length} agent</b> baru pindah ke bucket/aplikasi ini: ${allPindah.slice(0,3).join(', ')}${allPindah.length>3?'...':''} — perlu orientasi ulang strategi penagihan`});
+  }
+
+  // 10. Agent baru (tidak ada di data bulan lalu)
+  if(Object.keys(_prevAgentMap).length>0){
+    const agentBaru=ranked.filter(a=>!_prevAgentMap[a.ag]);
+    if(agentBaru.length>0){
+      insights.push({dot:'dot-blue',text:`<b>${agentBaru.length} agent baru</b> belum ada histori bulan lalu: ${agentBaru.slice(0,3).map(a=>a.ag).join(', ')}${agentBaru.length>3?'...':''} — butuh pendampingan ekstra di awal`});
+    }
+  }
+
+  // 11. Payment turun minggu ke minggu (per agent)
+  const turunAgents=[];
+  ranked.forEach(a=>{
+    const minggu1=a.rows.filter(r=>{const d=parseInt((r.tanggal||'').split('-')[2]);return d>=1&&d<=7;}).reduce((s,r)=>s+(r.dailyPayment||0),0);
+    const minggu2=a.rows.filter(r=>{const d=parseInt((r.tanggal||'').split('-')[2]);return d>=8&&d<=14;}).reduce((s,r)=>s+(r.dailyPayment||0),0);
+    const minggu3=a.rows.filter(r=>{const d=parseInt((r.tanggal||'').split('-')[2]);return d>=15&&d<=21;}).reduce((s,r)=>s+(r.dailyPayment||0),0);
+    const weeks=[minggu1,minggu2,minggu3].filter(w=>w>0);
+    if(weeks.length>=2){
+      const last=weeks[weeks.length-1];
+      const prev2=weeks[weeks.length-2];
+      if(prev2>0&&last<prev2*0.4)turunAgents.push({ag:a.ag,prev:prev2,last});
+    }
+  });
+  if(turunAgents.length>0){
+    const worst=turunAgents.sort((a,b)=>(a.last/a.prev)-(b.last/b.prev));
+    insights.push({dot:'dot-warn',text:`<b>${worst.length} agent</b> payment turun drastis minggu ini: ${worst.slice(0,2).map(a=>`${a.ag} (${fmtRp(a.prev)}→${fmtRp(a.last)})`).join(', ')}${worst.length>2?'...':''}`});
+  }
+
+  // 12. TL dengan banyak agent Rp 0 di hari yang sama
+  // Group by TL, cek hari dimana mayoritas agent Rp 0
+  const byTLBucket={};
+  ranked.forEach(a=>{
+    const tl=a.rows[0]?.teamLeader||'?';
+    if(!byTLBucket[tl])byTLBucket[tl]=[];
+    byTLBucket[tl].push(a);
+  });
+  const tlZonkDays=[];
+  Object.entries(byTLBucket).forEach(([tl,agts])=>{
+    if(agts.length<3)return;
+    // Kumpulkan semua tanggal
+    const allDates=[...new Set(agts.flatMap(a=>a.rows.map(r=>r.tanggal).filter(Boolean)))].sort();
+    allDates.forEach(tgl=>{
+      const hadirCount2=agts.filter(a=>a.rows.some(r=>r.tanggal===tgl&&r.absensi==='Hadir')).length;
+      const nolPayCount=agts.filter(a=>a.rows.some(r=>r.tanggal===tgl&&r.absensi==='Hadir'&&(r.dailyPayment||0)===0)).length;
+      if(hadirCount2>=3&&nolPayCount/hadirCount2>=0.6){
+        const day=parseInt(tgl.split('-')[2]);
+        tlZonkDays.push({tl,tgl:day,nol:nolPayCount,hadir:hadirCount2});
+      }
+    });
+  });
+  if(tlZonkDays.length>0){
+    const grouped={};
+    tlZonkDays.forEach(x=>{if(!grouped[x.tl])grouped[x.tl]=[];grouped[x.tl].push(x.tgl);});
+    const tlList=Object.entries(grouped).map(([tl,days])=>`${tl} (tgl ${days.join(',')})`).slice(0,2);
+    insights.push({dot:'dot-red',text:`Tim <b>${tlList.join(' & ')}</b> mayoritas agent Rp 0 di hari tersebut — kemungkinan ada kendala tim atau data akun</b>`});
+  }
+
+  // 13. Rank internal bucket — TL posisi terbawah
+  const byTLRank={};
+  ranked.forEach(a=>{
+    const tl=a.rows[0]?.teamLeader||'?';
+    if(!byTLRank[tl])byTLRank[tl]={payment:0,agents:0};
+    byTLRank[tl].payment+=a.payment;
+    byTLRank[tl].agents++;
+  });
+  const tlRanked=Object.entries(byTLRank).sort((a,b)=>b[1].payment-a[1].payment);
+  if(tlRanked.length>=3){
+    const lastTL=tlRanked[tlRanked.length-1];
+    const firstTL=tlRanked[0];
+    if(firstTL[1].payment>0&&lastTL[1].payment<firstTL[1].payment*0.4){
+      insights.push({dot:'dot-warn',text:`TL <b>${lastTL[0]}</b> posisi terbawah di bucket ini — payment ${fmtRpFull(lastTL[1].payment)} vs TL terbaik ${fmtRpFull(firstTL[1].payment)} (${Math.round(lastTL[1].payment/firstTL[1].payment*100)}%) — perlu evaluasi strategi tim`});
+    }
+  }
+
   if(!insights.length)insights.push({dot:'dot-green',text:'Tidak ada temuan kritis di level bucket — performa relatif merata.'});
 
   // Top 3 & bottom 3 agent
@@ -2248,9 +2388,52 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
       <div class="bucket-sum-stat ${s.waBlokir>s.sentuhWA*0.08?'warn':''}"><div class="lbl">WA Diblokir</div><div class="val">${fmtNum(s.waBlokir)}</div><div class="sub">${s.sentuhWA>0?Math.round(s.waBlokir/s.sentuhWA*100)+'% dari sentuh':'-'}</div></div>
     </div>
     <div class="insight-box">
-      <div class="insight-box-title">💡 Temuan Otomatis</div>
+      <div class="insight-box-title">📋 Temuan — ${insights.filter(i=>i.dot==='dot-red').length} kritis · ${insights.filter(i=>i.dot==='dot-warn').length} peringatan · ${insights.filter(i=>i.dot==='dot-blue').length} info</div>
       ${insights.map(ins=>`<div class="insight-item"><div class="insight-dot ${ins.dot}"></div><span>${ins.text}</span></div>`).join('')}
     </div>
+    ${(()=>{
+      // ── Kesimpulan otomatis ──
+      const kritisCount=insights.filter(i=>i.dot==='dot-red').length;
+      const warnCount=insights.filter(i=>i.dot==='dot-warn').length;
+      let kesimpulan='', kesimpulanCls='';
+      if(kritisCount>=3){
+        kesimpulan=`Bucket ini memiliki <b>${kritisCount} masalah kritis</b> yang perlu penanganan segera. Performa tim secara keseluruhan di bawah standar — eskalasi ke manajemen disarankan.`;
+        kesimpulanCls='danger';
+      } else if(kritisCount>=1||warnCount>=3){
+        kesimpulan=`Terdapat <b>${kritisCount} masalah kritis</b> dan <b>${warnCount} peringatan</b>. Perlu monitoring lebih ketat dan intervensi pada agent/TL yang teridentifikasi.`;
+        kesimpulanCls='warn';
+      } else if(warnCount>=1){
+        kesimpulan=`Bucket relatif stabil dengan <b>${warnCount} hal yang perlu diperhatikan</b>. Lakukan coaching preventif sebelum berkembang menjadi masalah kritis.`;
+        kesimpulanCls='info';
+      } else {
+        kesimpulan=`Bucket dalam kondisi baik. Tidak ada temuan kritis — pertahankan performa dan jadikan benchmark tim lain.`;
+        kesimpulanCls='good';
+      }
+      // ── Rekomendasi ──
+      const rekList=[];
+      const iTypes=insights.map(i=>i.text||'');
+      if(insights.some(i=>i.dot==='dot-red'&&i.text.includes('zonk')))rekList.push('Lakukan coaching 1-on-1 untuk agent yang hadir berturut-turut tanpa payment — cek kendala spesifik akun yang dipegang');
+      if(insights.some(i=>i.text.includes('mayoritas agent Rp 0')))rekList.push('Review strategi tim secara menyeluruh — kemungkinan ada kendala sistemik seperti data akun kedaluwarsa atau metode penagihan yang tidak efektif');
+      if(insights.some(i=>i.text.includes('pindah')||i.text.includes('pindah project')))rekList.push('Beri orientasi khusus untuk agent yang baru pindah — kenalkan karakteristik bucket dan target minimal');
+      if(insights.some(i=>i.text.includes('baru') && i.text.includes('histori')))rekList.push('Pasangkan agent baru dengan agent senior sebagai mentor selama 1–2 minggu pertama');
+      if(insights.some(i=>i.text.includes('turun drastis')))rekList.push('Evaluasi penyebab penurunan payment mingguan — apakah karena kualitas akun, hari libur, atau perubahan strategi');
+      if(insights.some(i=>i.text.includes('terbawah')))rekList.push('Jadwalkan evaluasi kinerja TL terbawah — bandingkan strategi dengan TL terbaik dan buat rencana perbaikan terukur');
+      if(insights.some(i=>i.dot==='dot-red'&&i.text.includes('hadir tapi payment Rp 0')))rekList.push('Identifikasi agent hadir tapi tidak produktif — pastikan akun yang dipegang masih aktif dan belum kadaluwarsa');
+      if(insights.some(i=>i.text.includes('rate') && i.text.includes('rendah')))rekList.push('Evaluasi kualitas portofolio akun di bucket ini — pertimbangkan rotasi akun atau pengayaan data');
+      if(rekList.length===0)rekList.push('Pertahankan performa saat ini. Lakukan review mingguan rutin untuk memastikan konsistensi.');
+      const borderColor=kesimpulanCls==='danger'?'var(--danger)':kesimpulanCls==='warn'?'var(--warning)':kesimpulanCls==='good'?'var(--success)':'var(--accent)';
+      return `
+    <div style="background:var(--surface);border:1px solid ${borderColor};border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;border-left:3px solid ${borderColor}">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">📊 Kesimpulan</div>
+      <div style="font-size:12px;color:var(--text);line-height:1.6">${kesimpulan}</div>
+    </div>
+    <div class="saran-box" style="margin-top:8px">
+      <div class="saran-box-title">✅ Rekomendasi Tindakan</div>
+      <ul class="saran-list">
+        ${rekList.map(r=>`<li><span>${r}</span></li>`).join('')}
+      </ul>
+    </div>`;
+    })()}
     <div class="divider-label">Top Agent</div>
     ${topRows}
     ${botRows?`<div class="divider-label" style="margin-top:8px">Perlu Perhatian</div>${botRows}`:''}
