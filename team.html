@@ -567,11 +567,16 @@ select:focus{border-color:var(--accent);}
 .bsm-view-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;margin-left:auto;}
 .bsm-view-btn{padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer;transition:all .15s;}
 .bsm-view-btn.active{background:var(--accent);color:#fff;}
-/* Individual mode: 5 freeze cols (Rank+TL+Agent+Hadir+TotalPay) */
-.bsm-individual td:nth-child(4){position:sticky;left:314px;z-index:2;background:var(--surface);min-width:70px;text-align:center;}
-.bsm-individual td:nth-child(5){position:sticky;left:384px;z-index:2;background:var(--surface);min-width:130px;border-right:2px solid var(--border);}
-.bsm-individual th:nth-child(4){position:sticky;top:0;left:314px;z-index:5;background:var(--navy);min-width:70px;text-align:center;}
-.bsm-individual th:nth-child(5){position:sticky;top:0;left:384px;z-index:5;background:var(--navy);min-width:130px;border-right:2px solid rgba(255,255,255,.2);}
+/* Individual mode: Rank(1) + TL/Agent(2) + Hadir(3) + Rate(4) + Payment(5) */
+.bsm-individual td:nth-child(3){position:sticky;left:210px;z-index:2;background:var(--surface);min-width:65px;text-align:center;}
+.bsm-individual td:nth-child(4){position:sticky;left:275px;z-index:2;background:var(--surface);min-width:70px;text-align:center;}
+.bsm-individual td:nth-child(5){position:sticky;left:345px;z-index:2;background:var(--surface);min-width:140px;border-right:2px solid var(--border);}
+.bsm-individual th:nth-child(3){position:sticky;top:0;left:210px;z-index:5;background:var(--navy);min-width:65px;text-align:center;}
+.bsm-individual th:nth-child(4){position:sticky;top:0;left:275px;z-index:5;background:var(--navy);min-width:70px;text-align:center;}
+.bsm-individual th:nth-child(5){position:sticky;top:0;left:345px;z-index:5;background:var(--navy);min-width:140px;border-right:2px solid rgba(255,255,255,.2);}
+/* TL/Agent merged col width */
+.bsm-individual td:nth-child(2){min-width:170px;}
+.bsm-individual th:nth-child(2){min-width:170px;}
 
 /* ── BUCKET SUMMARY BUTTON ── */
 .btn-bucket-summary{margin-left:auto;padding:3px 10px;font-size:11px;font-weight:600;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;}
@@ -1157,28 +1162,47 @@ function _renderBucketSummary() {
     const setups = getSetups(spv);
     const activeIdx = parseInt(localStorage.getItem('dca_active_setup_'+spv)||'0');
     const activeSetup = setups[activeIdx]||null;
+    // Fix 1: pakai urutan dari setup (activeSetup.metrics), bukan sort ulang
     const setupCols = activeSetup
       ? activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean)
       : ALL_METRICS.slice(0,8);
     const setupLabel = activeSetup ? escH(activeSetup.name) : 'Default';
+
+    // Fix 2: Rate dihitung dari dailyPayment / osDataBaru per agent
+    // Kolom header: Rank | TL+Agent (merged) | Hadir | Rate | Payment | ...setupCols
     const colHeaders = setupCols.map(m=>`<th style="text-align:center">${m.label}${escH(viewLabel)}</th>`).join('');
 
     const tableRows = agents.map((a,i) => {
       const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
       const _abs = calcAbsensi(a._rows);
       const s = summarizeRows(a._rows);
+
+      // Fix 2: Rate = dailyPayment / osDataBaru (sama seperti logika rank)
+      const agentRate = s.osDataBaru > 0 ? s.dailyPayment / s.osDataBaru : (s.avgRate||0);
+      const rateDisplay = (agentRate * 100).toFixed(2) + '%';
+
       const metricCells = setupCols.map(m => {
         const val = m.key==='absensiPct' ? _abs.pct
-          : m.key==='cmpRate' ? (s.avgRate||0)
+          : m.key==='cmpRate' ? agentRate
           : (s[m.key]||0);
-        const display = fmtView(val, a, m.fmt);
-        return `<td style="text-align:center">${display}</td>`;
+        return `<td style="text-align:center">${fmtView(val, a, m.fmt)}</td>`;
       }).join('');
+
+      // Fix 3: TL + Agent digabung dalam 1 cell
+      const tlAgentCell = `<td>
+        <div style="font-size:10px;color:var(--text3);font-weight:500;margin-bottom:1px">
+          <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(a.tl)}
+        </div>
+        <div style="font-weight:600;color:var(--text)">
+          <span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}">${escH(a.ag)}</span>${moveBadge}
+        </div>
+      </td>`;
+
       return `<tr>
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
-        <td style="font-weight:600;color:var(--accent)">${escH(a.tl)}</td>
-        <td><span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500">${escH(a.ag)}</span>${moveBadge}</td>
+        ${tlAgentCell}
         <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
+        <td style="text-align:center;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
         <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
         ${metricCells}
       </tr>`;
@@ -1188,8 +1212,10 @@ function _renderBucketSummary() {
         Setup aktif: <b style="color:var(--accent)">${setupLabel}</b>${date?` &nbsp;·&nbsp; <b style="color:var(--warning)">Tanggal: ${new Date(date).getDate()}</b>`:''}</div>
       <table class="bsm-table bsm-individual">
         <thead><tr>
-          <th style="text-align:center">Rank</th><th>Team Leader</th><th>Agent</th>
+          <th style="text-align:center">Rank</th>
+          <th>TL / Agent</th>
           <th style="text-align:center">Hadir</th>
+          <th style="text-align:center">Rate</th>
           <th style="text-align:center;border-right:2px solid rgba(255,255,255,.2)">Payment${escH(viewLabel)}</th>
           ${colHeaders}
         </tr></thead><tbody>${tableRows}</tbody></table>`;
