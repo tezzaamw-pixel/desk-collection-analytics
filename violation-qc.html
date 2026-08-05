@@ -360,6 +360,7 @@ select:focus{border-color:var(--accent);}
       </div>
     </div>
     <div class="nav-live"><div class="nav-live-dot"></div>Live</div>
+    <button class="btn-nav" id="btnPresentasi" onclick="togglePresentasiPanel()" style="background:rgba(139,92,246,.18);border-color:rgba(139,92,246,.4);color:#c4b5fd">🎯 Presentasi</button>
     <div class="theme-toggle">
       <button class="theme-btn active" id="btnLight" onclick="setTheme('light')">☀ Terang</button>
       <button class="theme-btn" id="btnDark" onclick="setTheme('dark')">🌙 Gelap</button>
@@ -523,16 +524,19 @@ select:focus{border-color:var(--accent);}
   <div id="contentWrap" style="display:none">
 
     <!-- SUMMARY CARDS -->
-    <div class="summary-grid" id="summaryGrid"></div>
+    <div class="summary-grid" id="summaryGrid" data-sec="summary"></div>
 
     <!-- KANAL BREAKDOWN -->
+    <div id="secBreakdown">
     <div class="section-title">📡 Breakdown Kanal Pengaduan</div>
     <div class="kanal-grid" id="kanalGrid"></div>
+    </div>
 
     <!-- CHARTS -->
+    <div id="secCharts">
     <div class="section-title">📊 Grafik Analitik</div>
     <div class="charts-grid">
-      <div class="chart-card">
+      <div class="chart-card" data-chart="tren">
         <div class="chart-header">
           <div class="chart-title">Tren Kasus per Bulan</div>
           <button class="chart-label-btn" id="lblBtn-tren" onclick="toggleLabels('tren')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
@@ -543,7 +547,7 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartTren"></canvas></div>
       </div>
-      <div class="chart-card">
+      <div class="chart-card" data-chart="kanal">
         <div class="chart-header">
           <div class="chart-title">Distribusi Kanal Pengaduan</div>
           <button class="chart-label-btn" id="lblBtn-kanal" onclick="toggleLabels('kanal')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
@@ -554,7 +558,7 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartKanal"></canvas></div>
       </div>
-      <div class="chart-card">
+      <div class="chart-card" data-chart="agent">
         <div class="chart-header">
           <div class="chart-title">Valid Ext. vs Valid Int.</div>
           <button class="chart-label-btn" id="lblBtn-agent" onclick="toggleLabels('agent')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
@@ -565,14 +569,14 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartAgent"></canvas></div>
       </div>
-      <div class="chart-card">
+      <div class="chart-card" data-chart="kanalStatus">
         <div class="chart-header">
           <div class="chart-title">Status Eksternal per Kanal</div>
           <button class="chart-label-btn" id="lblBtn-kanalStatus" onclick="toggleLabels('kanalStatus')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
         </div>
         <div class="chart-wrap"><canvas id="chartKanalStatus"></canvas></div>
       </div>
-      <div class="chart-card">
+      <div class="chart-card" data-chart="violRate">
         <div class="chart-header">
           <div class="chart-title">Violation Rate per Aplikasi (%)</div>
           <button class="chart-label-btn" id="lblBtn-violRate" onclick="toggleLabels('violRate')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
@@ -584,7 +588,7 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartViolRate"></canvas></div>
       </div>
-      <div class="chart-card">
+      <div class="chart-card" data-chart="aplikasi">
         <div class="chart-header">
           <div class="chart-title">Kasus per Aplikasi</div>
           <button class="chart-label-btn" id="lblBtn-aplikasi" onclick="toggleLabels('aplikasi')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
@@ -595,7 +599,7 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartAplikasi"></canvas></div>
       </div>
-      <div class="chart-card">
+      <div class="chart-card" data-chart="punishment">
         <div class="chart-header">
           <div class="chart-title">Distribusi Punishment Internal</div>
           <button class="chart-label-btn" id="lblBtn-punishment" onclick="toggleLabels('punishment')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
@@ -606,7 +610,7 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartPunishment"></canvas></div>
       </div>
-      <div class="chart-card">
+      <div class="chart-card" data-chart="durasi">
         <div class="chart-header">
           <div class="chart-title">Rata-rata Durasi Penyelesaian (hari)</div>
           <button class="chart-label-btn" id="lblBtn-durasi" onclick="toggleLabels('durasi')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
@@ -620,7 +624,7 @@ select:focus{border-color:var(--accent);}
     </div>
 
     <!-- GRAFIK PERGERAKAN PER TANGGAL -->
-    <div class="chart-card" style="margin-bottom:16px">
+    <div class="chart-card" style="margin-bottom:16px" data-chart="harian">
       <div class="chart-header">
         <div class="chart-title">📅 Pergerakan Violation per Tanggal</div>
         <button class="chart-label-btn" id="lblBtn-harian" onclick="toggleLabels('harian')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
@@ -632,19 +636,28 @@ select:focus{border-color:var(--accent);}
       <div class="chart-wrap" style="height:200px"><canvas id="chartHarian"></canvas></div>
     </div>
 
-    <!-- TOP 10 LEADERBOARD: APLIKASI, TL, AGENT -->
+    </div><!-- /secCharts -->
+
+    <!-- TOP 10 LEADERBOARD -->
+    <div id="secTop">
     <div class="section-title">🏆 Top Pelanggaran Terbanyak</div>
     <div class="leaderboard-grid" id="leaderboardGrid">
       <!-- diisi JS -->
     </div>
 
-    <!-- INSIGHT / ANALISA OTOMATIS -->
+    </div><!-- /secTop -->
+
+    <!-- INSIGHT -->
+    <div id="secAnalisa">
     <div class="insight-card">
       <div class="insight-title">🔍 Analisa & Perhatian Khusus <span style="font-size:11px;font-weight:400;color:var(--text3)">— otomatis berdasarkan data</span></div>
       <div class="insight-list" id="insightList"><div style="color:var(--text3);font-size:12px">Memuat analisa…</div></div>
     </div>
 
+    </div><!-- /secAnalisa -->
+
     <!-- TABLE -->
+    <div id="secTable">
     <div class="table-card">
       <div class="table-header">
         <div class="table-title">📋 Daftar Kasus Pelanggaran <span id="tblCount" style="font-size:12px;font-weight:400;color:var(--text3)"></span></div>
@@ -677,6 +690,7 @@ select:focus{border-color:var(--accent);}
       <div class="pagination" id="paginationWrap"></div>
     </div>
 
+    </div><!-- /secTable -->
   </div><!-- /contentWrap -->
 </div><!-- /main -->
 
@@ -2494,6 +2508,7 @@ function renderTableOnly(data){
   }
   pgHtml+=`<span class="pg-info">${fmtNum(start+1)}–${fmtNum(Math.min(start+PAGE_SIZE,total))} dari ${fmtNum(total)}</span>`;
   document.getElementById('paginationWrap').innerHTML=pgHtml;
+  if (typeof _applyPresColsToTable === 'function') _applyPresColsToTable();
 }
 
 function goPage(p){
@@ -3178,5 +3193,263 @@ document.addEventListener('click',function(e){
   if(!clickedInAny)closeAllMs();
 });
 </script>
+
+<!-- PRESENTASI PANEL -->
+<div id="presOverlay" onclick="togglePresentasiPanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:490"></div>
+<div id="presPanel" class="pres-panel">
+  <div class="pres-head">
+    <div class="pres-title">🎯 Mode Presentasi</div>
+    <button class="pres-close" onclick="togglePresentasiPanel()">✕</button>
+  </div>
+  <div class="pres-body">
+    <div class="pres-section">
+      <div class="pres-section-label">📱 Aplikasi yang Ditampilkan</div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:6px">Kosongkan = tampilkan semua aplikasi</div>
+      <div id="presAppList" class="pres-app-list"></div>
+    </div>
+    <div class="pres-section">
+      <div class="pres-section-label">📋 Konten</div>
+      <label class="pres-check"><input type="checkbox" id="psc-summary" checked onchange="applyPres()"><span>Ringkasan Angka (Cards)</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-breakdown" checked onchange="applyPres()"><span>Breakdown Kanal Pengaduan</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-top" checked onchange="applyPres()"><span>Top Pelanggaran Terbanyak</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-analisa" checked onchange="applyPres()"><span>Analisa & Perhatian Khusus</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-table" checked onchange="applyPres()"><span>Daftar Kasus Pelanggaran</span></label>
+    </div>
+    <div class="pres-section">
+      <div class="pres-section-label">📊 Grafik Analitik
+        <button class="pres-selall" onclick="presToggleAllCharts(true)">Semua</button>
+        <button class="pres-selall" onclick="presToggleAllCharts(false)">Hapus</button>
+      </div>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-tren" checked onchange="applyPres()"><span>Tren Kasus per Bulan</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-kanal" checked onchange="applyPres()"><span>Distribusi Kanal Pengaduan</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-agent" checked onchange="applyPres()"><span>Valid Ext. vs Valid Int.</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-kanalStatus" checked onchange="applyPres()"><span>Status Eksternal per Kanal</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-violRate" checked onchange="applyPres()"><span>Violation Rate per Aplikasi</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-aplikasi" checked onchange="applyPres()"><span>Kasus per Aplikasi</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-punishment" checked onchange="applyPres()"><span>Distribusi Punishment</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-durasi" checked onchange="applyPres()"><span>Rata-rata Durasi</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-chart-harian" checked onchange="applyPres()"><span>Pergerakan per Tanggal</span></label>
+    </div>
+    <div class="pres-section">
+      <div class="pres-section-label">📋 Kolom Daftar Kasus
+        <button class="pres-selall" onclick="presToggleAllCols(true)">Semua</button>
+        <button class="pres-selall" onclick="presToggleAllCols(false)">Hapus</button>
+      </div>
+      <label class="pres-check"><input type="checkbox" id="psc-col-no" checked onchange="applyPres()"><span>#</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-tgl" checked onchange="applyPres()"><span>Tgl Masuk</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-agent" checked onchange="applyPres()"><span>Nama Agent</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-app" checked onchange="applyPres()"><span>Aplikasi</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-bucket" checked onchange="applyPres()"><span>Bucket</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-leader" checked onchange="applyPres()"><span>Leader</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-kanal" checked onchange="applyPres()"><span>Kanal</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-kasus" checked onchange="applyPres()"><span>Kasus</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-qc" checked onchange="applyPres()"><span>QC Handle</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-stext" checked onchange="applyPres()"><span>Status Ext.</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-sint" checked onchange="applyPres()"><span>Status Int.</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-pun" checked onchange="applyPres()"><span>Punishment Int.</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-dur" checked onchange="applyPres()"><span>Durasi (hr)</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-val" checked onchange="applyPres()"><span>Validasi</span></label>
+      <label class="pres-check"><input type="checkbox" id="psc-col-denda" checked onchange="applyPres()"><span>Denda</span></label>
+    </div>
+  </div>
+  <div class="pres-foot">
+    <button class="pres-reset-btn" onclick="resetPres()">↩ Reset Semua</button>
+    <div id="presActiveBadge" style="display:none;font-size:11px;font-weight:600;color:#a78bfa">● Mode Aktif</div>
+  </div>
+</div>
+
+<script>
+// ── PRESENTASI MODE ──────────────────────────────────────────
+let _presPanelOpen = false;
+
+// CSS
+(function(){
+  const s = document.createElement('style');
+  s.textContent = `
+.pres-panel{position:fixed;top:0;right:-360px;width:340px;height:100vh;background:var(--surface);border-left:1px solid var(--border);z-index:500;display:flex;flex-direction:column;transition:right .3s ease;box-shadow:-4px 0 20px rgba(0,0,0,.15);}
+.pres-panel.open{right:0;}
+.pres-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;background:var(--navy);}
+.pres-title{font-size:14px;font-weight:700;color:#fff;}
+.pres-close{background:rgba(255,255,255,.15);border:none;color:#fff;border-radius:6px;width:28px;height:28px;cursor:pointer;font-size:14px;}
+.pres-body{flex:1;overflow-y:auto;padding:14px;}
+.pres-section{margin-bottom:18px;padding-bottom:14px;border-bottom:1px solid var(--border);}
+.pres-section:last-child{border-bottom:none;}
+.pres-section-label{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.pres-check{display:flex;align-items:center;gap:8px;padding:5px 6px;border-radius:5px;cursor:pointer;font-size:12px;color:var(--text);transition:background .1s;}
+.pres-check:hover{background:var(--surface2);}
+.pres-check input{cursor:pointer;accent-color:var(--accent);width:14px;height:14px;}
+.pres-app-list{display:flex;flex-wrap:wrap;gap:6px;}
+.pres-app-chip{padding:4px 10px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);font-size:11px;font-weight:600;cursor:pointer;color:var(--text2);transition:all .15s;}
+.pres-app-chip.selected{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pres-selall{font-size:9px;font-weight:600;padding:2px 7px;border-radius:4px;background:var(--surface2);border:1px solid var(--border);color:var(--text3);cursor:pointer;margin-left:4px;}
+.pres-selall:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+.pres-foot{padding:12px 18px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.pres-reset-btn{padding:6px 14px;font-size:12px;font-weight:600;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text2);cursor:pointer;}
+.pres-reset-btn:hover{border-color:var(--accent);color:var(--accent);}
+#btnPresentasi.pres-active{background:rgba(139,92,246,.35)!important;border-color:rgba(139,92,246,.7)!important;color:#c4b5fd!important;}
+  `;
+  document.head.appendChild(s);
+})();
+
+function togglePresentasiPanel() {
+  _presPanelOpen = !_presPanelOpen;
+  const panel = document.getElementById('presPanel');
+  const overlay = document.getElementById('presOverlay');
+  const btn = document.getElementById('btnPresentasi');
+  if (panel) panel.classList.toggle('open', _presPanelOpen);
+  if (overlay) overlay.style.display = _presPanelOpen ? 'block' : 'none';
+  if (btn) btn.classList.toggle('pres-active', _presPanelOpen);
+  if (_presPanelOpen) _buildPresAppList();
+}
+
+function _buildPresAppList() {
+  const container = document.getElementById('presAppList');
+  if (!container) return;
+  // Get all apps from current data
+  const apps = [...new Set((filteredData||allData||[]).map(r=>r.aplikasi).filter(Boolean))].sort();
+  const selected = _getPresApps();
+  container.innerHTML = apps.map(app => `
+    <div class="pres-app-chip ${selected.has(app)?'selected':''}"
+      onclick="togglePresApp('${app.replace(/'/g,"\\'")}')">${app}</div>`).join('');
+}
+
+function _getPresApps() {
+  return new Set(
+    [...document.querySelectorAll('.pres-app-chip.selected')].map(c=>c.textContent.trim())
+  );
+}
+
+function togglePresApp(app) {
+  const chips = document.querySelectorAll('.pres-app-chip');
+  chips.forEach(c => { if(c.textContent.trim()===app) c.classList.toggle('selected'); });
+  applyPres();
+}
+
+function presToggleAllCharts(val) {
+  document.querySelectorAll('[id^="psc-chart-"]').forEach(cb => cb.checked = val);
+  applyPres();
+}
+
+function presToggleAllCols(val) {
+  document.querySelectorAll('[id^="psc-col-"]').forEach(cb => cb.checked = val);
+  applyPres();
+}
+
+// Column index map
+const COL_IDX = {
+  'psc-col-no':0,'psc-col-tgl':1,'psc-col-agent':2,'psc-col-app':3,
+  'psc-col-bucket':4,'psc-col-leader':5,'psc-col-kanal':6,'psc-col-kasus':7,
+  'psc-col-qc':8,'psc-col-stext':9,'psc-col-sint':10,'psc-col-pun':11,
+  'psc-col-dur':12,'psc-col-val':13,'psc-col-denda':14
+};
+
+// Column visibility helper — called after every table render
+function _applyPresColsToTable() {
+  Object.entries(COL_IDX).forEach(([cbId, colIdx]) => {
+    const show = document.getElementById(cbId)?.checked !== false;
+    const ths = document.querySelectorAll('.viol-table thead tr th');
+    if (ths[colIdx]) ths[colIdx].style.display = show ? '' : 'none';
+    document.querySelectorAll('.viol-table tbody tr').forEach(tr => {
+      const td = tr.querySelectorAll('td')[colIdx];
+      if (td) td.style.display = show ? '' : 'none';
+    });
+  });
+}
+
+function applyPres() {
+  const get = id => document.getElementById(id)?.checked !== false;
+  const selectedApps = _getPresApps();
+  const isActive = selectedApps.size > 0 ||
+    !get('psc-summary') || !get('psc-breakdown') || !get('psc-top') ||
+    !get('psc-analisa') || !get('psc-table') ||
+    document.querySelectorAll('[id^="psc-chart-"]:not(:checked)').length > 0 ||
+    document.querySelectorAll('[id^="psc-col-"]:not(:checked)').length > 0;
+
+  // Badge
+  const badge = document.getElementById('presActiveBadge');
+  const btn = document.getElementById('btnPresentasi');
+  if (badge) badge.style.display = isActive ? 'block' : 'none';
+  if (btn) btn.classList.toggle('pres-active', isActive);
+
+  // 1. Sections show/hide
+  const sec = id => { const el=document.getElementById(id); if(el) el.style.display=get(`psc-${id.replace('sec','').toLowerCase()}`)?'':'none'; };
+  const summaryEl = document.getElementById('summaryGrid');
+  if (summaryEl) summaryEl.style.display = get('psc-summary') ? '' : 'none';
+  const secBreak = document.getElementById('secBreakdown');
+  if (secBreak) secBreak.style.display = get('psc-breakdown') ? '' : 'none';
+  const secTop = document.getElementById('secTop');
+  if (secTop) secTop.style.display = get('psc-top') ? '' : 'none';
+  const secAnal = document.getElementById('secAnalisa');
+  if (secAnal) secAnal.style.display = get('psc-analisa') ? '' : 'none';
+  const secTbl = document.getElementById('secTable');
+  if (secTbl) secTbl.style.display = get('psc-table') ? '' : 'none';
+
+  // 2. Chart cards show/hide
+  document.querySelectorAll('[data-chart]').forEach(card => {
+    const key = card.dataset.chart;
+    const cb = document.getElementById(`psc-chart-${key}`);
+    card.style.display = (!cb || cb.checked) ? '' : 'none';
+  });
+  // Hide secCharts entirely if all charts hidden
+  const anyChart = [...document.querySelectorAll('[id^="psc-chart-"]')].some(cb=>cb.checked);
+  const secCharts = document.getElementById('secCharts');
+  if (secCharts) secCharts.style.display = anyChart ? '' : 'none';
+
+  // 3. Table columns show/hide
+  Object.entries(COL_IDX).forEach(([cbId, colIdx]) => {
+    const show = document.getElementById(cbId)?.checked !== false;
+    // Header
+    const ths = document.querySelectorAll('.viol-table thead tr th');
+    if (ths[colIdx]) ths[colIdx].style.display = show ? '' : 'none';
+    // All body rows
+    document.querySelectorAll('.viol-table tbody tr').forEach(tr => {
+      const td = tr.querySelectorAll('td')[colIdx];
+      if (td) td.style.display = show ? '' : 'none';
+    });
+  });
+
+  // 4. Filter aplikasi — update msState and re-filter
+  if (selectedApps.size > 0) {
+    // Override ms-opt aplikasi selection
+    document.querySelectorAll('#msAplikasi .ms-opt').forEach(opt => {
+      const val = opt.dataset.val;
+      if (val === 'all') {
+        opt.classList.toggle('active', false);
+      } else {
+        opt.classList.toggle('active', selectedApps.has(val));
+      }
+    });
+    // Update msState
+    if (typeof msState !== 'undefined') {
+      msState.Aplikasi = new Set(selectedApps);
+    }
+    if (typeof applyFilter === 'function') applyFilter();
+  } else if (!isActive) {
+    // Reset aplikasi filter
+    document.querySelectorAll('#msAplikasi .ms-opt').forEach(opt => {
+      opt.classList.toggle('active', opt.dataset.val === 'all');
+    });
+    if (typeof msState !== 'undefined') msState.Aplikasi = new Set();
+    if (typeof applyFilter === 'function') applyFilter();
+  }
+}
+
+function resetPres() {
+  // Uncheck all app chips
+  document.querySelectorAll('.pres-app-chip').forEach(c => c.classList.remove('selected'));
+  // Check all checkboxes
+  document.querySelectorAll('.pres-panel input[type="checkbox"]').forEach(cb => cb.checked = true);
+  // Reset filter
+  document.querySelectorAll('#msAplikasi .ms-opt').forEach(opt => {
+    opt.classList.toggle('active', opt.dataset.val === 'all');
+  });
+  if (typeof msState !== 'undefined') msState.Aplikasi = new Set();
+  if (typeof applyFilter === 'function') applyFilter();
+  applyPres();
+}
+
+// Re-apply column visibility after table re-render
+const _origRenderTable = typeof renderTable === 'function' ? renderTable : null;
+</script>
+
 </body>
-</html>
