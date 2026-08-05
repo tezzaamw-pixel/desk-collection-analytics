@@ -2594,7 +2594,7 @@ function renderSpvCards(bySPV){
   const cards=spvKeys.map(spv=>{
     const rows=bySPV[spv];
     const s=summarizeRows(rows);
-    const agentCount=new Set(rows.map(r=>r.agent)).size;
+    const agentCount=computeActiveAgentCount(rows);
     const bucketCount=new Set(rows.map(r=>r.bucket).filter(Boolean)).size;
     const tlCount=new Set(rows.map(r=>r.teamLeader).filter(Boolean)).size;
     const appList=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))];
@@ -2682,7 +2682,7 @@ const spvAgentDataCache={}; // cache rows per spv untuk analisa attention panel
 
 function buildSPVBlock(spv,rows,bulan,tahun){
   const s=summarizeRows(rows);
-  const agentCount=new Set(rows.map(r=>r.agent)).size;
+  const agentCount=computeActiveAgentCount(rows);
   const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
   const appList=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].join(', ');
   const setups=getSetups(spv);
@@ -2712,8 +2712,14 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   let tlCounter=0;
   const bucketBlocks=Object.keys(byBucket).sort().map(bk=>{
     const tlsInBucket=Object.keys(byBucket[bk]).map(tl=>{
-      const ts=summarizeRows(byBucket[bk][tl]);
-      return{tl,s:ts,rows:byBucket[bk][tl],agentCount:new Set(byBucket[bk][tl].map(r=>r.agent)).size};
+      const tlRowsRaw=byBucket[bk][tl];
+      const ts=summarizeRows(tlRowsRaw);
+      // Agent "lama" (sudah digantikan/nonaktif/pindah akun dalam bulan ini) tidak
+      // dihitung sebagai headcount aktif — biar "X agent" match jumlah akun berjalan.
+      const rotasiInfo=detectRotasiInfo(tlRowsRaw,bk);
+      const lamaAgents=new Set(Object.keys(rotasiInfo).filter(ag=>rotasiInfo[ag].status==='lama'));
+      const activeAgents=new Set(tlRowsRaw.map(r=>r.agent).filter(ag=>ag&&!lamaAgents.has(ag)));
+      return{tl,s:ts,rows:tlRowsRaw,agentCount:activeAgents.size,_activeAgents:activeAgents,_rotasiInfo:rotasiInfo};
     }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
 
     // Get setup for this bucket (custom or fallback to SPV default)
@@ -2725,7 +2731,9 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       return buildTLRow(t,rankInBucket,spv,bulan,tahun,effectiveSetup,bk,tlId);
     }).join('');
 
-    const bkCount=new Set(Object.values(byBucket[bk]).flat().map(r=>r.agent)).size;
+    // Union agent aktif dari semua TL di bucket ini (bukan raw distinct count) —
+    // supaya konsisten dgn agentCount per-TL yang sudah exclude agent "lama".
+    const bkCount=new Set(tlsInBucket.flatMap(t=>[...(t._activeAgents||[])])).size;
     const bkTotalRaw = Object.values(byBucket[bk]).flat().reduce((s,r)=>s+(r.dailyPayment||0),0);
     const bkTotalPayment = fmtRpFull(bkTotalRaw);
     const safeBk=escA(bk); const safeSpv2=escA(spv);
@@ -3818,22 +3826,18 @@ function selectAttentionAgent(spv, safeSpvId, idx){
   },50);
 }
 
-function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
-  const safeSpv=escA(spv);
-  const rankClass=rank===0?'r1':rank===1?'r2':rank===2?'r3':'rn';
-
-  const setupCols=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
-  const firstM=setupCols[0];
-  const extraStat=firstM?`<div class="tl-stat"><span class="sk">${firstM.label}</span><span class="sv">${fmtMetric(firstM,t.s[firstM.key]||0)}</span></div>`:'';
-
+// --- DETEKSI ROTASI AKUN (dipakai bersama: label "Nonaktif"/"Pindah" di baris agent
+// TL, dan headcount aktif di header bucket/TL — supaya keduanya selalu konsisten) ---
+// Kalau 1 akun dipegang >1 agent dalam bulan yang sama, agent dgn tanggal terakhir
+// paling awal dianggap "lama" (sudah digantikan/nonaktif/pindah), sisanya "baru".
+function detectRotasiInfo(rows, bucket){
   const byAgent=new Map();
-  t.rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent.has(ag))byAgent.set(ag,[]);byAgent.get(ag).push(r);});
+  rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent.has(ag))byAgent.set(ag,[]);byAgent.get(ag).push(r);});
 
-  // --- DETEKSI ROTASI ---
   // Kumpulkan semua nama akun yang dipegang >1 agent → ada rotasi
   const akunToAgents={};
-  [...byAgent.entries()].forEach(([ag,rows])=>{
-    rows.forEach(r=>{
+  [...byAgent.entries()].forEach(([ag,ars])=>{
+    ars.forEach(r=>{
       const akun=r.namaAkun||'';
       if(!akun||akun==='—')return;
       if(!akunToAgents[akun])akunToAgents[akun]=new Set();
@@ -3851,8 +3855,8 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
     // Hitung tanggal terakhir masing-masing agent pegang akun ini
     const agLastDate={};
     agents.forEach(ag=>{
-      const rows=(byAgent.get(ag)||[]).filter(r=>r.namaAkun===akun&&r.tanggal);
-      const last=rows.map(r=>r.tanggal).sort().pop()||'';
+      const ars=(byAgent.get(ag)||[]).filter(r=>r.namaAkun===akun&&r.tanggal);
+      const last=ars.map(r=>r.tanggal).sort().pop()||'';
       agLastDate[ag]=last;
     });
     // Sort: yang tanggal terakhirnya lebih awal = agent lama
@@ -3875,6 +3879,49 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
     agentRotasiInfo[agLama]={status:'lama',lawan:agBaru,lawanFirstName:agBaru.split(' ')[0],bucketAktif:bucketAktifLama,akun,changeDate:lamaLastDate};
     agentRotasiInfo[agBaru]={status:'baru',lawan:agLama,lawanFirstName:firstNameLama,akun,changeDate:baruFirstDate};
   });
+  return agentRotasiInfo;
+}
+
+// Hitung jumlah agent AKTIF (exclude yang berstatus 'lama'/digantikan/nonaktif/pindah
+// akun) untuk sekumpulan rows apapun cakupannya (1 TL, 1 bucket, atau 1 SPV penuh).
+// Rotasi dideteksi per (bucket,TL) — sesuai unit di mana pergantian akun terjadi —
+// lalu hasil aktifnya di-union supaya total SPV konsisten dgn total per bucket/TL.
+function computeActiveAgentCount(rows){
+  const byBk={};
+  rows.forEach(r=>{
+    const bk=r.bucket||'(Tanpa Bucket)';
+    const tl=r.teamLeader||'(Tanpa TL)';
+    if(!byBk[bk])byBk[bk]={};
+    if(!byBk[bk][tl])byBk[bk][tl]=[];
+    byBk[bk][tl].push(r);
+  });
+  const active=new Set();
+  Object.keys(byBk).forEach(bk=>{
+    Object.keys(byBk[bk]).forEach(tl=>{
+      const tlRows=byBk[bk][tl];
+      const rotasiInfo=detectRotasiInfo(tlRows,bk);
+      const lama=new Set(Object.keys(rotasiInfo).filter(ag=>rotasiInfo[ag].status==='lama'));
+      tlRows.forEach(r=>{ if(r.agent&&!lama.has(r.agent)) active.add(r.agent); });
+    });
+  });
+  return active.size;
+}
+
+function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
+  const safeSpv=escA(spv);
+  const rankClass=rank===0?'r1':rank===1?'r2':rank===2?'r3':'rn';
+
+  const setupCols=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
+  const firstM=setupCols[0];
+  const extraStat=firstM?`<div class="tl-stat"><span class="sk">${firstM.label}</span><span class="sv">${fmtMetric(firstM,t.s[firstM.key]||0)}</span></div>`:'';
+
+  const byAgent=new Map();
+  t.rows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent.has(ag))byAgent.set(ag,[]);byAgent.get(ag).push(r);});
+
+  // --- DETEKSI ROTASI ---
+  // Dihitung sekali di caller (renderDetailSPV) supaya sama persis dengan headcount
+  // "X agent" di header bucket/TL. Fallback recompute kalau dipanggil dari tempat lain.
+  const agentRotasiInfo = t._rotasiInfo || detectRotasiInfo(t.rows, bucket);
 
   const agentList=[...byAgent.entries()].map(([ag,rows])=>{
     const as=summarizeRows(rows);
