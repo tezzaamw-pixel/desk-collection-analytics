@@ -384,6 +384,7 @@ function doGet(e) {
       case 'weekly':    result = endpointWeekly_(e);    break;
       case 'referensi': result = endpointReferensi_(e); break;
       case 'violation': result = endpointViolation_(e); break;
+      case 'jumlahakun': result = endpointJumlahAkun_(e); break;
       default: result = { success: false, message: 'Unknown action: ' + action };
     }
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -627,4 +628,74 @@ function TEST_referensi() {
 }
 function TEST_violation() {
   Logger.log(JSON.stringify(endpointViolation_({parameter:{}}), null, 2));
+}
+
+// ── Endpoint: Jumlah Akun per Aplikasi per Bulan ──────────────
+function endpointJumlahAkun_(e) {
+  const SHEET_NAME = 'DAFTAR APLIKASI & JUMLAH AGENT';
+  try {
+    const ss    = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+    const sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) return {success:false, message:'Sheet tidak ditemukan: '+SHEET_NAME};
+
+    const lastRow = sheet.getLastRow();
+    const lastCol = sheet.getLastColumn();
+    if (lastRow < 3 || lastCol < 2) return {success:true, data:[]};
+
+    // Row 2 = header tanggal (B2, C2, ...)
+    const headerRow = sheet.getRange(2, 1, 1, lastCol).getValues()[0];
+    // Row 3 dst = data aplikasi
+    const dataRows  = sheet.getRange(3, 1, lastRow - 2, lastCol).getValues();
+
+    // Parse header tanggal → {colIdx, bulan, tahun}
+    // Format tanggal di sheet: Date object atau string "1/1/2025" = bulan/hari/tahun atau hari/bulan/tahun
+    const BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni',
+                         'Juli','Agustus','September','Oktober','November','Desember'];
+    const headers = [];
+    for (let c = 1; c < headerRow.length; c++) {
+      const val = headerRow[c];
+      if (!val) continue;
+      let month, year;
+      if (val instanceof Date) {
+        month = val.getMonth() + 1; // 1-12
+        year  = val.getFullYear();
+      } else {
+        // String "1/1/2025" = hari/bulan/tahun (Indonesia)
+        const parts = String(val).split('/');
+        if (parts.length >= 3) {
+          month = parseInt(parts[1]);
+          year  = parseInt(parts[2]);
+        } else continue;
+      }
+      if (!month || !year) continue;
+      headers.push({col: c, bulan: BULAN_NAMES[month-1], tahun: String(year), month, year});
+    }
+
+    // Build data: [{aplikasi, bulan, tahun, jumlahAkun}]
+    const result = [];
+    dataRows.forEach(row => {
+      const aplikasi = String(row[0]||'').trim();
+      if (!aplikasi) return;
+      headers.forEach(h => {
+        const val = row[h.col];
+        const jumlah = parseInt(val) || 0;
+        if (jumlah > 0) {
+          result.push({
+            aplikasi,
+            bulan: h.bulan,
+            tahun: h.tahun,
+            jumlahAkun: jumlah
+          });
+        }
+      });
+    });
+
+    return {success: true, data: result};
+  } catch(err) {
+    return {success: false, message: err.message};
+  }
+}
+
+function TEST_jumlahakun() {
+  Logger.log(JSON.stringify(endpointJumlahAkun_({parameter:{}}), null, 2));
 }

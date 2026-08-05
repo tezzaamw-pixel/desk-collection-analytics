@@ -293,6 +293,7 @@ select:focus{border-color:var(--accent);}
 .lb-count-ag{background:#fce7f3;color:#9d174d;}
 .lb-card-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;}
 .lb-card-sub{font-size:11px;color:var(--text3);}
+.lb-list{max-height:560px;overflow-y:auto;scrollbar-width:thin;}
 .lb-kanal-summary{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
 .lb-ks-pill{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;}
 .lb-ks-ojk{background:#fce7f3;color:#9d174d;}
@@ -603,6 +604,24 @@ select:focus{border-color:var(--accent);}
       </div>
       <div class="chart-card">
         <div class="chart-header">
+          <div class="chart-title">Status Eksternal per Kanal</div>
+          <button class="chart-label-btn" id="lblBtn-kanalStatus" onclick="toggleLabels('kanalStatus')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
+        </div>
+        <div class="chart-wrap"><canvas id="chartKanalStatus"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Violation Rate per Aplikasi (%)</div>
+          <button class="chart-label-btn" id="lblBtn-violRate" onclick="toggleLabels('violRate')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
+          <div class="chart-type-toggle">
+            <button class="chart-type-btn active" onclick="switchChart('violRate','bar',this)">Bar</button>
+            <button class="chart-type-btn" onclick="switchChart('violRate','line',this)">Line</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartViolRate"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
           <div class="chart-title">Kasus per Aplikasi</div>
           <button class="chart-label-btn" id="lblBtn-aplikasi" onclick="toggleLabels('aplikasi')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
@@ -650,7 +669,7 @@ select:focus{border-color:var(--accent);}
     </div>
 
     <!-- TOP 10 LEADERBOARD: APLIKASI, TL, AGENT -->
-    <div class="section-title">🏆 Top 10 Pelanggaran Terbanyak</div>
+    <div class="section-title">🏆 Top Pelanggaran Terbanyak</div>
     <div class="leaderboard-grid" id="leaderboardGrid">
       <!-- diisi JS -->
     </div>
@@ -766,7 +785,7 @@ select:focus{border-color:var(--accent);}
 
 <script>
 // ── State label angka per chart ──────────────────────────────
-const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true,harian:false};
+const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true,harian:false,kanalStatus:true,violRate:true};
 
 function toggleLabels(key){
   showLabels[key]=!showLabels[key];
@@ -780,6 +799,8 @@ function toggleLabels(key){
   if(key==='tren')buildTrenChart(filteredData,cc);
   else if(key==='kanal')buildKanalChart(filteredData,cc);
   else if(key==='agent')buildAgentChart(filteredData,cc);
+  else if(key==='kanalStatus')buildKanalStatusChart(filteredData,cc);
+  else if(key==='violRate')buildViolRateChart(filteredData,cc);
   else if(key==='aplikasi')buildAplikasiChart(filteredData,cc);
   else if(key==='punishment')buildPunishmentChart(filteredData,cc);
   else if(key==='durasi')buildDurasiChart(filteredData,cc);
@@ -804,7 +825,7 @@ let allData=[];
 let filteredData=[];
 let currentPage=1;
 let charts={};
-let chartTypes={tren:'bar',kanal:'doughnut',agent:'bar',aplikasi:'bar',punishment:'bar',durasi:'bar',harian:'line'};
+let chartTypes={tren:'bar',kanal:'doughnut',agent:'bar',aplikasi:'bar',punishment:'bar',durasi:'bar',harian:'line',kanalStatus:'bar',violRate:'bar'};
 
 /* ===== THEME ===== */
 function setTheme(t){
@@ -923,7 +944,7 @@ function _buildTop10(data, keyFn) {
   });
   // Mark repeat agents
   Object.keys(map).forEach(k => { if(map[k].total>=3) map[k].repeat=true; });
-  return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
+  return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,30);
 }
 
 // ── Helper: build filter summary string ──
@@ -1350,7 +1371,7 @@ function exportPDF() {
 
   <!-- TOP 10 -->
   <div class="section">
-    <div class="section-title">🏆 Top 10 Pelanggaran Terbanyak</div>
+    <div class="section-title">🏆 Top Pelanggaran Terbanyak</div>
     <div class="top10-grid">
       <div>
         <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">📱 Top Aplikasi</div>
@@ -1651,6 +1672,8 @@ function buildCharts(data){
   buildTrenChart(data,cc);
   buildKanalChart(data,cc);
   buildAgentChart(data,cc);
+  buildKanalStatusChart(data,cc);
+  buildViolRateChart(data,cc);
   buildAplikasiChart(data,cc);
   buildPunishmentChart(data,cc);
   buildDurasiChart(data,cc);
@@ -1710,7 +1733,6 @@ function buildAgentChart(data,cc){
     if(ext==='VALID')extCount[b]++;
     if(int==='VALID')intCount[b]++;
   });
-  // Hanya bulan yang ada data
   const labels=BULAN_ORDER.filter(b=>extCount[b]>0||intCount[b]>0);
   const extVals=labels.map(b=>extCount[b]);
   const intVals=labels.map(b=>intCount[b]);
@@ -1736,6 +1758,169 @@ function buildAgentChart(data,cc){
         fill:type==='line',tension:.3,pointRadius:4,borderRadius:3}
     ]},
     options:opts
+  });
+}
+
+function buildKanalStatusChart(data,cc){
+  destroyChart('kanalStatus');
+  const KANALS=['OJK','AFPI','CS'];
+  const byKanal={};
+  KANALS.forEach(k=>{ byKanal[k]={valid:0,invalid:0,pending:0}; });
+
+  data.forEach(r=>{
+    const k=(r.kanalPengaduan||'').toUpperCase().trim();
+    if(!KANALS.includes(k))return;
+    const ext=(r.statusEksternal||'').toUpperCase();
+    if(ext==='VALID')byKanal[k].valid++;
+    else if(ext==='INVALID')byKanal[k].invalid++;
+    else if(ext==='PENDING')byKanal[k].pending++;
+  });
+
+  const labels=KANALS.filter(k=>byKanal[k].valid+byKanal[k].invalid+byKanal[k].pending>0);
+  const DL=window.ChartDataLabels;
+  const dlCfg = DL&&showLabels.kanalStatus ? {
+    datalabels:{
+      color:'#fff',font:{size:9,weight:'bold'},
+      formatter:v=>v>0?fmtNum(v):'',
+      anchor:'center',align:'center',
+      display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,
+    }
+  } : {};
+
+  charts.kanalStatus=new Chart(
+    document.getElementById('chartKanalStatus').getContext('2d'),{
+    type:'bar',
+    plugins:DL?[DL]:[],
+    data:{labels,datasets:[
+      {label:'Valid',data:labels.map(k=>byKanal[k].valid),
+        backgroundColor:'#16a34a',borderRadius:3,stack:'s'},
+      {label:'Invalid',data:labels.map(k=>byKanal[k].invalid),
+        backgroundColor:'#dc2626',borderRadius:3,stack:'s'},
+      {label:'Pending',data:labels.map(k=>byKanal[k].pending),
+        backgroundColor:'#d97706',borderRadius:3,stack:'s'},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:true,
+      plugins:{
+        legend:{display:true,position:'bottom',
+          labels:{color:cc.text2,font:{size:10},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)}`}},
+        ...dlCfg,
+      },
+      scales:{
+        x:{stacked:true,ticks:{color:cc.text3,font:{size:11}},grid:{color:cc.border}},
+        y:{stacked:true,beginAtZero:true,ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border}},
+      }
+    }
+  });
+}
+
+// ── Violation Rate Chart ──────────────────────────────────────
+let _jumlahAkunCache = null; // cache data dari sheet jumlah akun
+
+async function fetchJumlahAkun() {
+  if (_jumlahAkunCache) return _jumlahAkunCache;
+  try {
+    const res = await fetch(API_URL + '?action=jumlahakun');
+    const d = await res.json();
+    if (d.success) _jumlahAkunCache = d.data || [];
+    else _jumlahAkunCache = [];
+  } catch(e) { _jumlahAkunCache = []; }
+  return _jumlahAkunCache;
+}
+
+async function buildViolRateChart(data, cc) {
+  destroyChart('violRate');
+  const jaData = await fetchJumlahAkun();
+  if (!jaData.length) return;
+
+  // Hitung kasus per aplikasi per bulan dari violation data
+  const kasusByApp = {};
+  data.forEach(r => {
+    const app = r.aplikasi||'';
+    const bln = r.bulanMasuk||'';
+    const thn = r.tahunMasuk||'';
+    if (!app||!bln||!thn) return;
+    const key = app+'__'+bln+'__'+thn;
+    kasusByApp[key] = (kasusByApp[key]||0) + 1;
+  });
+
+  // Ambil filter bulan/tahun aktif dari UI
+  const selBulan = document.getElementById('msBulan');
+  const selTahun = document.getElementById('msTahun');
+  const activeBulan = selBulan ? [...selBulan.querySelectorAll('.ms-opt.active')].map(o=>o.dataset.val).filter(v=>v&&v!=='all') : [];
+  const activeTahun = selTahun ? [...selTahun.querySelectorAll('.ms-opt.active')].map(o=>o.dataset.val).filter(v=>v&&v!=='all') : [];
+
+  // Build rate per aplikasi (filtered)
+  const rateMap = {};
+  jaData.forEach(row => {
+    const {aplikasi, bulan, tahun, jumlahAkun} = row;
+    if (activeBulan.length && !activeBulan.includes(bulan)) return;
+    if (activeTahun.length && !activeTahun.includes(tahun)) return;
+    if (!jumlahAkun) return;
+    const key = aplikasi+'__'+bulan+'__'+tahun;
+    const kasus = kasusByApp[key]||0;
+    const rate  = (kasus / jumlahAkun) * 100;
+    if (!rateMap[aplikasi]) rateMap[aplikasi] = {totalKasus:0, totalAkun:0};
+    rateMap[aplikasi].totalKasus += kasus;
+    rateMap[aplikasi].totalAkun  += jumlahAkun;
+  });
+
+  // Filter hanya aplikasi yang ada kasus atau ada akun
+  const entries = Object.entries(rateMap)
+    .filter(([,v]) => v.totalAkun > 0)
+    .map(([app, v]) => ({app, rate: v.totalAkun>0 ? (v.totalKasus/v.totalAkun*100) : 0, kasus: v.totalKasus, akun: v.totalAkun}))
+    .sort((a,b) => b.rate - a.rate);
+
+  if (!entries.length) return;
+
+  const labels = entries.map(e => e.app);
+  const rates  = entries.map(e => +e.rate.toFixed(1));
+  // Warna: merah jika rate > 50%, kuning 20-50%, hijau < 20%
+  const colors = rates.map(r => r > 50 ? '#dc2626cc' : r > 20 ? '#d97706cc' : '#16a34acc');
+
+  const type = chartTypes.violRate==='line' ? 'line' : 'bar';
+  const DL = window.ChartDataLabels;
+  const dlCfg = DL && showLabels.violRate ? {
+    datalabels: {
+      color: '#fff', font:{size:8, weight:'bold'},
+      formatter: v => v > 0 ? v+'%' : '',
+      anchor:'end', align:'top',
+      color: cc.text,
+    }
+  } : {};
+
+  charts.violRate = new Chart(
+    document.getElementById('chartViolRate').getContext('2d'), {
+    type,
+    plugins: DL ? [DL] : [],
+    data: {labels, datasets:[{
+      label: 'Violation Rate (%)',
+      data: rates,
+      backgroundColor: type==='line' ? cc.danger+'33' : colors,
+      borderColor: type==='line' ? cc.danger : colors.map(c=>c.slice(0,-2)),
+      borderWidth: type==='line' ? 2 : 0,
+      borderRadius: 3,
+      fill: type==='line',
+      tension: .3, pointRadius: 4,
+    }]},
+    options: {
+      responsive:true, maintainAspectRatio:true,
+      plugins: {
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label: ctx => {
+            const e = entries[ctx.dataIndex];
+            return [` Rate: ${ctx.parsed.y}%`, ` Kasus: ${e.kasus}`, ` Akun: ${e.akun}`];
+          }
+        }},
+        ...dlCfg,
+      },
+      scales:{
+        x:{ticks:{color:cc.text3,font:{size:9},maxRotation:45},grid:{color:cc.border}},
+        y:{beginAtZero:true,ticks:{color:cc.text3,font:{size:10},callback:v=>v+'%'},grid:{color:cc.border}}
+      }
+    }
   });
 }
 
@@ -1883,7 +2068,7 @@ function renderLeaderboard(data){
       else if(kanal==='CS')map[k].CS++;
       else map[k].other++;
     });
-    return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
+    return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,30);
   }
 
   const appEntries = buildMap(data, r=>r.aplikasi||'');
@@ -2590,7 +2775,7 @@ function openLbModal(type, name){
           <div class="prev-tl-kanal">${badgeKanal(r.kanalPengaduan)}</div>
           <div class="prev-tl-kasus">
             <span style="font-size:10px;font-weight:700;color:var(--accent);margin-right:4px">[${r.aplikasi||'—'}]</span>
-            ${(r.kasus||'—').substring(0,65)}${(r.kasus||'').length>65?'…':''}
+            ${(r.kasus||'—')}
           </div>
         </div>`).join('')}</div>`;
   }
