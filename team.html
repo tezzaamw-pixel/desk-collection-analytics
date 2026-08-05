@@ -6,6 +6,9 @@
 <title>Tim — System TZ Analytics</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-datalabels/2.2.0/chartjs-plugin-datalabels.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root{
   --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
@@ -98,6 +101,29 @@ select:focus{border-color:var(--accent);}
 .setup-tab-del{background:none;border:none;color:var(--text3);cursor:pointer;font-size:13px;padding:0 2px;line-height:1;flex-shrink:0;}
 .setup-tab-del:hover{color:var(--danger);}
 .btn-add-setup{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius-sm);border:1px dashed var(--border);background:none;font-size:12px;color:var(--text3);cursor:pointer;transition:all .15s;}
+.btn-cmp-bulan{padding:5px 12px;font-size:11px;font-weight:600;background:rgba(99,102,241,.12);color:#818cf8;border:1px solid rgba(99,102,241,.3);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn-cmp-bulan:hover{background:rgba(99,102,241,.25);border-color:#818cf8;}
+#cmpBulanModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:center;justify-content:center;padding:20px;}
+#cmpBulanModal.open{display:flex;}
+.cmpb-box{background:var(--surface);border-radius:var(--radius);width:95vw;max-width:960px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;}
+.cmpb-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.cmpb-title{font-size:14px;font-weight:700;color:var(--text);flex:1;}
+.cmpb-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);}
+.cmpb-tabs{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;overflow-x:auto;}
+.cmpb-tab{padding:5px 14px;font-size:11px;font-weight:600;border-radius:20px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);white-space:nowrap;transition:all .15s;}
+.cmpb-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.cmpb-body{flex:1;overflow:auto;padding:16px;}
+.cmpb-table{width:100%;border-collapse:collapse;font-size:12px;}
+.cmpb-table th{padding:8px 12px;text-align:left;background:var(--navy);color:#fff;font-weight:600;position:sticky;top:0;z-index:2;}
+.cmpb-table th:not(:first-child){text-align:right;}
+.cmpb-table td{padding:7px 12px;border-bottom:1px solid var(--border);color:var(--text2);}
+.cmpb-table td:not(:first-child){text-align:right;font-weight:500;}
+.cmpb-table tr:hover td{background:var(--surface2);}
+.cmpb-up{color:var(--success);font-weight:700;}
+.cmpb-down{color:var(--danger);font-weight:700;}
+.cmpb-same{color:var(--text3);}
+.cmpb-section-head{background:var(--surface2)!important;}
+.cmpb-section-head td{font-weight:700!important;color:var(--accent)!important;font-size:11px;}
 .btn-add-setup:hover{border-color:var(--accent);color:var(--accent);}
 
 /* FIXED METRIC BOXES */
@@ -229,6 +255,8 @@ select:focus{border-color:var(--accent);}
 /* ROTATION LABELS */
 .label-pengganti{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#dbeafe;color:#1d4ed8;margin-left:6px;vertical-align:middle;white-space:nowrap;}
 .label-pindah{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#fef3c7;color:#92400e;margin-left:6px;vertical-align:middle;white-space:nowrap;}
+.agent-new-badge{display:inline-block;padding:1px 6px;border-radius:20px;font-size:9px;font-weight:700;background:#d1fae5;color:#065f46;margin-left:4px;vertical-align:middle;cursor:pointer;border:1px solid #6ee7b7;white-space:nowrap;}
+.agent-new-badge:hover{background:#a7f3d0;}
 .label-nonaktif{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#f3f4f6;color:#6b7280;margin-left:6px;vertical-align:middle;white-space:nowrap;}
 .agent-row.rotasi-lama td{opacity:0.5;}
 .agent-row.rotasi-lama td:first-child{opacity:1;}
@@ -598,6 +626,20 @@ select:focus{border-color:var(--accent);}
 .bsm-tl-group-header:hover td{background:var(--accent-bg)!important;}
 [data-theme="dark"] .bsm-tl-group-header td{background:#1a2540!important;}
 
+.bk-target-wrap{display:flex;align-items:center;gap:5px;margin-right:6px;}
+.bk-target-bar{width:70px;height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.bk-target-fill{height:100%;border-radius:3px;transition:width .3s;}
+.bk-target-pct{font-size:10px;font-weight:700;white-space:nowrap;}
+.btn-bucket-target{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);padding:2px 6px;font-size:11px;cursor:pointer;color:var(--text3);margin-right:4px;transition:all .15s;}
+.btn-bucket-target:hover{border-color:var(--accent);color:var(--accent);}
+/* Target input popup */
+.bk-target-popup{position:fixed;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 4px 20px rgba(0,0,0,.15);z-index:400;padding:14px 16px;min-width:240px;}
+.bk-target-popup h4{margin:0 0 10px;font-size:13px;font-weight:700;color:var(--text);}
+.bk-target-popup input{width:100%;padding:7px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);font-size:13px;outline:none;box-sizing:border-box;}
+.bk-target-popup input:focus{border-color:var(--accent);}
+.bk-target-popup-btns{display:flex;gap:8px;margin-top:10px;}
+.bk-target-popup-btns button{flex:1;padding:6px;font-size:12px;font-weight:600;border-radius:var(--radius-sm);cursor:pointer;border:none;}
+
 /* ── BUCKET SUMMARY BUTTON ── */
 .btn-bucket-summary{margin-left:auto;padding:3px 10px;font-size:11px;font-weight:600;background:var(--accent-bg);color:var(--accent);border:1px solid var(--accent);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;}
 .btn-bucket-summary:hover{background:var(--accent);color:#fff;}
@@ -726,7 +768,33 @@ select:focus{border-color:var(--accent);}
 <!-- BUCKET SETUP DROPDOWN -->
 <div class="bk-setup-dropdown" id="bkSetupDropdown"></div>
 
+<!-- TARGET INPUT POPUP -->
+<div id="bkTargetPopup" class="bk-target-popup" style="display:none">
+  <h4>🎯 Target Payment Bucket</h4>
+  <div style="font-size:11px;color:var(--text3);margin-bottom:8px" id="bkTargetSubtitle"></div>
+  <input type="text" id="bkTargetInput" placeholder="Contoh: 500000000 atau 500jt"
+    onkeydown="if(event.key==='Enter')saveBucketTarget()" oninput="bkTargetPreview(this.value)">
+  <div id="bkTargetPreviewText" style="font-size:11px;color:var(--accent);margin-top:5px;min-height:16px"></div>
+  <div class="bk-target-popup-btns">
+    <button onclick="saveBucketTarget()" style="background:var(--accent);color:#fff">Simpan</button>
+    <button onclick="clearBucketTarget()" style="background:var(--surface2);color:var(--danger);border:1px solid var(--danger)">Hapus Target</button>
+    <button onclick="closeBkTargetPopup()" style="background:var(--surface2);color:var(--text2);border:1px solid var(--border)">Batal</button>
+  </div>
+</div>
+
 <!-- BUCKET SUMMARY MODAL -->
+<!-- CMP BULAN MODAL -->
+<div id="cmpBulanModal" onclick="if(event.target===this)closeCmpBulan()">
+  <div class="cmpb-box">
+    <div class="cmpb-head">
+      <div class="cmpb-title" id="cmpbTitle">📅 Perbandingan Bulan Ini vs Bulan Lalu</div>
+      <div style="font-size:10px;color:var(--text3)" id="cmpbSubtitle"></div>
+      <button class="cmpb-close" onclick="closeCmpBulan()">✕</button>
+    </div>
+    <div class="cmpb-tabs" id="cmpbTabs"></div>
+    <div class="cmpb-body" id="cmpbBody"><div class="cmpb-loading">⏳ Memuat data...</div></div>
+  </div>
+</div>
 <div id="modalBucketSummary" onclick="if(event.target===this)closeBucketSummary()">
   <div class="bsm-modal">
     <div class="bsm-head">
@@ -736,6 +804,10 @@ select:focus{border-color:var(--accent);}
         <button class="bsm-mode-btn" data-mode="individual" onclick="setBsmMode('individual')" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">👤 Individual</button>
       </div>
       <button class="bsm-fs-btn" id="bsmFsBtn" onclick="toggleBsmFullscreen()" title="Fullscreen">⛶</button>
+      <div style="display:flex;gap:4px">
+        <button onclick="exportBsmExcel()" title="Export Excel" style="padding:3px 10px;font-size:11px;font-weight:600;background:#16a34a;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">⬇ Excel</button>
+        <button onclick="exportBsmPDF()" title="Export PDF" style="padding:3px 10px;font-size:11px;font-weight:600;background:#dc2626;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">⬇ PDF</button>
+      </div>
       <button class="bsm-close" onclick="closeBucketSummary()">✕</button>
     </div>
     <div class="bsm-bucket-nav" id="bsmBucketNav"></div>
@@ -1094,6 +1166,293 @@ async function loadData(){
   btn.disabled=false;btn.textContent='Tampilkan';
 }
 
+// ── Perbandingan Bulan vs Bulan Lalu ─────────────────────────
+let _cmpBulanState = {spv:'', tab:'spv'};
+let _cmpPrevData   = null; // cache full prev month data
+
+async function openCmpBulan(spv, safeSpvId) {
+  _cmpBulanState = {spv, tab:'spv'};
+  document.getElementById('cmpBulanModal').classList.add('open');
+  document.getElementById('cmpbBody').innerHTML = '<div class="cmpb-loading">⏳ Memuat data bulan lalu...</div>';
+
+  const bulan = document.getElementById('selBulan').value;
+  const tahun = document.getElementById('selTahun').value;
+
+  // Hitung bulan lalu
+  const BULAN_IDX = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const idxNow = BULAN_IDX.indexOf(bulan);
+  const idxPrev = idxNow === 0 ? 11 : idxNow - 1;
+  const thnPrev = idxNow === 0 ? String(parseInt(tahun)-1) : tahun;
+  const bulanPrev = BULAN_IDX[idxPrev];
+
+  // Hitung tanggal hari ini di bulan berjalan (apple-to-apple)
+  const today = new Date();
+  const maxDay = today.getMonth() === idxNow && today.getFullYear() === parseInt(tahun)
+    ? today.getDate() : 31;
+
+  document.getElementById('cmpbTitle').textContent = `📅 ${bulan} ${tahun} vs ${bulanPrev} ${thnPrev}`;
+  document.getElementById('cmpbSubtitle').textContent = `Apple-to-apple: data sampai tanggal ${maxDay}`;
+
+  // Fetch prev month data
+  try {
+    if (!_cmpPrevData || _cmpPrevData._bulan !== bulanPrev || _cmpPrevData._tahun !== thnPrev) {
+      const url = GAS_URL + `?action=agentdata&bulan=${encodeURIComponent(bulanPrev)}&tahun=${encodeURIComponent(thnPrev)}`;
+      const res = await fetch(url);
+      const d = await res.json();
+      _cmpPrevData = {rows: d.data||[], _bulan: bulanPrev, _tahun: thnPrev};
+    }
+  } catch(e) {
+    document.getElementById('cmpbBody').innerHTML = `<div class="cmpb-loading">⚠️ Gagal load data bulan lalu: ${e.message}</div>`;
+    return;
+  }
+
+  // Current month rows for this SPV, filtered apple-to-apple
+  const currRows = (spvAgentDataCache[spv]||[]).filter(r => {
+    if (!r.tanggal) return false;
+    const day = parseInt(r.tanggal.split('-')[2]);
+    return day <= maxDay;
+  });
+  const prevRows = (_cmpPrevData.rows||[]).filter(r => {
+    const rSpv = r.supervisor||r.spv||'';
+    if (rSpv !== spv) return false;
+    if (!r.tanggal) return false;
+    const day = parseInt(r.tanggal.split('-')[2]);
+    return day <= maxDay;
+  });
+
+  _cmpBulanState.currRows = currRows;
+  _cmpBulanState.prevRows = prevRows;
+  _cmpBulanState.maxDay = maxDay;
+  _cmpBulanState.bulan = bulan; _cmpBulanState.tahun = tahun;
+  _cmpBulanState.bulanPrev = bulanPrev; _cmpBulanState.thnPrev = thnPrev;
+
+  // Build tabs: SPV, per Bucket, per TL, per Agent
+  const buckets = [...new Set(currRows.map(r=>r.bucket).filter(Boolean))].sort();
+  const tabs = [
+    {id:'spv',   label:'📊 SPV'},
+    {id:'bucket',label:'🗂 Bucket'},
+    {id:'tl',    label:'👤 Team Leader'},
+    {id:'agent', label:'🧑 Agent'},
+  ];
+  document.getElementById('cmpbTabs').innerHTML = tabs.map(t =>
+    `<button class="cmpb-tab ${t.id==='spv'?'active':''}" onclick="setCmpBulanTab('${t.id}')">${t.label}</button>`
+  ).join('');
+
+  renderCmpBulanTab('spv');
+}
+
+function setCmpBulanTab(tab) {
+  _cmpBulanState.tab = tab;
+  document.querySelectorAll('.cmpb-tab').forEach(b =>
+    b.classList.toggle('active', b.textContent.includes(tab==='spv'?'SPV':tab==='bucket'?'Bucket':tab==='tl'?'Team Leader':'Agent'))
+  );
+  renderCmpBulanTab(tab);
+}
+
+function renderCmpBulanTab(tab) {
+  const {currRows, prevRows, bulan, tahun, bulanPrev, thnPrev, maxDay} = _cmpBulanState;
+  if (!currRows) return;
+
+  const METRICS = [
+    {key:'dailyPayment', label:'Payment', fmt:'rp'},
+    {key:'avgRate',      label:'Rate',    fmt:'rate'},
+    {key:'jmlDataBayar', label:'Data Bayar', fmt:'num'},
+    {key:'sentuhWA',     label:'Sentuh WA',  fmt:'num'},
+    {key:'responWA',     label:'Respon WA',  fmt:'num'},
+    {key:'callManual',   label:'Call Manual',fmt:'num'},
+    {key:'ptp',          label:'PTP',        fmt:'num'},
+    {key:'ptpBayar',     label:'PTP Bayar',  fmt:'num'},
+    {key:'jumlahAlatWA', label:'Alat WA',    fmt:'num'},
+  ];
+
+  function sumRows(rows) {
+    const s = summarizeRows(rows);
+    return s;
+  }
+
+  function fmtVal(val, fmt) {
+    if (fmt==='rp')   return 'Rp '+Math.round(val).toLocaleString('id-ID');
+    if (fmt==='rate') return (val*100).toFixed(2)+'%';
+    return fmtNum(Math.round(val));
+  }
+
+  function diffHtml(curr, prev, fmt) {
+    if (!prev || prev === 0) return '<span class="cmpb-same">—</span>';
+    const pct = ((curr-prev)/prev)*100;
+    const arrow = pct > 0 ? '↑' : pct < 0 ? '↓' : '→';
+    const cls   = pct > 0 ? 'cmpb-up' : pct < 0 ? 'cmpb-down' : 'cmpb-same';
+    return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
+  }
+
+  function buildTable(groups) {
+    // groups = [{label, currRows, prevRows, isSection?}]
+    const header = `<tr>
+      <th>Nama</th>
+      ${METRICS.map(m=>`<th>${m.label}</th>`).join('')}
+    </tr>`;
+    const body = groups.map(g => {
+      if (g.isSection) return `<tr class="cmpb-section-head"><td colspan="${METRICS.length+1}">${g.label}</td></tr>`;
+      const cs = sumRows(g.currRows);
+      const ps = sumRows(g.prevRows);
+      return `<tr>
+        <td style="font-weight:600;color:var(--text)">${escH(g.label)}</td>
+        ${METRICS.map(m => {
+          const cv = m.key==='avgRate'?(cs.avgRate||0):(cs[m.key]||0);
+          const pv = m.key==='avgRate'?(ps.avgRate||0):(ps[m.key]||0);
+          return `<td>${fmtVal(cv,m.fmt)}<br><small style="color:var(--text3)">${fmtVal(pv,m.fmt)}</small> ${diffHtml(cv,pv,m.fmt)}</td>`;
+        }).join('')}
+      </tr>`;
+    }).join('');
+    return `<table class="cmpb-table"><thead>${header}</thead><tbody>${body}</tbody></table>
+      <div style="font-size:10px;color:var(--text3);margin-top:8px">
+        Baris atas = ${bulan} ${tahun} (s/d tgl ${maxDay}) · Baris bawah kecil = ${bulanPrev} ${thnPrev} (s/d tgl ${maxDay})
+      </div>`;
+  }
+
+  let groups = [];
+
+  if (tab === 'spv') {
+    groups = [{label: _cmpBulanState.spv, currRows, prevRows}];
+  } else if (tab === 'bucket') {
+    const bks = [...new Set([...currRows,...prevRows].map(r=>r.bucket).filter(Boolean))].sort();
+    groups = bks.map(bk => ({
+      label: bk,
+      currRows: currRows.filter(r=>r.bucket===bk),
+      prevRows: prevRows.filter(r=>r.bucket===bk),
+    }));
+  } else if (tab === 'tl') {
+    const tls = [...new Set([...currRows,...prevRows].map(r=>r.teamLeader).filter(Boolean))].sort();
+    // Group by bucket
+    const bks = [...new Set(currRows.map(r=>r.bucket).filter(Boolean))].sort();
+    bks.forEach(bk => {
+      groups.push({isSection: true, label: `📦 ${bk}`});
+      const tlsInBk = tls.filter(tl => currRows.some(r=>r.bucket===bk&&r.teamLeader===tl));
+      tlsInBk.forEach(tl => groups.push({
+        label: tl,
+        currRows: currRows.filter(r=>r.bucket===bk&&r.teamLeader===tl),
+        prevRows: prevRows.filter(r=>r.bucket===bk&&r.teamLeader===tl),
+      }));
+    });
+  } else if (tab === 'agent') {
+    const ags = [...new Set([...currRows,...prevRows].map(r=>r.agent).filter(Boolean))].sort();
+    const bks = [...new Set(currRows.map(r=>r.bucket).filter(Boolean))].sort();
+    bks.forEach(bk => {
+      groups.push({isSection: true, label: `📦 ${bk}`});
+      const agsInBk = ags.filter(ag => currRows.some(r=>r.bucket===bk&&r.agent===ag));
+      agsInBk.forEach(ag => groups.push({
+        label: ag,
+        currRows: currRows.filter(r=>r.bucket===bk&&r.agent===ag),
+        prevRows: prevRows.filter(r=>r.bucket===bk&&r.agent===ag),
+      }));
+    });
+  }
+
+  document.getElementById('cmpbBody').innerHTML = buildTable(groups);
+}
+
+function closeCmpBulan() {
+  document.getElementById('cmpBulanModal').classList.remove('open');
+}
+
+// ── Bucket Target Payment ─────────────────────────────────────
+// Storage: dca_bucket_target_{spv} = { "NPA": 500000000, "S1-3": 1000000000 }
+function getBucketTargetMap(spv) {
+  try { const r=localStorage.getItem('dca_bucket_target_'+spv); if(r) return JSON.parse(r); } catch(e){}
+  return {};
+}
+function getBucketTarget(spv, bucket) {
+  return getBucketTargetMap(spv)[bucket] || 0;
+}
+function saveBucketTargetMap(spv, map) {
+  localStorage.setItem('dca_bucket_target_'+spv, JSON.stringify(map));
+}
+
+let _bkTargetState = {spv:'', bucket:''};
+
+function openTargetInput(e, bucket, spv) {
+  e.stopPropagation();
+  _bkTargetState = {spv, bucket};
+  const popup = document.getElementById('bkTargetPopup');
+  const input = document.getElementById('bkTargetInput');
+  const sub   = document.getElementById('bkTargetSubtitle');
+  if (!popup) return;
+
+  const bulan = document.getElementById('selBulan').value;
+  const tahun = document.getElementById('selTahun').value;
+  const curr  = getBucketTarget(spv, bucket);
+
+  sub.textContent = `Bucket ${bucket} — ${bulan} ${tahun}`;
+  input.value = curr > 0 ? curr : '';
+  document.getElementById('bkTargetPreviewText').textContent = curr > 0 ? `Saat ini: ${fmtRpFull(curr)}` : '';
+
+  // Position near button
+  const rect = e.currentTarget.getBoundingClientRect();
+  popup.style.display = 'block';
+  const pw = popup.offsetWidth || 240;
+  let left = rect.left - pw + rect.width;
+  if (left < 8) left = 8;
+  popup.style.left = left + 'px';
+  popup.style.top  = (rect.bottom + 6) + 'px';
+  input.focus();
+  input.select();
+}
+
+function _parseTargetInput(val) {
+  val = val.trim().toLowerCase().replace(/[.,]/g,'');
+  if (val.endsWith('jt'))  return parseFloat(val)*1e6;
+  if (val.endsWith('m'))   return parseFloat(val)*1e6;
+  if (val.endsWith('rb'))  return parseFloat(val)*1e3;
+  return parseFloat(val) || 0;
+}
+
+function bkTargetPreview(val) {
+  const num = _parseTargetInput(val);
+  const el = document.getElementById('bkTargetPreviewText');
+  if (el) el.textContent = num > 0 ? `= ${fmtRpFull(num)}` : '';
+}
+
+function saveBucketTarget() {
+  const {spv, bucket} = _bkTargetState;
+  const val = document.getElementById('bkTargetInput').value;
+  const num = _parseTargetInput(val);
+  if (num <= 0 && val.trim() !== '') { alert('Format tidak valid. Contoh: 500000000 atau 500jt'); return; }
+  const map = getBucketTargetMap(spv);
+  if (num > 0) map[bucket] = num;
+  else delete map[bucket];
+  saveBucketTargetMap(spv, map);
+  closeBkTargetPopup();
+  // Re-render SPV block
+  _rerenderSpvBlock(spv);
+}
+
+function clearBucketTarget() {
+  const {spv, bucket} = _bkTargetState;
+  const map = getBucketTargetMap(spv);
+  delete map[bucket];
+  saveBucketTargetMap(spv, map);
+  closeBkTargetPopup();
+  _rerenderSpvBlock(spv);
+}
+
+function closeBkTargetPopup() {
+  const popup = document.getElementById('bkTargetPopup');
+  if (popup) popup.style.display = 'none';
+}
+
+function _rerenderSpvBlock(spv) {
+  const filtered = getFilteredRows();
+  const bySPV = {};
+  filtered.forEach(r => { const s=r.supervisor||'(Tanpa SPV)'; if(!bySPV[s])bySPV[s]=[]; bySPV[s].push(r); });
+  if (currentSpvView === spv) renderDetailSPV(spv, bySPV[spv]||[], bySPV);
+}
+
+// Close target popup on outside click
+document.addEventListener('click', e => {
+  const popup = document.getElementById('bkTargetPopup');
+  if (popup && popup.style.display!=='none' && !popup.contains(e.target) && !e.target.classList.contains('btn-bucket-target'))
+    closeBkTargetPopup();
+});
+
 // ── Bucket Setup Dropdown ─────────────────────────────────────
 let _bkSetupState = {bucket:'', spv:''};
 
@@ -1253,6 +1612,120 @@ function switchBsmBucket(bucket, spv) {
   if (vt) vt.style.display = 'flex';
 
   _renderBucketSummary();
+}
+
+// ── Export Summary Bucket ─────────────────────────────────────
+function _getBsmExportData() {
+  const {bucket, spv, mode, date, view} = _bsmState;
+  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+  const rows = date ? allRows.filter(r=>r.tanggal===date) : allRows;
+
+  const bulan = document.getElementById('selBulan').value;
+  const tahun = document.getElementById('selTahun').value;
+  const title = `Summary Bucket ${bucket} — ${date||'Semua Tanggal'} — ${bulan} ${tahun}`;
+
+  // Build per-agent data
+  const byAgent = {};
+  rows.forEach(r => {
+    const ag = r.agent||'?';
+    if (!byAgent[ag]) byAgent[ag] = {ag, tl:r.teamLeader||'—', total:0, _rows:[], days:{}, aplikasi:r.aplikasi||''};
+    byAgent[ag].total += (r.dailyPayment||0);
+    byAgent[ag]._rows.push(r);
+    if (r.tanggal) byAgent[ag].days[parseInt(r.tanggal.split('-')[2])] = {payment:r.dailyPayment||0, absensi:r.absensi||''};
+  });
+  const agents = Object.values(byAgent).sort((a,b)=>b.total-a.total);
+
+  if (mode === 'payment') {
+    const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
+    const headers = ['Rank','Team Leader','Agent','Hadir','Total Payment',
+      ...allDates.map(d=>{const dt=new Date(d);const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];return `${dt.getDate()}(${dn[dt.getDay()]})`;})];
+    const dataRows = agents.map((a,i) => {
+      const _abs = calcAbsensi(a._rows);
+      const row = [i+1, a.tl, a.ag, `${_abs.hadir}/${_abs.hariKerja}`, a.total];
+      allDates.forEach(d => {
+        const day = parseInt(d.split('-')[2]);
+        const info = a.days[day];
+        row.push(info ? (info.absensi==='Off'?'Off':(info.payment||0)) : '—');
+      });
+      return row;
+    });
+    return {title, headers, dataRows, mode:'payment'};
+  } else {
+    const setups = getSetups(spv);
+    const activeIdx = parseInt(localStorage.getItem('dca_active_setup_'+spv)||'0');
+    const {setup: bkSetup} = getBucketSetup(spv, bucket);
+    const effectiveSetup = bkSetup || setups[activeIdx] || null;
+    const setupCols = effectiveSetup
+      ? effectiveSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean)
+      : ALL_METRICS.slice(0,8);
+    const headers = ['Rank','Team Leader','Agent','Hadir','Rate','Payment',...setupCols.map(m=>m.label)];
+    const dataRows = agents.map((a,i) => {
+      const _abs = calcAbsensi(a._rows);
+      const s = summarizeRows(a._rows);
+      const agentRate = s.osDataBaru>0 ? (s.dailyPayment/s.osDataBaru*100).toFixed(2)+'%' : '0%';
+      const pay = view==='avg' ? (a.total/Math.max(_abs.hariKerja,1)) : a.total;
+      const metricVals = setupCols.map(m => {
+        const val = m.key==='absensiPct'?_abs.pct:m.key==='cmpRate'?(s.avgRate||0):(s[m.key]||0);
+        const v2 = view==='avg'&&!date ? val/Math.max(_abs.hariKerja,1) : val;
+        return (m.fmt==='pct'||m.fmt==='rate') ? (v2*100).toFixed(2)+'%' : Math.round(v2);
+      });
+      return [i+1, a.tl, a.ag, `${_abs.hadir}/${_abs.hariKerja}`, agentRate, Math.round(pay), ...metricVals];
+    });
+    return {title, headers, dataRows, mode:'individual', setupName: effectiveSetup?.name||'Default'};
+  }
+}
+
+function exportBsmExcel() {
+  if (typeof XLSX === 'undefined') { alert('Library Excel belum siap, coba lagi sebentar.'); return; }
+  const {title, headers, dataRows, mode, setupName} = _getBsmExportData();
+  const wb = XLSX.utils.book_new();
+  const wsData = [
+    [title],
+    mode==='individual' ? [`Setup: ${setupName}`] : [],
+    [],
+    headers,
+    ...dataRows
+  ].filter(r=>r.length>0);
+  const ws = XLSX.utils.aoa_to_sheet(wsData);
+  // Style header row
+  const headerRow = mode==='individual' ? 4 : 4;
+  ws['!cols'] = headers.map((_,i) => ({wch: i===2?25:i===1?20:i===0?6:12}));
+  XLSX.utils.book_append_sheet(wb, ws, 'Summary');
+  const fname = `Summary_${_bsmState.bucket}_${_bsmState.spv}_${new Date().toLocaleDateString('id-ID').replace(/\//g,'-')}.xlsx`;
+  XLSX.writeFile(wb, fname);
+}
+
+function exportBsmPDF() {
+  if (typeof window.jspdf === 'undefined') { alert('Library PDF belum siap, coba lagi sebentar.'); return; }
+  const {jsPDF} = window.jspdf;
+  const {title, headers, dataRows, mode, setupName} = _getBsmExportData();
+  const bulan = document.getElementById('selBulan').value;
+  const tahun = document.getElementById('selTahun').value;
+
+  const doc = new jsPDF({orientation:'landscape', unit:'mm', format:'a4'});
+  // Title
+  doc.setFontSize(13); doc.setFont('helvetica','bold');
+  doc.text(title, 14, 16);
+  if (mode==='individual') {
+    doc.setFontSize(9); doc.setFont('helvetica','normal');
+    doc.text(`Setup: ${setupName}`, 14, 23);
+  }
+  // Meta
+  doc.setFontSize(8); doc.setFont('helvetica','normal');
+  doc.text(`Digenerate: ${new Date().toLocaleString('id-ID')}`, 14, mode==='individual'?29:22);
+
+  doc.autoTable({
+    head: [headers],
+    body: dataRows,
+    startY: mode==='individual' ? 33 : 26,
+    styles: {fontSize:7, cellPadding:2},
+    headStyles: {fillColor:[29,96,200], textColor:255, fontStyle:'bold'},
+    alternateRowStyles: {fillColor:[245,247,250]},
+    columnStyles: {0:{cellWidth:8}, 1:{cellWidth:22}, 2:{cellWidth:28}, 3:{cellWidth:12}, 4:{cellWidth:16}},
+  });
+
+  const fname = `Summary_${_bsmState.bucket}_${_bsmState.spv}_${new Date().toLocaleDateString('id-ID').replace(/\//g,'-')}.pdf`;
+  doc.save(fname);
 }
 
 function toggleBsmGroup() {
@@ -1485,6 +1958,32 @@ function _renderBucketSummary() {
   const titleDate = date ? ` — ${(()=>{const dt=new Date(date);const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];return dt.getDate()+' ('+dn[dt.getDay()]+')'})()}` : '';
   document.getElementById('bsmTitle').textContent =
     `📊 Summary Bucket ${bucket}${titleDate} — ${bulan} ${tahun}`;
+
+  // Show target in modal if set
+  const bkTarget = getBucketTarget(spv, bucket);
+  const totalPayment = allRows.reduce((s,r)=>s+(r.dailyPayment||0),0);
+  let targetEl = document.getElementById('bsmTargetInfo');
+  if (!targetEl) {
+    targetEl = document.createElement('div');
+    targetEl.id = 'bsmTargetInfo';
+    targetEl.style.cssText = 'padding:6px 20px;font-size:11px;display:flex;align-items:center;gap:10px;background:var(--surface2);border-bottom:1px solid var(--border);flex-shrink:0';
+    const head = document.querySelector('#modalBucketSummary .bsm-head');
+    if (head) head.insertAdjacentElement('afterend', targetEl);
+  }
+  if (bkTarget > 0) {
+    const pct = Math.min((totalPayment/bkTarget)*100,100);
+    const col = pct>=100?'var(--success)':pct>=70?'var(--warning)':'var(--danger)';
+    targetEl.style.display = 'flex';
+    targetEl.innerHTML = `<span style="color:var(--text3)">🎯 Target:</span>
+      <span style="font-weight:700;color:var(--text)">${fmtRpFull(bkTarget)}</span>
+      <div style="flex:1;height:8px;background:var(--border);border-radius:4px;overflow:hidden;max-width:200px">
+        <div style="height:100%;border-radius:4px;background:${col};width:${pct.toFixed(1)}%;transition:width .3s"></div>
+      </div>
+      <span style="font-weight:700;color:${col}">${pct.toFixed(1)}%</span>
+      <span style="color:var(--text3)">${fmtRpFull(totalPayment)} tercapai</span>`;
+  } else {
+    targetEl.style.display = 'none';
+  }
 
   // Build per-agent aggregated data from filtered rows
   const byAgent = {};
@@ -1782,6 +2281,14 @@ function getAgentMoveBadge(agentName, currentAplikasi, appsBulanIni) {
 
   let prevApp='', prevBkt='', tooltipDetail='';
 
+  // Case 0: agent baru — tidak ada di data bulan lalu sama sekali
+  if (Object.keys(_prevAgentMap).length > 0 && !_prevAgentMap[agentName]) {
+    return `<span class="agent-new-badge"
+      onmouseenter="showMoveTooltipRaw(event,'<b>✨ Agent Baru</b><br>Tidak ada histori bulan lalu di aplikasi manapun')"
+      onmouseleave="hideMoveTooltip()"
+      title="Agent baru — tidak ada histori bulan lalu">✨ Baru</span>`;
+  }
+
   // Case 1: pindah dalam bulan ini (multi-app)
   if (appsBulanIni && appsBulanIni.length > 1) {
     const others = appsBulanIni.filter(a=>a!==currentAplikasi);
@@ -2074,10 +2581,24 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     }).join('');
 
     const bkCount=new Set(Object.values(byBucket[bk]).flat().map(r=>r.agent)).size;
-    const bkTotalPayment = fmtRpFull(Object.values(byBucket[bk]).flat().reduce((s,r)=>s+(r.dailyPayment||0),0));
+    const bkTotalRaw = Object.values(byBucket[bk]).flat().reduce((s,r)=>s+(r.dailyPayment||0),0);
+    const bkTotalPayment = fmtRpFull(bkTotalRaw);
     const safeBk=escA(bk); const safeSpv2=escA(spv);
     const hasCustom = bkSetupIdx !== -1;
     const setupLabel = hasCustom ? escH(bkSetup.name) : 'Default';
+
+    // Target payment
+    const bkTarget = getBucketTarget(spv, bk);
+    const targetPct = bkTarget > 0 ? Math.min((bkTotalRaw/bkTarget)*100, 100) : 0;
+    const targetColor = targetPct >= 100 ? 'var(--success)' : targetPct >= 70 ? 'var(--warning)' : 'var(--danger)';
+    const targetHtml = bkTarget > 0 ? `
+      <div class="bk-target-wrap" title="Target: ${fmtRpFull(bkTarget)}">
+        <div class="bk-target-bar">
+          <div class="bk-target-fill" style="width:${targetPct.toFixed(1)}%;background:${targetColor}"></div>
+        </div>
+        <span class="bk-target-pct" style="color:${targetColor}">${targetPct.toFixed(0)}%</span>
+      </div>` : '';
+
     return `<div class="bucket-group">
       <div class="bucket-header">
         <span class="bucket-label">${escH(bk)}</span>
@@ -2085,7 +2606,9 @@ function buildSPVBlock(spv,rows,bulan,tahun){
         <button class="btn-bucket-setup ${hasCustom?'has-custom':''}"
           onclick="openBkSetupDropdown(event,'${safeBk}','${safeSpv2}')"
           title="Setup kolom untuk bucket ini">⚙ ${setupLabel}</button>
-        <span style="font-size:11px;font-weight:700;color:var(--accent);margin-left:auto;margin-right:8px">${bkTotalPayment}</span>
+        <span style="font-size:11px;font-weight:700;color:var(--accent);margin-left:auto;margin-right:4px">${bkTotalPayment}</span>
+        ${targetHtml}
+        <button class="btn-bucket-target" onclick="openTargetInput(event,'${safeBk}','${safeSpv2}')" title="Set target payment">🎯</button>
         <button class="btn-bucket-summary" onclick="openBucketSummary('${safeBk}','${safeSpv2}')" title="Lihat summary ranking bucket">📊 Summary</button>
       </div>
       ${tlRows}
@@ -2115,6 +2638,7 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       </div>
       <div class="spv-header-right">
         <span class="pill-blue">${bulan} ${tahun}</span>
+        <button class="btn-cmp-bulan" onclick="openCmpBulan('${safeSpv}','${safeSpvId}')" title="Bandingkan dengan bulan lalu (apple-to-apple)">📅 vs Bln Lalu</button>
         <button class="btn-add-setup" onclick="openSetupModal('${safeSpv}',null)">+ Setup baru</button>
       </div>
     </div>
@@ -5374,6 +5898,7 @@ function initPresCharts(slideIdx){
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&document.getElementById('presOverlay').classList.contains('open'))closePresentation();
   if(e.key==='Escape'&&document.getElementById('modalBucketSummary').classList.contains('open'))closeBucketSummary();
+  if(e.key==='Escape'&&document.getElementById('cmpBulanModal')?.classList.contains('open'))closeCmpBulan();
   if(document.getElementById('presOverlay').classList.contains('open')){
     if(e.key==='ArrowRight')presNavigate(1);
     if(e.key==='ArrowLeft')presNavigate(-1);
