@@ -108,6 +108,22 @@ select:focus{border-color:var(--accent);}
 .sum-card.success .val{color:var(--success);}
 /* CHARTS */
 .charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:20px;}
+/* ── CHART EXPAND MODAL ── */
+#chartExpandModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:600;align-items:center;justify-content:center;padding:20px;}
+#chartExpandModal.open{display:flex;}
+.chart-expand-box{background:var(--surface);border-radius:var(--radius);width:92vw;max-width:1100px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;}
+.chart-expand-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.chart-expand-title{font-size:15px;font-weight:700;color:var(--text);}
+.chart-expand-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);padding:2px 8px;}
+.chart-expand-close:hover{color:var(--text);}
+.chart-expand-body{flex:1;padding:20px;overflow:auto;min-height:400px;position:relative;}
+.chart-expand-wrap{position:relative;width:100%;height:100%;min-height:400px;}
+/* Expand icon on chart card hover */
+.chart-card{position:relative;cursor:pointer;}
+.chart-card:hover .chart-expand-btn{opacity:1;}
+.chart-expand-btn{position:absolute;top:10px;right:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 8px;font-size:11px;color:var(--text3);cursor:pointer;opacity:0;transition:opacity .15s;z-index:2;}
+.chart-expand-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
 .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .chart-title{font-size:13px;font-weight:600;color:var(--text);}
@@ -616,6 +632,7 @@ select:focus{border-color:var(--accent);}
           <div class="chart-type-toggle">
             <button class="chart-type-btn active" onclick="switchChart('violRate','bar',this)">Bar</button>
             <button class="chart-type-btn" onclick="switchChart('violRate','line',this)">Line</button>
+            <button class="chart-type-btn" onclick="switchChart('violRate','doughnut',this)">Donut</button>
           </div>
         </div>
         <div class="chart-wrap"><canvas id="chartViolRate"></canvas></div>
@@ -773,6 +790,19 @@ select:focus{border-color:var(--accent);}
 </div>
 
 <!-- MODAL PREVIEW LB (Agent / TL) -->
+<!-- CHART EXPAND MODAL -->
+<div id="chartExpandModal" onclick="if(event.target===this)closeChartExpand()">
+  <div class="chart-expand-box">
+    <div class="chart-expand-head">
+      <div class="chart-expand-title" id="chartExpandTitle"></div>
+      <button class="chart-expand-close" onclick="closeChartExpand()">✕</button>
+    </div>
+    <div class="chart-expand-body">
+      <div class="chart-expand-wrap"><canvas id="chartExpandCanvas"></canvas></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalLbOverlay" onclick="closeLbModal(event)">
   <div class="modal-box-md">
     <div class="modal-head">
@@ -1680,7 +1710,7 @@ function buildCharts(data){
   buildHarianChart(data,cc);
 }
 
-function rebuildAllCharts(){if(filteredData.length>0)buildCharts(filteredData);}
+function rebuildAllCharts(){if(filteredData.length>0){buildCharts(filteredData);setTimeout(initChartExpandButtons,500);}}
 
 function switchChart(key,type,btn){
   chartTypes[key]=type;
@@ -1852,6 +1882,7 @@ async function buildViolRateChart(data, cc) {
   const activeTahun = selTahun ? [...selTahun.querySelectorAll('.ms-opt.active')].map(o=>o.dataset.val).filter(v=>v&&v!=='all') : [];
 
   // Build rate per aplikasi (filtered)
+  // rateMap: totalKasus, sumAkun, countBulan → avgAkun = sumAkun/countBulan
   const rateMap = {};
   jaData.forEach(row => {
     const {aplikasi, bulan, tahun, jumlahAkun} = row;
@@ -1860,26 +1891,36 @@ async function buildViolRateChart(data, cc) {
     if (!jumlahAkun) return;
     const key = aplikasi+'__'+bulan+'__'+tahun;
     const kasus = kasusByApp[key]||0;
-    const rate  = (kasus / jumlahAkun) * 100;
-    if (!rateMap[aplikasi]) rateMap[aplikasi] = {totalKasus:0, totalAkun:0};
+    if (!rateMap[aplikasi]) rateMap[aplikasi] = {totalKasus:0, sumAkun:0, countBulan:0};
     rateMap[aplikasi].totalKasus += kasus;
-    rateMap[aplikasi].totalAkun  += jumlahAkun;
+    rateMap[aplikasi].sumAkun    += jumlahAkun;
+    rateMap[aplikasi].countBulan++;
   });
 
-  // Filter hanya aplikasi yang ada kasus atau ada akun
+  // Rate = totalKasus / avgAkun × 100
+  // avgAkun = sumAkun / countBulan (rata-rata akun per bulan, bukan total akumulasi)
   const entries = Object.entries(rateMap)
-    .filter(([,v]) => v.totalAkun > 0)
-    .map(([app, v]) => ({app, rate: v.totalAkun>0 ? (v.totalKasus/v.totalAkun*100) : 0, kasus: v.totalKasus, akun: v.totalAkun}))
+    .filter(([,v]) => v.sumAkun > 0 && v.totalKasus > 0)
+    .map(([app, v]) => {
+      const avgAkun = v.sumAkun / v.countBulan;
+      const rate = (v.totalKasus / avgAkun) * 100;
+      return {app, rate, kasus: v.totalKasus, akun: Math.round(avgAkun)};
+    })
     .sort((a,b) => b.rate - a.rate);
 
   if (!entries.length) return;
 
   const labels = entries.map(e => e.app);
   const rates  = entries.map(e => +e.rate.toFixed(1));
-  // Warna: merah jika rate > 50%, kuning 20-50%, hijau < 20%
-  const colors = rates.map(r => r > 50 ? '#dc2626cc' : r > 20 ? '#d97706cc' : '#16a34acc');
 
-  const type = chartTypes.violRate==='line' ? 'line' : 'bar';
+  // Warna relative: merah = top 25% rate tertinggi, kuning = 25-60%, hijau = bawah
+  const maxRate = Math.max(...rates, 1);
+  const colors = rates.map(r =>
+    r >= maxRate * 0.6 ? '#dc2626cc' :
+    r >= maxRate * 0.25 ? '#d97706cc' : '#16a34acc'
+  );
+
+  const type = chartTypes.violRate || 'bar'; // 'bar' = horizontal, 'line', 'doughnut'
   const DL = window.ChartDataLabels;
   const dlCfg = DL && showLabels.violRate ? {
     datalabels: {
@@ -1890,38 +1931,81 @@ async function buildViolRateChart(data, cc) {
     }
   } : {};
 
-  charts.violRate = new Chart(
-    document.getElementById('chartViolRate').getContext('2d'), {
-    type,
+  // Horizontal bar untuk readability nama aplikasi
+  const isDonut = type === 'doughnut';
+  const isHoriz = !isDonut;
+
+  const chartCfg = isDonut ? {
+    type: 'doughnut',
     plugins: DL ? [DL] : [],
     data: {labels, datasets:[{
       label: 'Violation Rate (%)',
       data: rates,
-      backgroundColor: type==='line' ? cc.danger+'33' : colors,
-      borderColor: type==='line' ? cc.danger : colors.map(c=>c.slice(0,-2)),
-      borderWidth: type==='line' ? 2 : 0,
-      borderRadius: 3,
-      fill: type==='line',
-      tension: .3, pointRadius: 4,
+      backgroundColor: colors,
+      borderWidth: 1,
     }]},
     options: {
       responsive:true, maintainAspectRatio:true,
+      plugins: {
+        legend:{display:true, position:'right',
+          labels:{color:cc.text2, font:{size:9}, padding:6}},
+        tooltip:{callbacks:{
+          label: ctx => {
+            const e = entries[ctx.dataIndex];
+            return ` ${ctx.label}: ${rates[ctx.dataIndex]}% (${e.kasus} kasus / ${e.akun} akun)`;
+          }
+        }},
+        ...(DL&&showLabels.violRate ? {datalabels:{
+          color:'#fff', font:{size:8,weight:'bold'},
+          formatter:(v,ctx)=>v>5?rates[ctx.dataIndex]+'%':'',
+        }} : {}),
+      }
+    }
+  } : {
+    // Horizontal bar — nama di kiri, bar ke kanan
+    type: 'bar',
+    plugins: DL ? [DL] : [],
+    data: {labels, datasets:[{
+      label: 'Violation Rate (%)',
+      data: rates,
+      backgroundColor: colors,
+      borderRadius: 3,
+      borderWidth: 0,
+    }]},
+    options: {
+      indexAxis: 'y',
+      responsive:true, maintainAspectRatio:false,
       plugins: {
         legend:{display:false},
         tooltip:{callbacks:{
           label: ctx => {
             const e = entries[ctx.dataIndex];
-            return [` Rate: ${ctx.parsed.y}%`, ` Kasus: ${e.kasus}`, ` Akun: ${e.akun}`];
+            return [` Rate: ${ctx.parsed.x}%`, ` Kasus: ${e.kasus}`, ` Rata-rata Akun: ${e.akun}`];
           }
         }},
-        ...dlCfg,
+        ...(DL&&showLabels.violRate ? {datalabels:{
+          color: cc.text,
+          font:{size:9,weight:'bold'},
+          formatter: v => v > 0 ? v+'%' : '',
+          anchor:'end', align:'right',
+          clamp: true,
+        }} : {}),
       },
       scales:{
-        x:{ticks:{color:cc.text3,font:{size:9},maxRotation:45},grid:{color:cc.border}},
-        y:{beginAtZero:true,ticks:{color:cc.text3,font:{size:10},callback:v=>v+'%'},grid:{color:cc.border}}
+        x:{beginAtZero:true, ticks:{color:cc.text3,font:{size:9},callback:v=>v+'%'},grid:{color:cc.border}},
+        y:{ticks:{color:cc.text2,font:{size:10}},grid:{display:false}}
       }
     }
-  });
+  };
+
+  // Height tetap normal di dashboard — expand modal yang akan lebih tinggi
+  const wrap = document.getElementById('chartViolRate').parentElement;
+  wrap.style.height = '';
+
+  charts.violRate = new Chart(
+    document.getElementById('chartViolRate').getContext('2d'),
+    chartCfg
+  );
 }
 
 function buildAplikasiChart(data,cc){
@@ -2721,8 +2805,7 @@ function openLbModal(type, name){
   rows.forEach(r=>{
     const k=(r.kasus||'').trim();
     if(!k||k==='—')return;
-    const key=k.length>90?k.substring(0,90)+'…':k;
-    kasusCnt[key]=(kasusCnt[key]||0)+1;
+    kasusCnt[k]=(kasusCnt[k]||0)+1;
   });
   const topKasus=Object.entries(kasusCnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
@@ -2814,6 +2897,123 @@ function openLbModal(type, name){
   document.getElementById('modalLbOverlay').classList.add('open');
 }
 
+// ── Chart Expand Modal ────────────────────────────────────────
+let _expandChart = null;
+
+const CHART_META = {
+  chartTren:       {key:'tren',       title:'Tren Kasus per Bulan'},
+  chartKanal:      {key:'kanal',      title:'Distribusi Kanal Pengaduan'},
+  chartAgent:      {key:'agent',      title:'Valid Ext. vs Valid Int.'},
+  chartKanalStatus:{key:'kanalStatus',title:'Status Eksternal per Kanal'},
+  chartViolRate:   {key:'violRate',   title:'Violation Rate per Aplikasi (%)'},
+  chartAplikasi:   {key:'aplikasi',   title:'Kasus per Aplikasi'},
+  chartPunishment: {key:'punishment', title:'Distribusi Punishment Internal'},
+  chartDurasi:     {key:'durasi',     title:'Rata-rata Durasi Penyelesaian (hari)'},
+  chartHarian:     {key:'harian',     title:'Pergerakan Violation per Tanggal'},
+};
+
+function _expandOptions(opts, isHoriz) {
+  opts = opts || {};
+  opts.responsive = true;
+  opts.maintainAspectRatio = false;
+  opts.animation = {duration: 300};
+  const scaleFonts = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.font && obj.font.size) obj.font.size = Math.min(obj.font.size + 3, 14);
+    Object.values(obj).forEach(v => { if (v && typeof v === 'object') scaleFonts(v); });
+  };
+  scaleFonts(opts);
+  if (opts?.plugins?.datalabels?.font) opts.plugins.datalabels.font.size = 11;
+
+  // Restore formatter callbacks lost during JSON.stringify (functions are not serializable)
+  if (opts?.plugins?.datalabels) {
+    opts.plugins.datalabels.formatter = (v) => v > 0 ? v + '%' : '';
+    opts.plugins.datalabels.display   = (ctx) => ctx.dataset.data[ctx.dataIndex] > 0;
+    if (isHoriz) {
+      opts.plugins.datalabels.anchor = 'end';
+      opts.plugins.datalabels.align  = 'right';
+      opts.plugins.datalabels.clamp  = true;
+    }
+  }
+  // Restore axis % tick callback
+  if (opts?.scales?.y?.ticks && !isHoriz)
+    opts.scales.y.ticks.callback = v => v + '%';
+  if (opts?.scales?.x?.ticks && isHoriz)
+    opts.scales.x.ticks.callback = v => v + '%';
+
+  return opts;
+}
+
+async function openChartExpand(canvasId) {
+  const meta = CHART_META[canvasId];
+  if (!meta) return;
+
+  document.getElementById('chartExpandTitle').textContent = meta.title;
+  document.getElementById('chartExpandModal').classList.add('open');
+  if (_expandChart) { _expandChart.destroy(); _expandChart = null; }
+
+  const expandWrap = document.querySelector('.chart-expand-wrap');
+  const DL = window.ChartDataLabels;
+
+  // For violRate: chart may be async — clone from existing chart object
+  const srcChart = charts[meta.key];
+  if (!srcChart) {
+    expandWrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">⏳ Chart belum dimuat. Klik Refresh lalu coba lagi.</div>';
+    return;
+  }
+
+  const cfg = srcChart.config;
+  const isHoriz = cfg.options?.indexAxis === 'y';
+  expandWrap.style.height = isHoriz
+    ? Math.max(500, (cfg.data?.labels?.length||10) * 36) + 'px'
+    : '480px';
+
+  // Safe deep clone — skip functions/circular refs
+  let dataClone, optsClone;
+  try {
+    dataClone = JSON.parse(JSON.stringify(cfg.data));
+    optsClone = JSON.parse(JSON.stringify(cfg.options || {}));
+  } catch(e) {
+    dataClone = cfg.data;
+    optsClone = {};
+  }
+
+  _expandChart = new Chart(
+    document.getElementById('chartExpandCanvas').getContext('2d'), {
+    type: cfg.type,
+    plugins: DL ? [DL] : [],
+    data: dataClone,
+    options: _expandOptions(optsClone, isHoriz),
+  });
+}
+
+function closeChartExpand() {
+  document.getElementById('chartExpandModal').classList.remove('open');
+  if (_expandChart) { _expandChart.destroy(); _expandChart = null; }
+}
+
+// Inject expand button on all chart-wrap elements after page loads
+function initChartExpandButtons() {
+  Object.keys(CHART_META).forEach(canvasId => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const card = canvas.closest('.chart-card');
+    if (!card || card.querySelector('.chart-expand-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'chart-expand-btn';
+    btn.textContent = '⛶ Perbesar';
+    btn.onclick = (e) => { e.stopPropagation(); openChartExpand(canvasId); };
+    card.style.position = 'relative';
+    card.appendChild(btn);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initChartExpandButtons, 1000);
+});
+
+// Re-init after charts rebuilt
+const _origRebuildAll = typeof rebuildAllCharts === 'function' ? rebuildAllCharts : null;
 function closeLbModal(e){if(e.target===document.getElementById('modalLbOverlay'))closeLbModalDirect();}
 function closeLbModalDirect(){document.getElementById('modalLbOverlay').classList.remove('open');}
 
@@ -2823,6 +3023,7 @@ document.addEventListener('keydown',e=>{
     closeModalDirect();
     closeAppModalDirect();
     closeLbModalDirect();
+    closeChartExpand();
     closeAllMs();
   }
 });

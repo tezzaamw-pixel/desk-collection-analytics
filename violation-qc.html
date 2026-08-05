@@ -108,6 +108,21 @@ select:focus{border-color:var(--accent);}
 .sum-card.success .val{color:var(--success);}
 /* CHARTS */
 .charts-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:16px;margin-bottom:20px;}
+/* ── CHART EXPAND MODAL ── */
+#chartExpandModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:600;align-items:center;justify-content:center;padding:20px;}
+#chartExpandModal.open{display:flex;}
+.chart-expand-box{background:var(--surface);border-radius:var(--radius);width:92vw;max-width:1100px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden;}
+.chart-expand-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;}
+.chart-expand-title{font-size:15px;font-weight:700;color:var(--text);}
+.chart-expand-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);padding:2px 8px;}
+.chart-expand-close:hover{color:var(--text);}
+.chart-expand-body{flex:1;padding:20px;overflow:auto;min-height:400px;position:relative;}
+.chart-expand-wrap{position:relative;width:100%;height:100%;min-height:400px;}
+.chart-card{position:relative;cursor:pointer;}
+.chart-card:hover .chart-expand-btn{opacity:1;}
+.chart-expand-btn{position:absolute;top:10px;right:10px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:3px 8px;font-size:11px;color:var(--text3);cursor:pointer;opacity:0;transition:opacity .15s;z-index:2;}
+.chart-expand-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+
 .chart-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px;}
 .chart-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
 .chart-title{font-size:13px;font-weight:600;color:var(--text);}
@@ -290,6 +305,7 @@ select:focus{border-color:var(--accent);}
 .lb-count-ag{background:#fce7f3;color:#9d174d;}
 .lb-card-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:2px;}
 .lb-card-sub{font-size:11px;color:var(--text3);}
+.lb-list{max-height:560px;overflow-y:auto;scrollbar-width:thin;}
 .lb-kanal-summary{display:flex;gap:5px;margin-top:8px;flex-wrap:wrap;}
 .lb-ks-pill{font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600;}
 .lb-ks-ojk{background:#fce7f3;color:#9d174d;}
@@ -551,6 +567,25 @@ select:focus{border-color:var(--accent);}
       </div>
       <div class="chart-card">
         <div class="chart-header">
+          <div class="chart-title">Status Eksternal per Kanal</div>
+          <button class="chart-label-btn" id="lblBtn-kanalStatus" onclick="toggleLabels('kanalStatus')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
+        </div>
+        <div class="chart-wrap"><canvas id="chartKanalStatus"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
+          <div class="chart-title">Violation Rate per Aplikasi (%)</div>
+          <button class="chart-label-btn" id="lblBtn-violRate" onclick="toggleLabels('violRate')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
+          <div class="chart-type-toggle">
+            <button class="chart-type-btn active" onclick="switchChart('violRate','bar',this)">Bar</button>
+            <button class="chart-type-btn" onclick="switchChart('violRate','line',this)">Line</button>
+            <button class="chart-type-btn" onclick="switchChart('violRate','doughnut',this)">Donut</button>
+          </div>
+        </div>
+        <div class="chart-wrap"><canvas id="chartViolRate"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-header">
           <div class="chart-title">Kasus per Aplikasi</div>
           <button class="chart-label-btn" id="lblBtn-aplikasi" onclick="toggleLabels('aplikasi')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
           <div class="chart-type-toggle">
@@ -598,7 +633,7 @@ select:focus{border-color:var(--accent);}
     </div>
 
     <!-- TOP 10 LEADERBOARD: APLIKASI, TL, AGENT -->
-    <div class="section-title">🏆 Top 10 Pelanggaran Terbanyak</div>
+    <div class="section-title">🏆 Top Pelanggaran Terbanyak</div>
     <div class="leaderboard-grid" id="leaderboardGrid">
       <!-- diisi JS -->
     </div>
@@ -646,6 +681,19 @@ select:focus{border-color:var(--accent);}
 </div><!-- /main -->
 
 <!-- MODAL DETAIL KASUS -->
+<!-- CHART EXPAND MODAL -->
+<div id="chartExpandModal" onclick="if(event.target===this)closeChartExpand()">
+  <div class="chart-expand-box">
+    <div class="chart-expand-head">
+      <div class="chart-expand-title" id="chartExpandTitle"></div>
+      <button class="chart-expand-close" onclick="closeChartExpand()">✕</button>
+    </div>
+    <div class="chart-expand-body">
+      <div class="chart-expand-wrap"><canvas id="chartExpandCanvas"></canvas></div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
   <div class="modal-box">
     <div class="modal-head">
@@ -714,7 +762,7 @@ select:focus{border-color:var(--accent);}
 
 <script>
 // ── State label angka per chart ──────────────────────────────
-const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true,harian:false};
+const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true,harian:false,kanalStatus:true,violRate:true};
 
 function toggleLabels(key){
   showLabels[key]=!showLabels[key];
@@ -728,6 +776,8 @@ function toggleLabels(key){
   if(key==='tren')buildTrenChart(filteredData,cc);
   else if(key==='kanal')buildKanalChart(filteredData,cc);
   else if(key==='agent')buildAgentChart(filteredData,cc);
+  else if(key==='kanalStatus')buildKanalStatusChart(filteredData,cc);
+  else if(key==='violRate')buildViolRateChart(filteredData,cc);
   else if(key==='aplikasi')buildAplikasiChart(filteredData,cc);
   else if(key==='punishment')buildPunishmentChart(filteredData,cc);
   else if(key==='durasi')buildDurasiChart(filteredData,cc);
@@ -752,7 +802,7 @@ let allData=[];
 let filteredData=[];
 let currentPage=1;
 let charts={};
-let chartTypes={tren:'bar',kanal:'doughnut',agent:'bar',aplikasi:'bar',punishment:'bar',durasi:'bar',harian:'line'};
+let chartTypes={tren:'bar',kanal:'doughnut',agent:'bar',aplikasi:'bar',punishment:'bar',durasi:'bar',harian:'line',kanalStatus:'bar',violRate:'bar'};
 
 /* ===== THEME ===== */
 function setTheme(t){
@@ -857,7 +907,7 @@ function _buildTop10(data, keyFn) {
   });
   // Mark repeat agents
   Object.keys(map).forEach(k => { if(map[k].total>=3) map[k].repeat=true; });
-  return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
+  return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,30);
 }
 
 // ── Helper: build filter summary string ──
@@ -1284,7 +1334,7 @@ function exportPDF() {
 
   <!-- TOP 10 -->
   <div class="section">
-    <div class="section-title">🏆 Top 10 Pelanggaran Terbanyak</div>
+    <div class="section-title">🏆 Top Pelanggaran Terbanyak</div>
     <div class="top10-grid">
       <div>
         <div style="font-size:11px;font-weight:700;color:#475569;margin-bottom:8px">📱 Top Aplikasi</div>
@@ -1580,13 +1630,131 @@ function buildCharts(data){
   buildTrenChart(data,cc);
   buildKanalChart(data,cc);
   buildAgentChart(data,cc);
+  buildKanalStatusChart(data,cc);
+  buildViolRateChart(data,cc);
   buildAplikasiChart(data,cc);
   buildPunishmentChart(data,cc);
   buildDurasiChart(data,cc);
   buildHarianChart(data,cc);
 }
 
-function rebuildAllCharts(){if(filteredData.length>0)buildCharts(filteredData);}
+// ── Chart Expand Modal ────────────────────────────────────────
+let _expandChart = null;
+
+const CHART_META = {
+  chartTren:       {key:'tren',       title:'Tren Kasus per Bulan'},
+  chartKanal:      {key:'kanal',      title:'Distribusi Kanal Pengaduan'},
+  chartAgent:      {key:'agent',      title:'Valid Ext. vs Valid Int.'},
+  chartKanalStatus:{key:'kanalStatus',title:'Status Eksternal per Kanal'},
+  chartViolRate:   {key:'violRate',   title:'Violation Rate per Aplikasi (%)'},
+  chartAplikasi:   {key:'aplikasi',   title:'Kasus per Aplikasi'},
+  chartPunishment: {key:'punishment', title:'Distribusi Punishment Internal'},
+  chartDurasi:     {key:'durasi',     title:'Rata-rata Durasi Penyelesaian (hari)'},
+  chartHarian:     {key:'harian',     title:'Pergerakan Violation per Tanggal'},
+};
+
+function _expandOptions(opts, isHoriz) {
+  opts = opts || {};
+  opts.responsive = true;
+  opts.maintainAspectRatio = false;
+  opts.animation = {duration: 300};
+  const scaleFonts = (obj) => {
+    if (!obj || typeof obj !== 'object') return;
+    if (obj.font && obj.font.size) obj.font.size = Math.min(obj.font.size + 3, 14);
+    Object.values(obj).forEach(v => { if (v && typeof v === 'object') scaleFonts(v); });
+  };
+  scaleFonts(opts);
+  if (opts?.plugins?.datalabels?.font) opts.plugins.datalabels.font.size = 11;
+
+  // Restore formatter callbacks lost during JSON.stringify (functions are not serializable)
+  if (opts?.plugins?.datalabels) {
+    opts.plugins.datalabels.formatter = (v) => v > 0 ? v + '%' : '';
+    opts.plugins.datalabels.display   = (ctx) => ctx.dataset.data[ctx.dataIndex] > 0;
+    if (isHoriz) {
+      opts.plugins.datalabels.anchor = 'end';
+      opts.plugins.datalabels.align  = 'right';
+      opts.plugins.datalabels.clamp  = true;
+    }
+  }
+  // Restore axis % tick callback
+  if (opts?.scales?.y?.ticks && !isHoriz)
+    opts.scales.y.ticks.callback = v => v + '%';
+  if (opts?.scales?.x?.ticks && isHoriz)
+    opts.scales.x.ticks.callback = v => v + '%';
+
+  return opts;
+}
+
+async function openChartExpand(canvasId) {
+  const meta = CHART_META[canvasId];
+  if (!meta) return;
+
+  document.getElementById('chartExpandTitle').textContent = meta.title;
+  document.getElementById('chartExpandModal').classList.add('open');
+  if (_expandChart) { _expandChart.destroy(); _expandChart = null; }
+
+  const expandWrap = document.querySelector('.chart-expand-wrap');
+  const DL = window.ChartDataLabels;
+
+  // For violRate: chart may be async — clone from existing chart object
+  const srcChart = charts[meta.key];
+  if (!srcChart) {
+    expandWrap.innerHTML = '<div style="padding:40px;text-align:center;color:var(--text3);font-size:13px">⏳ Chart belum dimuat. Klik Refresh lalu coba lagi.</div>';
+    return;
+  }
+
+  const cfg = srcChart.config;
+  const isHoriz = cfg.options?.indexAxis === 'y';
+  expandWrap.style.height = isHoriz
+    ? Math.max(500, (cfg.data?.labels?.length||10) * 36) + 'px'
+    : '480px';
+
+  // Safe deep clone — skip functions/circular refs
+  let dataClone, optsClone;
+  try {
+    dataClone = JSON.parse(JSON.stringify(cfg.data));
+    optsClone = JSON.parse(JSON.stringify(cfg.options || {}));
+  } catch(e) {
+    dataClone = cfg.data;
+    optsClone = {};
+  }
+
+  _expandChart = new Chart(
+    document.getElementById('chartExpandCanvas').getContext('2d'), {
+    type: cfg.type,
+    plugins: DL ? [DL] : [],
+    data: dataClone,
+    options: _expandOptions(optsClone, isHoriz),
+  });
+}
+
+function closeChartExpand() {
+  document.getElementById('chartExpandModal').classList.remove('open');
+  if (_expandChart) { _expandChart.destroy(); _expandChart = null; }
+}
+
+// Inject expand button on all chart-wrap elements after page loads
+function initChartExpandButtons() {
+  Object.keys(CHART_META).forEach(canvasId => {
+    const canvas = document.getElementById(canvasId);
+    if (!canvas) return;
+    const card = canvas.closest('.chart-card');
+    if (!card || card.querySelector('.chart-expand-btn')) return;
+    const btn = document.createElement('button');
+    btn.className = 'chart-expand-btn';
+    btn.textContent = '⛶ Perbesar';
+    btn.onclick = (e) => { e.stopPropagation(); openChartExpand(canvasId); };
+    card.style.position = 'relative';
+    card.appendChild(btn);
+  });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  setTimeout(initChartExpandButtons, 1000);
+});
+
+
+function rebuildAllCharts(){if(filteredData.length>0){buildCharts(filteredData);setTimeout(initChartExpandButtons,500);}}
 
 function switchChart(key,type,btn){
   chartTypes[key]=type;
@@ -1666,6 +1834,222 @@ function buildAgentChart(data,cc){
     ]},
     options:opts
   });
+}
+
+function buildKanalStatusChart(data,cc){
+  destroyChart('kanalStatus');
+  const KANALS=['OJK','AFPI','CS'];
+  const byKanal={};
+  KANALS.forEach(k=>{ byKanal[k]={valid:0,invalid:0,pending:0}; });
+
+  data.forEach(r=>{
+    const k=(r.kanalPengaduan||'').toUpperCase().trim();
+    if(!KANALS.includes(k))return;
+    const ext=(r.statusEksternal||'').toUpperCase();
+    if(ext==='VALID')byKanal[k].valid++;
+    else if(ext==='INVALID')byKanal[k].invalid++;
+    else if(ext==='PENDING')byKanal[k].pending++;
+  });
+
+  const labels=KANALS.filter(k=>byKanal[k].valid+byKanal[k].invalid+byKanal[k].pending>0);
+  const DL=window.ChartDataLabels;
+  const dlCfg = DL&&showLabels.kanalStatus ? {
+    datalabels:{
+      color:'#fff',font:{size:9,weight:'bold'},
+      formatter:v=>v>0?fmtNum(v):'',
+      anchor:'center',align:'center',
+      display:ctx=>ctx.dataset.data[ctx.dataIndex]>0,
+    }
+  } : {};
+
+  charts.kanalStatus=new Chart(
+    document.getElementById('chartKanalStatus').getContext('2d'),{
+    type:'bar',
+    plugins:DL?[DL]:[],
+    data:{labels,datasets:[
+      {label:'Valid',data:labels.map(k=>byKanal[k].valid),
+        backgroundColor:'#16a34a',borderRadius:3,stack:'s'},
+      {label:'Invalid',data:labels.map(k=>byKanal[k].invalid),
+        backgroundColor:'#dc2626',borderRadius:3,stack:'s'},
+      {label:'Pending',data:labels.map(k=>byKanal[k].pending),
+        backgroundColor:'#d97706',borderRadius:3,stack:'s'},
+    ]},
+    options:{
+      responsive:true,maintainAspectRatio:true,
+      plugins:{
+        legend:{display:true,position:'bottom',
+          labels:{color:cc.text2,font:{size:10},boxWidth:12,padding:8}},
+        tooltip:{callbacks:{label:ctx=>` ${ctx.dataset.label}: ${fmtNum(ctx.parsed.y)}`}},
+        ...dlCfg,
+      },
+      scales:{
+        x:{stacked:true,ticks:{color:cc.text3,font:{size:11}},grid:{color:cc.border}},
+        y:{stacked:true,beginAtZero:true,ticks:{color:cc.text3,font:{size:10}},grid:{color:cc.border}},
+      }
+    }
+  });
+}
+
+// ── Violation Rate Chart ──────────────────────────────────────
+let _jumlahAkunCache = null; // cache data dari sheet jumlah akun
+
+async function fetchJumlahAkun() {
+  if (_jumlahAkunCache) return _jumlahAkunCache;
+  try {
+    const res = await fetch(API_URL + '?action=jumlahakun');
+    const d = await res.json();
+    if (d.success) _jumlahAkunCache = d.data || [];
+    else _jumlahAkunCache = [];
+  } catch(e) { _jumlahAkunCache = []; }
+  return _jumlahAkunCache;
+}
+
+async function buildViolRateChart(data, cc) {
+  destroyChart('violRate');
+  const jaData = await fetchJumlahAkun();
+  if (!jaData.length) return;
+
+  // Hitung kasus per aplikasi per bulan dari violation data
+  const kasusByApp = {};
+  data.forEach(r => {
+    const app = r.aplikasi||'';
+    const bln = r.bulanMasuk||'';
+    const thn = r.tahunMasuk||'';
+    if (!app||!bln||!thn) return;
+    const key = app+'__'+bln+'__'+thn;
+    kasusByApp[key] = (kasusByApp[key]||0) + 1;
+  });
+
+  // Ambil filter bulan/tahun aktif dari UI
+  const selBulan = document.getElementById('msBulan');
+  const selTahun = document.getElementById('msTahun');
+  const activeBulan = selBulan ? [...selBulan.querySelectorAll('.ms-opt.active')].map(o=>o.dataset.val).filter(v=>v&&v!=='all') : [];
+  const activeTahun = selTahun ? [...selTahun.querySelectorAll('.ms-opt.active')].map(o=>o.dataset.val).filter(v=>v&&v!=='all') : [];
+
+  // Build rate per aplikasi (filtered)
+  // rateMap: totalKasus, sumAkun, countBulan → avgAkun = sumAkun/countBulan
+  const rateMap = {};
+  jaData.forEach(row => {
+    const {aplikasi, bulan, tahun, jumlahAkun} = row;
+    if (activeBulan.length && !activeBulan.includes(bulan)) return;
+    if (activeTahun.length && !activeTahun.includes(tahun)) return;
+    if (!jumlahAkun) return;
+    const key = aplikasi+'__'+bulan+'__'+tahun;
+    const kasus = kasusByApp[key]||0;
+    if (!rateMap[aplikasi]) rateMap[aplikasi] = {totalKasus:0, sumAkun:0, countBulan:0};
+    rateMap[aplikasi].totalKasus += kasus;
+    rateMap[aplikasi].sumAkun    += jumlahAkun;
+    rateMap[aplikasi].countBulan++;
+  });
+
+  // Rate = totalKasus / avgAkun × 100
+  // avgAkun = sumAkun / countBulan (rata-rata akun per bulan, bukan total akumulasi)
+  const entries = Object.entries(rateMap)
+    .filter(([,v]) => v.sumAkun > 0 && v.totalKasus > 0)
+    .map(([app, v]) => {
+      const avgAkun = v.sumAkun / v.countBulan;
+      const rate = (v.totalKasus / avgAkun) * 100;
+      return {app, rate, kasus: v.totalKasus, akun: Math.round(avgAkun)};
+    })
+    .sort((a,b) => b.rate - a.rate);
+
+  if (!entries.length) return;
+
+  const labels = entries.map(e => e.app);
+  const rates  = entries.map(e => +e.rate.toFixed(1));
+  // Warna: merah jika rate > 50%, kuning 20-50%, hijau < 20%
+  const maxRate = Math.max(...rates, 1);
+  const colors = rates.map(r =>
+    r >= maxRate * 0.6 ? '#dc2626cc' :
+    r >= maxRate * 0.25 ? '#d97706cc' : '#16a34acc'
+  );
+
+  const type = chartTypes.violRate || 'bar'; // 'bar' = horizontal, 'line', 'doughnut'
+  const DL = window.ChartDataLabels;
+  const dlCfg = DL && showLabels.violRate ? {
+    datalabels: {
+      color: '#fff', font:{size:8, weight:'bold'},
+      formatter: v => v > 0 ? v+'%' : '',
+      anchor:'end', align:'top',
+      color: cc.text,
+    }
+  } : {};
+
+  // Horizontal bar untuk readability nama aplikasi
+  const isDonut = type === 'doughnut';
+  const isHoriz = !isDonut;
+
+  const chartCfg = isDonut ? {
+    type: 'doughnut',
+    plugins: DL ? [DL] : [],
+    data: {labels, datasets:[{
+      label: 'Violation Rate (%)',
+      data: rates,
+      backgroundColor: colors,
+      borderWidth: 1,
+    }]},
+    options: {
+      responsive:true, maintainAspectRatio:true,
+      plugins: {
+        legend:{display:true, position:'right',
+          labels:{color:cc.text2, font:{size:9}, padding:6}},
+        tooltip:{callbacks:{
+          label: ctx => {
+            const e = entries[ctx.dataIndex];
+            return ` ${ctx.label}: ${rates[ctx.dataIndex]}% (${e.kasus} kasus / ${e.akun} akun)`;
+          }
+        }},
+        ...(DL&&showLabels.violRate ? {datalabels:{
+          color:'#fff', font:{size:8,weight:'bold'},
+          formatter:(v,ctx)=>v>5?rates[ctx.dataIndex]+'%':'',
+        }} : {}),
+      }
+    }
+  } : {
+    // Horizontal bar — nama di kiri, bar ke kanan
+    type: 'bar',
+    plugins: DL ? [DL] : [],
+    data: {labels, datasets:[{
+      label: 'Violation Rate (%)',
+      data: rates,
+      backgroundColor: colors,
+      borderRadius: 3,
+      borderWidth: 0,
+    }]},
+    options: {
+      indexAxis: 'y',
+      responsive:true, maintainAspectRatio:false,
+      plugins: {
+        legend:{display:false},
+        tooltip:{callbacks:{
+          label: ctx => {
+            const e = entries[ctx.dataIndex];
+            return [` Rate: ${ctx.parsed.x}%`, ` Kasus: ${e.kasus}`, ` Rata-rata Akun: ${e.akun}`];
+          }
+        }},
+        ...(DL&&showLabels.violRate ? {datalabels:{
+          color: cc.text,
+          font:{size:9,weight:'bold'},
+          formatter: v => v > 0 ? v+'%' : '',
+          anchor:'end', align:'right',
+          clamp: true,
+        }} : {}),
+      },
+      scales:{
+        x:{beginAtZero:true, ticks:{color:cc.text3,font:{size:9},callback:v=>v+'%'},grid:{color:cc.border}},
+        y:{ticks:{color:cc.text2,font:{size:10}},grid:{display:false}}
+      }
+    }
+  };
+
+  // Set dynamic height for horizontal bar
+  const wrap = document.getElementById('chartViolRate').parentElement;
+  wrap.style.height = '';
+
+  charts.violRate = new Chart(
+    document.getElementById('chartViolRate').getContext('2d'),
+    chartCfg
+  );
 }
 
 function buildAplikasiChart(data,cc){
@@ -1812,7 +2196,7 @@ function renderLeaderboard(data){
       else if(kanal==='CS')map[k].CS++;
       else map[k].other++;
     });
-    return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,10);
+    return Object.entries(map).sort((a,b)=>b[1].total-a[1].total).slice(0,30);
   }
 
   const appEntries = buildMap(data, r=>r.aplikasi||'');
@@ -2465,8 +2849,7 @@ function openLbModal(type, name){
   rows.forEach(r=>{
     const k=(r.kasus||'').trim();
     if(!k||k==='—')return;
-    const key=k.length>90?k.substring(0,90)+'…':k;
-    kasusCnt[key]=(kasusCnt[key]||0)+1;
+    kasusCnt[k]=(kasusCnt[k]||0)+1;
   });
   const topKasus=Object.entries(kasusCnt).sort((a,b)=>b[1]-a[1]).slice(0,8);
 
@@ -2519,7 +2902,7 @@ function openLbModal(type, name){
           <div class="prev-tl-kanal">${badgeKanal(r.kanalPengaduan)}</div>
           <div class="prev-tl-kasus">
             <span style="font-size:10px;font-weight:700;color:var(--accent);margin-right:4px">[${r.aplikasi||'—'}]</span>
-            ${(r.kasus||'—').substring(0,65)}${(r.kasus||'').length>65?'…':''}
+            ${(r.kasus||'—')}
           </div>
         </div>`).join('')}</div>`;
   }
@@ -2558,6 +2941,8 @@ function openLbModal(type, name){
   document.getElementById('modalLbOverlay').classList.add('open');
 }
 
+
+
 function closeLbModal(e){if(e.target===document.getElementById('modalLbOverlay'))closeLbModalDirect();}
 function closeLbModalDirect(){document.getElementById('modalLbOverlay').classList.remove('open');}
 
@@ -2567,6 +2952,7 @@ document.addEventListener('keydown',e=>{
     closeModalDirect();
     closeAppModalDirect();
     closeLbModalDirect();
+    closeChartExpand();
     closeAllMs();
   }
 });
