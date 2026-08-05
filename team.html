@@ -570,6 +570,12 @@ select:focus{border-color:var(--accent);}
 #modalBucketSummary.fullscreen-mode{padding-top:0;align-items:stretch;}
 
 .bsm-mode-btn.active{background:var(--accent)!important;color:#fff!important;}
+/* Bucket navbar */
+.bsm-bucket-nav{display:flex;align-items:center;gap:6px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface2);overflow-x:auto;flex-shrink:0;scrollbar-width:thin;}
+.bsm-bucket-tab{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);white-space:nowrap;transition:all .15s;flex-shrink:0;}
+.bsm-bucket-tab:hover{border-color:var(--accent);color:var(--accent);}
+.bsm-bucket-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.bsm-bucket-tab-count{font-size:10px;opacity:.8;margin-left:3px;}
 .bsm-toolbar{padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;}
 .bsm-toolbar-label{font-size:11px;font-weight:600;color:var(--text3);white-space:nowrap;}
 .bsm-date-select{padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);cursor:pointer;outline:none;}
@@ -732,6 +738,7 @@ select:focus{border-color:var(--accent);}
       <button class="bsm-fs-btn" id="bsmFsBtn" onclick="toggleBsmFullscreen()" title="Fullscreen">⛶</button>
       <button class="bsm-close" onclick="closeBucketSummary()">✕</button>
     </div>
+    <div class="bsm-bucket-nav" id="bsmBucketNav"></div>
     <div class="bsm-body">
       <div class="bsm-toolbar">
         <span class="bsm-toolbar-label">📅 Tanggal:</span>
@@ -744,7 +751,36 @@ select:focus{border-color:var(--accent);}
           <button class="bsm-view-btn" data-view="avg" onclick="setBsmView('avg')">Rata-rata/hari</button>
         </div>
       </div>
-      <div class="bsm-table-wrap" id="bsmTableWrap"></div>
+    <div class="bsm-body">
+      <div class="bsm-toolbar">
+        <span class="bsm-toolbar-label">📅 Tanggal:</span>
+        <select class="bsm-date-select" id="bsmDateSelect" onchange="setBsmDate(this.value)">
+          <option value="">Semua Tanggal</option>
+        </select>
+        <button class="bsm-view-btn" id="bsmGroupBtn" onclick="toggleBsmGroup()" style="margin-left:8px;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s">👥 Group</button>
+        <div class="bsm-view-toggle" id="bsmViewToggle">
+          <button class="bsm-view-btn active" data-view="total" onclick="setBsmView('total')">Jumlah</button>
+          <button class="bsm-view-btn" data-view="avg" onclick="setBsmView('avg')">Rata-rata/hari</button>
+        </div>
+        <div style="margin-left:auto;display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+          <button class="bsm-tab-btn active" data-tab="table" onclick="setBsmTab('table')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">📋 Tabel</button>
+          <button class="bsm-tab-btn" data-tab="chart" onclick="setBsmTab('chart')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📈 Chart</button>
+        </div>
+      </div>
+      <div id="bsmTableWrap" class="bsm-table-wrap"></div>
+      <div id="bsmChartWrap" style="display:none;padding:16px;flex:1">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:600;color:var(--text3)">Tampilkan:</span>
+          <select id="bsmChartFilter" onchange="renderBsmChart()" style="padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none">
+            <option value="total">Total Bucket</option>
+          </select>
+          <div style="margin-left:auto;display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+            <button class="bsm-chart-type-btn active" data-ctype="line" onclick="setBsmChartType('line')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">Line</button>
+            <button class="bsm-chart-type-btn" data-ctype="bar" onclick="setBsmChartType('bar')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">Bar</button>
+          </div>
+        </div>
+        <div style="position:relative;height:340px"><canvas id="bsmPayChart"></canvas></div>
+      </div>
     </div>
     <div class="bsm-footer">
       <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#fee2e2"></div> 0 Payment</div>
@@ -1135,13 +1171,32 @@ let _bsmState = { bucket:'', spv:'', mode:'payment', date:'', view:'total', grou
 function openBucketSummary(bucket, spv) {
   const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
   if (!rows.length) { alert('Tidak ada data untuk bucket ini.'); return; }
-  _bsmState = { bucket, spv, mode:'payment', date:'', view:'total', grouped:false };
+  _bsmState = { bucket, spv, mode:'payment', date:'', view:'total', grouped:false, tab:'table' };
   document.querySelectorAll('.bsm-mode-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.mode==='payment'));
   document.querySelectorAll('.bsm-view-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.view==='total'));
+  document.querySelectorAll('.bsm-tab-btn').forEach(b => {
+    const isActive = b.dataset.tab === 'table';
+    b.classList.toggle('active', isActive);
+    b.style.background = isActive ? 'var(--accent)' : 'var(--surface2)';
+    b.style.color = isActive ? '#fff' : 'var(--text2)';
+  });
+  // Reset to table view
+  const tw = document.getElementById('bsmTableWrap');
+  const cw = document.getElementById('bsmChartWrap');
+  if (tw) tw.style.display = '';
+  if (cw) cw.style.display = 'none';
+  if (_bsmPayChart) { _bsmPayChart.destroy(); _bsmPayChart = null; }
   const gb = document.getElementById('bsmGroupBtn');
   if (gb) { gb.style.background='var(--surface2)'; gb.style.color='var(--text2)'; gb.style.borderColor='var(--border)'; gb.textContent='👥 Group'; }
+
+  // Build bucket navbar
+  _buildBsmBucketNav(spv, bucket);
+  // Init chart filter dropdown
+  _initBsmChartFilter(rows);
+
+  // Populate date dropdown
   const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
   const sel = document.getElementById('bsmDateSelect');
   if (sel) {
@@ -1157,6 +1212,61 @@ function openBucketSummary(bucket, spv) {
   _renderBucketSummary();
 }
 
+function _buildBsmBucketNav(spv, activeBucket) {
+  const nav = document.getElementById('bsmBucketNav');
+  if (!nav) return;
+  // Get all buckets for this SPV from allRows
+  const allSpvRows = spvAgentDataCache[spv]||[];
+  const buckets = [...new Set(allSpvRows.map(r=>r.bucket).filter(Boolean))].sort();
+  if (buckets.length <= 1) { nav.style.display='none'; return; }
+  nav.style.display = 'flex';
+  nav.innerHTML = buckets.map(bk => {
+    const count = new Set(allSpvRows.filter(r=>r.bucket===bk).map(r=>r.agent)).size;
+    return `<button class="bsm-bucket-tab ${bk===activeBucket?'active':''}"
+      onclick="switchBsmBucket('${escA(bk)}','${escA(spv)}')" title="${escH(bk)}">
+      ${escH(bk)}<span class="bsm-bucket-tab-count">${count}</span>
+    </button>`;
+  }).join('');
+}
+
+function switchBsmBucket(bucket, spv) {
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+  if (!rows.length) return;
+  _bsmState.bucket = bucket;
+  _bsmState.date = '';
+  _bsmState.grouped = false;
+  if (_bsmPayChart) { _bsmPayChart.destroy(); _bsmPayChart = null; }
+
+  // Re-init chart filter for new bucket
+  _initBsmChartFilter(rows);
+
+  // Update active tab
+  document.querySelectorAll('.bsm-bucket-tab').forEach(t =>
+    t.classList.toggle('active', t.textContent.trim().startsWith(bucket)));
+
+  // Reset group btn
+  const gb = document.getElementById('bsmGroupBtn');
+  if (gb) { gb.style.background='var(--surface2)'; gb.style.color='var(--text2)'; gb.style.borderColor='var(--border)'; gb.textContent='👥 Group'; }
+
+  // Rebuild date dropdown
+  const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
+  const sel = document.getElementById('bsmDateSelect');
+  if (sel) {
+    sel.innerHTML = '<option value="">Semua Tanggal</option>' +
+      allDates.map(d => {
+        const dt = new Date(d);
+        const dn = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+        return `<option value="${d}">${dt.getDate()} (${dn[dt.getDay()]})</option>`;
+      }).join('');
+    sel.value = '';
+  }
+  // Hide view toggle (reset)
+  const vt = document.getElementById('bsmViewToggle');
+  if (vt) vt.style.display = 'flex';
+
+  _renderBucketSummary();
+}
+
 function toggleBsmGroup() {
   _bsmState.grouped = !_bsmState.grouped;
   const btn = document.getElementById('bsmGroupBtn');
@@ -1167,6 +1277,166 @@ function toggleBsmGroup() {
     btn.textContent = _bsmState.grouped ? '👥 Ungroup' : '👥 Group';
   }
   _renderBucketSummary();
+}
+
+let _bsmChartType = 'line';
+let _bsmPayChart  = null;
+
+function setBsmTab(tab) {
+  _bsmState.tab = tab;
+  document.querySelectorAll('.bsm-tab-btn').forEach(b => {
+    const isActive = b.dataset.tab === tab;
+    b.classList.toggle('active', isActive);
+    b.style.background = isActive ? 'var(--accent)' : 'var(--surface2)';
+    b.style.color = isActive ? '#fff' : 'var(--text2)';
+  });
+  const tw = document.getElementById('bsmTableWrap');
+  const cw = document.getElementById('bsmChartWrap');
+  const gb = document.getElementById('bsmGroupBtn');
+  const vt = document.getElementById('bsmViewToggle');
+  if (tab === 'chart') {
+    if (tw) tw.style.display = 'none';
+    if (cw) cw.style.display = 'block';
+    if (gb) gb.style.display = 'none';
+    if (vt) vt.style.display = 'none';
+    renderBsmChart();
+  } else {
+    if (tw) tw.style.display = '';
+    if (cw) cw.style.display = 'none';
+    if (gb) gb.style.display = '';
+    if (vt) vt.style.display = 'flex';
+  }
+}
+
+function setBsmChartType(ctype) {
+  _bsmChartType = ctype;
+  document.querySelectorAll('.bsm-chart-type-btn').forEach(b => {
+    const isActive = b.dataset.ctype === ctype;
+    b.classList.toggle('active', isActive);
+    b.style.background = isActive ? 'var(--accent)' : 'var(--surface2)';
+    b.style.color = isActive ? '#fff' : 'var(--text2)';
+  });
+  renderBsmChart();
+}
+
+function _initBsmChartFilter(rows) {
+  const sel = document.getElementById('bsmChartFilter');
+  if (!sel) return;
+  // Build options: Total, per TL, per Agent
+  const tls    = [...new Set(rows.map(r=>r.teamLeader).filter(Boolean))].sort();
+  const agents = [...new Set(rows.map(r=>r.agent).filter(Boolean))].sort();
+  sel.innerHTML =
+    '<option value="total">📊 Total Bucket</option>' +
+    '<optgroup label="Per Team Leader">' +
+    tls.map(t=>`<option value="tl:${escH(t)}">👤 TL: ${escH(t)}</option>`).join('') +
+    '</optgroup>' +
+    '<optgroup label="Per Agent">' +
+    agents.map(a=>`<option value="agent:${escH(a)}">👤 ${escH(a)}</option>`).join('') +
+    '</optgroup>';
+}
+
+function renderBsmChart() {
+  const {bucket, spv} = _bsmState;
+  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+  if (!allRows.length) return;
+
+  const sel = document.getElementById('bsmChartFilter');
+  const filterVal = sel ? sel.value : 'total';
+
+  // Collect all dates sorted
+  const allDates = [...new Set(allRows.map(r=>r.tanggal).filter(Boolean))].sort();
+
+  // Build datasets based on filter
+  const PALETTE = ['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#6366f1'];
+  let datasets = [];
+
+  if (filterVal === 'total') {
+    // Sum all agent payments per date
+    const payByDate = {};
+    allDates.forEach(d => payByDate[d] = 0);
+    allRows.forEach(r => { if (r.tanggal && payByDate.hasOwnProperty(r.tanggal)) payByDate[r.tanggal] += (r.dailyPayment||0); });
+    datasets = [{
+      label: 'Total Bucket',
+      data: allDates.map(d => payByDate[d]),
+      borderColor: PALETTE[0],
+      backgroundColor: _bsmChartType === 'bar' ? PALETTE[0]+'cc' : PALETTE[0]+'22',
+      borderWidth: 2, fill: _bsmChartType === 'line',
+      tension: .3, pointRadius: 4, borderRadius: 3,
+    }];
+  } else if (filterVal.startsWith('tl:')) {
+    const tlName = filterVal.slice(3);
+    const tlRows = allRows.filter(r=>r.teamLeader===tlName);
+    // Show total TL + per agent
+    const agentsInTL = [...new Set(tlRows.map(r=>r.agent).filter(Boolean))];
+    // Total TL
+    const tlPayByDate = {};
+    allDates.forEach(d => tlPayByDate[d] = 0);
+    tlRows.forEach(r => { if (r.tanggal) tlPayByDate[r.tanggal] = (tlPayByDate[r.tanggal]||0) + (r.dailyPayment||0); });
+    datasets.push({
+      label: `Total ${tlName}`,
+      data: allDates.map(d => tlPayByDate[d]||0),
+      borderColor: PALETTE[0], backgroundColor: PALETTE[0]+'22',
+      borderWidth: 3, fill: false, tension: .3, pointRadius: 4, borderDash: [],
+    });
+    // Per agent lines
+    agentsInTL.forEach((ag, i) => {
+      const agRows = tlRows.filter(r=>r.agent===ag);
+      const agPayByDate = {};
+      allDates.forEach(d => agPayByDate[d] = 0);
+      agRows.forEach(r => { if (r.tanggal) agPayByDate[r.tanggal] = (r.dailyPayment||0); });
+      datasets.push({
+        label: ag,
+        data: allDates.map(d => agPayByDate[d]||0),
+        borderColor: PALETTE[(i+1)%PALETTE.length],
+        backgroundColor: PALETTE[(i+1)%PALETTE.length]+'22',
+        borderWidth: 1.5, fill: false, tension: .3, pointRadius: 3,
+        borderDash: [4,3],
+      });
+    });
+  } else if (filterVal.startsWith('agent:')) {
+    const agName = filterVal.slice(6);
+    const agRows = allRows.filter(r=>r.agent===agName);
+    const agPayByDate = {};
+    allDates.forEach(d => agPayByDate[d] = 0);
+    agRows.forEach(r => { if (r.tanggal) agPayByDate[r.tanggal] = (r.dailyPayment||0); });
+    datasets = [{
+      label: agName,
+      data: allDates.map(d => agPayByDate[d]||0),
+      borderColor: PALETTE[2], backgroundColor: PALETTE[2]+'22',
+      borderWidth: 2, fill: _bsmChartType === 'line',
+      tension: .3, pointRadius: 4, borderRadius: 3,
+    }];
+  }
+
+  // Destroy old chart
+  if (_bsmPayChart) { _bsmPayChart.destroy(); _bsmPayChart = null; }
+
+  const ctx = document.getElementById('bsmPayChart');
+  if (!ctx) return;
+  _bsmPayChart = new Chart(ctx.getContext('2d'), {
+    type: _bsmChartType,
+    data: {
+      labels: allDates.map(d => { const dt=new Date(d); const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab']; return `${dt.getDate()} (${dn[dt.getDay()]})`; }),
+      datasets,
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: datasets.length > 1, position: 'bottom',
+          labels: { font:{size:10}, boxWidth:12, padding:8 }},
+        tooltip: { callbacks: {
+          label: ctx => ` ${ctx.dataset.label}: Rp ${Math.round(ctx.parsed.y).toLocaleString('id-ID')}`
+        }}
+      },
+      scales: {
+        x: { ticks:{font:{size:10}}, grid:{display:false} },
+        y: { beginAtZero:true, ticks:{
+          font:{size:10},
+          callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'jt' : v >= 1e3 ? (v/1e3).toFixed(0)+'rb' : v
+        }}
+      }
+    }
+  });
 }
 
 function setBsmMode(mode) {
@@ -1494,6 +1764,8 @@ function closeBucketSummary() {
   overlay.classList.remove('fullscreen-mode');
   const btn = document.getElementById('bsmFsBtn');
   if (btn) { btn.textContent='⛶'; btn.title='Fullscreen'; }
+  const nav = document.getElementById('bsmBucketNav');
+  if (nav) { nav.innerHTML=''; nav.style.display='none'; }
   overlay.classList.remove('open');
 }
 
