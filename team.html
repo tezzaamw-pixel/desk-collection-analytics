@@ -750,18 +750,6 @@ select:focus{border-color:var(--accent);}
           <button class="bsm-view-btn active" data-view="total" onclick="setBsmView('total')">Jumlah</button>
           <button class="bsm-view-btn" data-view="avg" onclick="setBsmView('avg')">Rata-rata/hari</button>
         </div>
-      </div>
-    <div class="bsm-body">
-      <div class="bsm-toolbar">
-        <span class="bsm-toolbar-label">📅 Tanggal:</span>
-        <select class="bsm-date-select" id="bsmDateSelect" onchange="setBsmDate(this.value)">
-          <option value="">Semua Tanggal</option>
-        </select>
-        <button class="bsm-view-btn" id="bsmGroupBtn" onclick="toggleBsmGroup()" style="margin-left:8px;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s">👥 Group</button>
-        <div class="bsm-view-toggle" id="bsmViewToggle">
-          <button class="bsm-view-btn active" data-view="total" onclick="setBsmView('total')">Jumlah</button>
-          <button class="bsm-view-btn" data-view="avg" onclick="setBsmView('avg')">Rata-rata/hari</button>
-        </div>
         <div style="margin-left:auto;display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
           <button class="bsm-tab-btn active" data-tab="table" onclick="setBsmTab('table')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">📋 Tabel</button>
           <button class="bsm-tab-btn" data-tab="chart" onclick="setBsmTab('chart')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📈 Chart</button>
@@ -1408,13 +1396,14 @@ function renderBsmChart() {
     }];
   }
 
-  // Destroy old chart
   if (_bsmPayChart) { _bsmPayChart.destroy(); _bsmPayChart = null; }
 
+  const DL = window.ChartDataLabels;
   const ctx = document.getElementById('bsmPayChart');
   if (!ctx) return;
   _bsmPayChart = new Chart(ctx.getContext('2d'), {
     type: _bsmChartType,
+    plugins: DL ? [DL] : [],
     data: {
       labels: allDates.map(d => { const dt=new Date(d); const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab']; return `${dt.getDate()} (${dn[dt.getDay()]})`; }),
       datasets,
@@ -1426,7 +1415,21 @@ function renderBsmChart() {
           labels: { font:{size:10}, boxWidth:12, padding:8 }},
         tooltip: { callbacks: {
           label: ctx => ` ${ctx.dataset.label}: Rp ${Math.round(ctx.parsed.y).toLocaleString('id-ID')}`
-        }}
+        }},
+        ...(DL ? { datalabels: {
+          display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+          color: _bsmChartType === 'bar' ? '#fff' : '#1d60c8',
+          backgroundColor: null,
+          borderRadius: 3,
+          padding: 2,
+          font: { size: 9, weight: 'bold' },
+          anchor: _bsmChartType === 'bar' ? 'center' : 'end',
+          align: _bsmChartType === 'bar' ? 'center' : 'top',
+          offset: _bsmChartType === 'line' ? 4 : 0,
+          formatter: v => v >= 1e6 ? (v/1e6).toFixed(1)+'jt'
+            : v >= 1e3 ? (v/1e3).toFixed(0)+'rb' : Math.round(v),
+          clamp: true,
+        }} : {}),
       },
       scales: {
         x: { ticks:{font:{size:10}}, grid:{display:false} },
