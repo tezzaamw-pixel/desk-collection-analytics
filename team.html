@@ -1196,7 +1196,7 @@ async function openCmpBulan(spv, safeSpvId) {
   // Fetch prev month data
   try {
     if (!_cmpPrevData || _cmpPrevData._bulan !== bulanPrev || _cmpPrevData._tahun !== thnPrev) {
-      const url = GAS_URL + `?action=agentdata&bulan=${encodeURIComponent(bulanPrev)}&tahun=${encodeURIComponent(thnPrev)}`;
+      const url = API_URL + `?action=agentdata&bulan=${encodeURIComponent(bulanPrev)}&tahun=${encodeURIComponent(thnPrev)}`;
       const res = await fetch(url);
       const d = await res.json();
       _cmpPrevData = {rows: d.data||[], _bulan: bulanPrev, _tahun: thnPrev};
