@@ -2191,9 +2191,118 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
   return{score,issues,saranList,s,hadirCount,hadirRatio,offCount,izinCount,sakitCount,alphaCount,totalHari,catatanCount,catatanRows,hadirTapiNolPayment,waBlokRatio,callConnRatio,ptpBayarRatio,peerAvg,peerAgents};
 }
 
-/* ============================================================
-   BUCKET SUMMARY — analisa level bucket (tampil saat bucket dipilih)
-   ============================================================ */
+// ── Gemini AI Integration ─────────────────────────────────────
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
+
+function getGeminiKey() {
+  return localStorage.getItem('tz_gemini_key')||'';
+}
+function setGeminiKey(key) {
+  localStorage.setItem('tz_gemini_key', key.trim());
+}
+
+// Cache insights data per bucket (populated by buildBucketSummaryHtml)
+const _bucketInsightsCache = {};
+
+async function generateBucketAI(safeSpvId) {
+  const btn = document.getElementById('bks-ai-btn-'+safeSpvId);
+  const result = document.getElementById('bks-ai-result-'+safeSpvId);
+  if (!btn || !result) return;
+
+  const apiKey = getGeminiKey();
+  if (!apiKey) {
+    result.style.display = 'block';
+    result.innerHTML = `<div style="padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);margin-top:4px">
+      <div style="font-size:11px;font-weight:600;color:var(--text);margin-bottom:8px">🔑 Masukkan Gemini API Key</div>
+      <div style="display:flex;gap:8px">
+        <input id="gemini-key-input-${safeSpvId}" type="password" placeholder="Paste API key di sini..."
+          style="flex:1;padding:7px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none">
+        <button onclick="saveGeminiKeyAndGenerate('${safeSpvId}')"
+          style="padding:7px 14px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;white-space:nowrap">
+          Simpan & Generate
+        </button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:5px">Key tersimpan di browser — tidak dikirim ke server manapun selain Google</div>
+    </div>`;
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = '⏳ Generating...';
+  result.style.display = 'block';
+  result.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--text3);background:var(--surface2);border-radius:var(--radius-sm);margin-top:4px;display:flex;align-items:center;gap:8px">
+    <div class="spinner" style="width:14px;height:14px;border-width:2px"></div> Sedang menganalisa data bucket...
+  </div>`;
+
+  const cache = _bucketInsightsCache[safeSpvId];
+  if (!cache) { btn.disabled=false; btn.textContent='✨ Generate'; return; }
+
+  try {
+    const prompt = `Kamu adalah analis kinerja tim collection (penagihan hutang) yang berpengalaman. 
+Berdasarkan data berikut, tulis analisis dalam 2 paragraf bahasa Indonesia yang natural, spesifik, dan actionable.
+
+Bucket: ${cache.bucket}
+Bulan: ${cache.bulan} ${cache.tahun}
+Total Agent: ${cache.totalAgent}
+Total Payment: ${cache.totalPayment}
+Avg Rate: ${cache.avgRate}
+
+Temuan otomatis sistem:
+${cache.insights.map((ins,i)=>`${i+1}. [${ins.level}] ${ins.text.replace(/<[^>]+>/g,'')}`).join('\n')}
+
+Instruksi:
+- Paragraf 1: Kesimpulan kondisi bucket — sebutkan nama agent/TL spesifik yang bermasalah dan yang berprestasi, sertakan angka nyata
+- Paragraf 2: Rekomendasi tindakan konkret yang harus dilakukan SPV/TL dalam 3-5 hari ke depan
+- Gunakan bahasa profesional tapi mudah dipahami
+- Tidak perlu header atau bullet — tulis paragraf mengalir
+- Maksimal 150 kata total`;
+
+    const resp = await fetch(GEMINI_URL + apiKey, {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        contents:[{parts:[{text:prompt}]}],
+        generationConfig:{temperature:0.7, maxOutputTokens:300}
+      })
+    });
+
+    if (!resp.ok) {
+      if (resp.status===400||resp.status===403) {
+        // API key salah — hapus dari localStorage
+        localStorage.removeItem('tz_gemini_key');
+        throw new Error('API key tidak valid. Key dihapus, silakan masukkan ulang.');
+      }
+      throw new Error('API error: '+resp.status);
+    }
+    const data = await resp.json();
+    const text = data.candidates?.[0]?.content?.parts?.[0]?.text||'Tidak ada hasil.';
+
+    result.innerHTML = `
+      <div style="background:var(--surface);border:1px solid var(--accent);border-left:3px solid var(--accent);border-radius:var(--radius-sm);padding:12px 14px;margin-top:4px">
+        <div style="font-size:10px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between">
+          <span>✨ Analisis AI</span>
+          <button onclick="localStorage.removeItem('tz_gemini_key')" style="font-size:9px;background:none;border:none;color:var(--text3);cursor:pointer;padding:0">🔑 Ganti Key</button>
+        </div>
+        <div style="font-size:12px;color:var(--text);line-height:1.75;white-space:pre-line">${escH(text)}</div>
+      </div>`;
+    btn.textContent = '🔄 Regenerate';
+  } catch(e) {
+    result.innerHTML = `<div style="padding:10px 12px;font-size:12px;color:var(--danger);background:var(--surface);border:1px solid var(--danger);border-radius:var(--radius-sm);margin-top:4px">
+      ⚠️ ${escH(e.message)}
+    </div>`;
+    btn.textContent = '✨ Coba lagi';
+  }
+  btn.disabled = false;
+}
+
+function saveGeminiKeyAndGenerate(safeSpvId) {
+  const inp = document.getElementById('gemini-key-input-'+safeSpvId);
+  if (!inp||!inp.value.trim()) return;
+  setGeminiKey(inp.value.trim());
+  generateBucketAI(safeSpvId);
+}
+
+// ── Bucket Summary HTML ───────────────────────────────────────
 function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
   if(!bucketRows||!bucketRows.length)return'';
   const s=summarizeRows(bucketRows);
@@ -2355,6 +2464,18 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
 
   if(!insights.length)insights.push({dot:'dot-green',text:'Tidak ada temuan kritis di level bucket — performa relatif merata.'});
 
+  // Simpan ke cache untuk Gemini AI
+  const bulan = document.getElementById('selBulan')?.value||'';
+  const tahun = document.getElementById('selTahun')?.value||'';
+  _bucketInsightsCache[safeSpvId] = {
+    bucket: bucketRows[0]?.bucket||'',
+    bulan, tahun,
+    totalAgent: n,
+    totalPayment: fmtRpFull(s.dailyPayment),
+    avgRate: fmtRate(s.avgRate),
+    insights: insights.map(i=>({text:i.text, level:i.dot==='dot-red'?'KRITIS':i.dot==='dot-warn'?'PERINGATAN':'INFO'})),
+  };
+
   // Top 3 & bottom 3 agent
   const top3=ranked.slice(0,3);
   const bot3=ranked.slice(-3).filter(a=>!top3.includes(a));
@@ -2391,49 +2512,16 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
       <div class="insight-box-title">📋 Temuan — ${insights.filter(i=>i.dot==='dot-red').length} kritis · ${insights.filter(i=>i.dot==='dot-warn').length} peringatan · ${insights.filter(i=>i.dot==='dot-blue').length} info</div>
       ${insights.map(ins=>`<div class="insight-item"><div class="insight-dot ${ins.dot}"></div><span>${ins.text}</span></div>`).join('')}
     </div>
-    ${(()=>{
-      // ── Kesimpulan otomatis ──
-      const kritisCount=insights.filter(i=>i.dot==='dot-red').length;
-      const warnCount=insights.filter(i=>i.dot==='dot-warn').length;
-      let kesimpulan='', kesimpulanCls='';
-      if(kritisCount>=3){
-        kesimpulan=`Bucket ini memiliki <b>${kritisCount} masalah kritis</b> yang perlu penanganan segera. Performa tim secara keseluruhan di bawah standar — eskalasi ke manajemen disarankan.`;
-        kesimpulanCls='danger';
-      } else if(kritisCount>=1||warnCount>=3){
-        kesimpulan=`Terdapat <b>${kritisCount} masalah kritis</b> dan <b>${warnCount} peringatan</b>. Perlu monitoring lebih ketat dan intervensi pada agent/TL yang teridentifikasi.`;
-        kesimpulanCls='warn';
-      } else if(warnCount>=1){
-        kesimpulan=`Bucket relatif stabil dengan <b>${warnCount} hal yang perlu diperhatikan</b>. Lakukan coaching preventif sebelum berkembang menjadi masalah kritis.`;
-        kesimpulanCls='info';
-      } else {
-        kesimpulan=`Bucket dalam kondisi baik. Tidak ada temuan kritis — pertahankan performa dan jadikan benchmark tim lain.`;
-        kesimpulanCls='good';
-      }
-      // ── Rekomendasi ──
-      const rekList=[];
-      const iTypes=insights.map(i=>i.text||'');
-      if(insights.some(i=>i.dot==='dot-red'&&i.text.includes('zonk')))rekList.push('Lakukan coaching 1-on-1 untuk agent yang hadir berturut-turut tanpa payment — cek kendala spesifik akun yang dipegang');
-      if(insights.some(i=>i.text.includes('mayoritas agent Rp 0')))rekList.push('Review strategi tim secara menyeluruh — kemungkinan ada kendala sistemik seperti data akun kedaluwarsa atau metode penagihan yang tidak efektif');
-      if(insights.some(i=>i.text.includes('pindah')||i.text.includes('pindah project')))rekList.push('Beri orientasi khusus untuk agent yang baru pindah — kenalkan karakteristik bucket dan target minimal');
-      if(insights.some(i=>i.text.includes('baru') && i.text.includes('histori')))rekList.push('Pasangkan agent baru dengan agent senior sebagai mentor selama 1–2 minggu pertama');
-      if(insights.some(i=>i.text.includes('turun drastis')))rekList.push('Evaluasi penyebab penurunan payment mingguan — apakah karena kualitas akun, hari libur, atau perubahan strategi');
-      if(insights.some(i=>i.text.includes('terbawah')))rekList.push('Jadwalkan evaluasi kinerja TL terbawah — bandingkan strategi dengan TL terbaik dan buat rencana perbaikan terukur');
-      if(insights.some(i=>i.dot==='dot-red'&&i.text.includes('hadir tapi payment Rp 0')))rekList.push('Identifikasi agent hadir tapi tidak produktif — pastikan akun yang dipegang masih aktif dan belum kadaluwarsa');
-      if(insights.some(i=>i.text.includes('rate') && i.text.includes('rendah')))rekList.push('Evaluasi kualitas portofolio akun di bucket ini — pertimbangkan rotasi akun atau pengayaan data');
-      if(rekList.length===0)rekList.push('Pertahankan performa saat ini. Lakukan review mingguan rutin untuk memastikan konsistensi.');
-      const borderColor=kesimpulanCls==='danger'?'var(--danger)':kesimpulanCls==='warn'?'var(--warning)':kesimpulanCls==='good'?'var(--success)':'var(--accent)';
-      return `
-    <div style="background:var(--surface);border:1px solid ${borderColor};border-radius:var(--radius-sm);padding:10px 12px;margin-top:8px;border-left:3px solid ${borderColor}">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:5px">📊 Kesimpulan</div>
-      <div style="font-size:12px;color:var(--text);line-height:1.6">${kesimpulan}</div>
+    <div id="bks-ai-${safeSpvId}" style="margin-top:8px">
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;gap:10px">
+        <div style="font-size:11px;color:var(--text3)">✨ Kesimpulan & Rekomendasi AI</div>
+        <button onclick="generateBucketAI('${safeSpvId}')" id="bks-ai-btn-${safeSpvId}"
+          style="margin-left:auto;padding:4px 12px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">
+          ✨ Generate
+        </button>
+      </div>
+      <div id="bks-ai-result-${safeSpvId}" style="display:none"></div>
     </div>
-    <div class="saran-box" style="margin-top:8px">
-      <div class="saran-box-title">✅ Rekomendasi Tindakan</div>
-      <ul class="saran-list">
-        ${rekList.map(r=>`<li><span>${r}</span></li>`).join('')}
-      </ul>
-    </div>`;
-    })()}
     <div class="divider-label">Top Agent</div>
     ${topRows}
     ${botRows?`<div class="divider-label" style="margin-top:8px">Perlu Perhatian</div>${botRows}`:''}
