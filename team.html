@@ -124,6 +124,13 @@ select:focus{border-color:var(--accent);}
 .cmpb-same{color:var(--text3);}
 .cmpb-section-head{background:var(--surface2)!important;}
 .cmpb-section-head td{font-weight:700!important;color:var(--accent)!important;font-size:11px;}
+.cmpb-legend{display:flex;align-items:center;gap:16px;padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;font-size:11px;font-weight:600;color:var(--text2);}
+.cmpb-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
+.cmpb-legend .dot-curr{background:var(--text);}
+.cmpb-legend .dot-prev{background:var(--text3);}
+.cmpb-cell-curr{color:var(--text);font-weight:700;}
+.cmpb-cell-prev{color:var(--text3);font-weight:500;font-size:10.5px;}
+.cmpb-cell-prev b{color:var(--text3);font-weight:600;}
 .btn-add-setup:hover{border-color:var(--accent);color:var(--accent);}
 
 /* FIXED METRIC BOXES */
@@ -792,6 +799,7 @@ select:focus{border-color:var(--accent);}
       <button class="cmpb-close" onclick="closeCmpBulan()">✕</button>
     </div>
     <div class="cmpb-tabs" id="cmpbTabs"></div>
+    <div class="cmpb-legend" id="cmpbLegend"></div>
     <div class="cmpb-body" id="cmpbBody"><div class="cmpb-loading">⏳ Memuat data...</div></div>
   </div>
 </div>
@@ -1169,6 +1177,7 @@ async function loadData(){
 // ── Perbandingan Bulan vs Bulan Lalu ─────────────────────────
 let _cmpBulanState = {spv:'', tab:'spv'};
 let _cmpPrevData   = null; // cache full prev month data
+const BULAN_ABBR = {Januari:'Jan',Februari:'Feb',Maret:'Mar',April:'Apr',Mei:'Mei',Juni:'Jun',Juli:'Jul',Agustus:'Ags',September:'Sep',Oktober:'Okt',November:'Nov',Desember:'Des'};
 
 async function openCmpBulan(spv, safeSpvId) {
   _cmpBulanState = {spv, tab:'spv'};
@@ -1192,6 +1201,10 @@ async function openCmpBulan(spv, safeSpvId) {
 
   document.getElementById('cmpbTitle').textContent = `📅 ${bulan} ${tahun} vs ${bulanPrev} ${thnPrev}`;
   document.getElementById('cmpbSubtitle').textContent = `Apple-to-apple: data sampai tanggal ${maxDay}`;
+  document.getElementById('cmpbLegend').innerHTML =
+    `<span><span class="dot dot-curr"></span>${escH(bulan)} ${escH(tahun)} <span style="font-weight:400;color:var(--text3)">(bulan ini)</span></span>` +
+    `<span><span class="dot dot-prev"></span>${escH(bulanPrev)} ${escH(thnPrev)} <span style="font-weight:400;color:var(--text3)">(bulan lalu)</span></span>` +
+    `<span style="margin-left:auto;font-weight:400;color:var(--text3)">Data dibandingkan s/d tanggal ${maxDay}</span>`;
 
   // Fetch prev month data
   try {
@@ -1199,7 +1212,8 @@ async function openCmpBulan(spv, safeSpvId) {
       const url = API_URL + `?action=agentdata&bulan=${encodeURIComponent(bulanPrev)}&tahun=${encodeURIComponent(thnPrev)}`;
       const res = await fetch(url);
       const d = await res.json();
-      _cmpPrevData = {rows: d.data||[], _bulan: bulanPrev, _tahun: thnPrev};
+      // NB: endpoint agentdata mengembalikan field "rows", bukan "data" — jangan diubah balik ke d.data
+      _cmpPrevData = {rows: d.rows||[], _bulan: bulanPrev, _tahun: thnPrev};
     }
   } catch(e) {
     document.getElementById('cmpbBody').innerHTML = `<div class="cmpb-loading">⚠️ Gagal load data bulan lalu: ${e.message}</div>`;
@@ -1284,11 +1298,14 @@ function renderCmpBulanTab(tab) {
     return `<span class="${cls}">${arrow} ${Math.abs(pct).toFixed(1)}%</span>`;
   }
 
+  const abbrCurr = BULAN_ABBR[bulan] || bulan;
+  const abbrPrev = BULAN_ABBR[bulanPrev] || bulanPrev;
+
   function buildTable(groups) {
     // groups = [{label, currRows, prevRows, isSection?}]
     const header = `<tr>
       <th>Nama</th>
-      ${METRICS.map(m=>`<th>${m.label}</th>`).join('')}
+      ${METRICS.map(m=>`<th>${m.label} <span style="font-weight:400;opacity:.7;font-size:9px">(${escH(abbrCurr)}/${escH(abbrPrev)})</span></th>`).join('')}
     </tr>`;
     const body = groups.map(g => {
       if (g.isSection) return `<tr class="cmpb-section-head"><td colspan="${METRICS.length+1}">${g.label}</td></tr>`;
@@ -1299,14 +1316,15 @@ function renderCmpBulanTab(tab) {
         ${METRICS.map(m => {
           const cv = m.key==='avgRate'?(cs.avgRate||0):(cs[m.key]||0);
           const pv = m.key==='avgRate'?(ps.avgRate||0):(ps[m.key]||0);
-          return `<td>${fmtVal(cv,m.fmt)}<br><small style="color:var(--text3)">${fmtVal(pv,m.fmt)}</small> ${diffHtml(cv,pv,m.fmt)}</td>`;
+          return `<td>
+            <div class="cmpb-cell-curr">${fmtVal(cv,m.fmt)} <span style="font-weight:400;color:var(--text3);font-size:9px">${escH(abbrCurr)}</span></div>
+            <div class="cmpb-cell-prev">${fmtVal(pv,m.fmt)} ${escH(abbrPrev)}</div>
+            ${diffHtml(cv,pv,m.fmt)}
+          </td>`;
         }).join('')}
       </tr>`;
     }).join('');
-    return `<table class="cmpb-table"><thead>${header}</thead><tbody>${body}</tbody></table>
-      <div style="font-size:10px;color:var(--text3);margin-top:8px">
-        Baris atas = ${bulan} ${tahun} (s/d tgl ${maxDay}) · Baris bawah kecil = ${bulanPrev} ${thnPrev} (s/d tgl ${maxDay})
-      </div>`;
+    return `<table class="cmpb-table"><thead>${header}</thead><tbody>${body}</tbody></table>`;
   }
 
   let groups = [];
