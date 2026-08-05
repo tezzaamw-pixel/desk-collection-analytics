@@ -2192,7 +2192,7 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
 }
 
 // ── Gemini AI Integration ─────────────────────────────────────
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=';
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=';
 
 function getGeminiKey() {
   return localStorage.getItem('tz_gemini_key')||'';
