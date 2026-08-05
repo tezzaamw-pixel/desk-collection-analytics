@@ -106,12 +106,21 @@ select:focus{border-color:var(--accent);}
 #cmpBulanModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:center;justify-content:center;padding:20px;}
 #cmpBulanModal.open{display:flex;}
 .cmpb-box{background:var(--surface);border-radius:var(--radius);width:95vw;max-width:960px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;}
+.cmpb-box.fullscreen{width:100vw!important;max-width:100vw!important;max-height:100vh!important;height:100vh;border-radius:0;margin:0;}
+#cmpBulanModal.fullscreen-mode{padding:0;align-items:stretch;}
+.cmpb-fs-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:16px;cursor:pointer;color:var(--text2);padding:3px 8px;transition:all .15s;}
+.cmpb-fs-btn:hover{border-color:var(--accent);color:var(--accent);}
 .cmpb-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;}
 .cmpb-title{font-size:14px;font-weight:700;color:var(--text);flex:1;}
 .cmpb-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);}
-.cmpb-tabs{display:flex;gap:6px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;overflow-x:auto;}
+.cmpb-tabs-row{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;}
+.cmpb-tabs{display:flex;gap:6px;flex:1;overflow-x:auto;}
 .cmpb-tab{padding:5px 14px;font-size:11px;font-weight:600;border-radius:20px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);white-space:nowrap;transition:all .15s;}
 .cmpb-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.cmpb-view-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;flex-shrink:0;}
+.cmpb-view-btn{padding:5px 12px;font-size:11px;font-weight:600;background:var(--surface);color:var(--text2);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.cmpb-view-btn.active{background:var(--accent);color:#fff;}
+.cmpb-view-btn:not(.active):hover{background:var(--surface);opacity:.8;}
 .cmpb-body{flex:1;overflow:auto;padding:16px;}
 .cmpb-table{width:100%;border-collapse:collapse;font-size:12px;}
 .cmpb-table th{padding:8px 12px;text-align:left;background:var(--navy);color:#fff;font-weight:600;position:sticky;top:0;z-index:2;}
@@ -128,6 +137,8 @@ select:focus{border-color:var(--accent);}
 .cmpb-legend .dot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;vertical-align:middle;}
 .cmpb-legend .dot-curr{background:var(--text);}
 .cmpb-legend .dot-prev{background:var(--text3);}
+.cmpb-hint{padding:6px 16px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;font-size:10.5px;color:var(--text3);}
+.cmpb-hint .agent-new-badge,.cmpb-hint .agent-move-badge{cursor:default;}
 .cmpb-cell-curr{color:var(--text);font-weight:700;}
 .cmpb-cell-prev{color:var(--text3);font-weight:500;font-size:10.5px;}
 .cmpb-cell-prev b{color:var(--text3);font-weight:600;}
@@ -796,10 +807,18 @@ select:focus{border-color:var(--accent);}
     <div class="cmpb-head">
       <div class="cmpb-title" id="cmpbTitle">📅 Perbandingan Bulan Ini vs Bulan Lalu</div>
       <div style="font-size:10px;color:var(--text3)" id="cmpbSubtitle"></div>
+      <button class="cmpb-fs-btn" id="cmpbFsBtn" onclick="toggleCmpbFullscreen()" title="Fullscreen">⛶</button>
       <button class="cmpb-close" onclick="closeCmpBulan()">✕</button>
     </div>
-    <div class="cmpb-tabs" id="cmpbTabs"></div>
+    <div class="cmpb-tabs-row">
+      <div class="cmpb-tabs" id="cmpbTabs"></div>
+      <div class="cmpb-view-toggle" id="cmpbViewToggle">
+        <button class="cmpb-view-btn active" data-view="total" onclick="setCmpbView('total')" title="Total akumulasi s/d tanggal cutoff">Jumlah</button>
+        <button class="cmpb-view-btn" data-view="avg" onclick="setCmpbView('avg')" title="Dibagi jumlah hari yang ada datanya (per grup). Rate & Alat WA tetap ditampilkan sebagai total.">Rata-rata/hari</button>
+      </div>
+    </div>
     <div class="cmpb-legend" id="cmpbLegend"></div>
+    <div class="cmpb-hint" id="cmpbHint" style="display:none"></div>
     <div class="cmpb-body" id="cmpbBody"><div class="cmpb-loading">⏳ Memuat data...</div></div>
   </div>
 </div>
@@ -1177,10 +1196,19 @@ async function loadData(){
 // ── Perbandingan Bulan vs Bulan Lalu ─────────────────────────
 let _cmpBulanState = {spv:'', tab:'spv'};
 let _cmpPrevData   = null; // cache full prev month data
+let _cmpbView      = 'total'; // 'total' = Jumlah, 'avg' = Rata-rata/hari
 const BULAN_ABBR = {Januari:'Jan',Februari:'Feb',Maret:'Mar',April:'Apr',Mei:'Mei',Juni:'Jun',Juli:'Jul',Agustus:'Ags',September:'Sep',Oktober:'Okt',November:'Nov',Desember:'Des'};
+
+function setCmpbView(view) {
+  _cmpbView = view;
+  document.querySelectorAll('.cmpb-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === view));
+  renderCmpBulanTab(_cmpBulanState.tab);
+}
 
 async function openCmpBulan(spv, safeSpvId) {
   _cmpBulanState = {spv, tab:'spv'};
+  _cmpbView = 'total';
+  document.querySelectorAll('.cmpb-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === 'total'));
   document.getElementById('cmpBulanModal').classList.add('open');
   document.getElementById('cmpbBody').innerHTML = '<div class="cmpb-loading">⏳ Memuat data bulan lalu...</div>';
 
@@ -1263,13 +1291,55 @@ function setCmpBulanTab(tab) {
   renderCmpBulanTab(tab);
 }
 
+// Badge ✨/🔄 khusus modal vs Bulan Lalu — pakai _prevAgentMap yang sama dengan
+// badge di halaman utama (diisi oleh _fetchPrevMonthData saat loadData()).
+// Bedanya: di sini juga dicek pindah BUCKET (bukan cuma pindah aplikasi),
+// karena modal ini membandingkan per-bucket dalam 1 SPV/aplikasi yang sama.
+function _cmpMoveBadge(agentName, currentAplikasi, currentBucket) {
+  if (!agentName || !Object.keys(_prevAgentMap).length) return '';
+  const prev = _prevAgentMap[agentName];
+  if (!prev) {
+    return `<span class="agent-new-badge"
+      onmouseenter="showMoveTooltipRaw(event,'<b>✨ Agent Baru</b><br>Tidak ada histori bulan lalu di aplikasi manapun')"
+      onmouseleave="hideMoveTooltip()">✨</span>`;
+  }
+  const movedApp    = prev.aplikasi && currentAplikasi && prev.aplikasi !== currentAplikasi;
+  const movedBucket = !movedApp && prev.bucket && currentBucket && prev.bucket !== currentBucket;
+  if (!movedApp && !movedBucket) return '';
+  const detail = movedApp
+    ? `Bulan lalu: <b>${escH(prev.aplikasi)}</b>${prev.bucket?' · Bucket '+escH(prev.bucket):''}<br>Bulan ini: <b>${escH(currentAplikasi)}</b>${currentBucket?' · Bucket '+escH(currentBucket):''}`
+    : `Pindah bucket (aplikasi sama):<br>Bulan lalu: <b>Bucket ${escH(prev.bucket)}</b><br>Bulan ini: <b>Bucket ${escH(currentBucket)}</b>`;
+  const safeDetail = detail.replace(/'/g,"\\'").replace(/\n/g,'');
+  return `<span class="agent-move-badge"
+    onmouseenter="showMoveTooltipRaw(event,'${safeDetail}')"
+    onmouseleave="hideMoveTooltip()"
+    onclick="showMoveTooltipRaw(event,'${safeDetail}')">🔄</span>`;
+}
+
 function renderCmpBulanTab(tab) {
   const {currRows, prevRows, bulan, tahun, bulanPrev, thnPrev, maxDay} = _cmpBulanState;
   if (!currRows) return;
 
+  const hintEl = document.getElementById('cmpbHint');
+  if (hintEl) {
+    if (tab === 'agent' || tab === 'tl') {
+      hintEl.style.display = 'block';
+      const dataReady = Object.keys(_prevAgentMap).length > 0;
+      hintEl.innerHTML = dataReady
+        ? `<span class="agent-new-badge">✨</span> Agent baru (tidak ada histori bulan lalu) &nbsp;&nbsp;
+           <span class="agent-move-badge">🔄</span> Pindah aplikasi/bucket dari bulan lalu
+           — <b style="color:var(--text2)">bukan bug</b>: payment 0 di bulan lalu karena agent belum ada di bucket ini.`
+        : `⏳ Data histori agent bulan lalu masih dimuat di background, badge ✨/🔄 akan muncul begitu siap...`;
+    } else {
+      hintEl.style.display = 'none';
+    }
+  }
+
   const METRICS = [
     {key:'dailyPayment', label:'Payment', fmt:'rp'},
     {key:'avgRate',      label:'Rate',    fmt:'rate'},
+    {key:'totalData',    label:'Total Data', fmt:'num'},
+    {key:'dataBaru',     label:'Data Baru',  fmt:'num'},
     {key:'jmlDataBayar', label:'Data Bayar', fmt:'num'},
     {key:'sentuhWA',     label:'Sentuh WA',  fmt:'num'},
     {key:'responWA',     label:'Respon WA',  fmt:'num'},
@@ -1284,9 +1354,19 @@ function renderCmpBulanTab(tab) {
     return s;
   }
 
-  function fmtVal(val, fmt) {
+  // Jumlah hari unik yang punya data di kelompok ini (dipakai utk mode Rata-rata/hari)
+  function daysInGroup(rows) {
+    return Math.max(new Set(rows.map(r=>r.tanggal).filter(Boolean)).size, 1);
+  }
+
+  // Metrik yang TIDAK dibagi hari walau mode Rata-rata aktif:
+  // Rate sudah berupa persentase, jadi tidak masuk akal dibagi hari lagi.
+  const NO_AVG_CMP = new Set(['avgRate']);
+
+  function fmtVal(val, fmt, isAvgVal) {
     if (fmt==='rp')   return 'Rp '+Math.round(val).toLocaleString('id-ID');
     if (fmt==='rate') return (val*100).toFixed(2)+'%';
+    if (isAvgVal) return val%1===0 ? Math.round(val).toLocaleString('id-ID') : val.toFixed(1);
     return fmtNum(Math.round(val));
   }
 
@@ -1311,14 +1391,19 @@ function renderCmpBulanTab(tab) {
       if (g.isSection) return `<tr class="cmpb-section-head"><td colspan="${METRICS.length+1}">${g.label}</td></tr>`;
       const cs = sumRows(g.currRows);
       const ps = sumRows(g.prevRows);
+      const daysCurr = daysInGroup(g.currRows);
+      const daysPrev = daysInGroup(g.prevRows);
       return `<tr>
-        <td style="font-weight:600;color:var(--text)">${escH(g.label)}</td>
+        <td style="font-weight:600;color:var(--text)">${escH(g.label)}${g.badge||''}</td>
         ${METRICS.map(m => {
-          const cv = m.key==='avgRate'?(cs.avgRate||0):(cs[m.key]||0);
-          const pv = m.key==='avgRate'?(ps.avgRate||0):(ps[m.key]||0);
+          const rawCv = m.key==='avgRate'?(cs.avgRate||0):(cs[m.key]||0);
+          const rawPv = m.key==='avgRate'?(ps.avgRate||0):(ps[m.key]||0);
+          const applyAvg = _cmpbView==='avg' && !NO_AVG_CMP.has(m.key);
+          const cv = applyAvg ? rawCv/daysCurr : rawCv;
+          const pv = applyAvg ? rawPv/daysPrev : rawPv;
           return `<td>
-            <div class="cmpb-cell-curr">${fmtVal(cv,m.fmt)} <span style="font-weight:400;color:var(--text3);font-size:9px">${escH(abbrCurr)}</span></div>
-            <div class="cmpb-cell-prev">${fmtVal(pv,m.fmt)} ${escH(abbrPrev)}</div>
+            <div class="cmpb-cell-curr">${fmtVal(cv,m.fmt,applyAvg)} <span style="font-weight:400;color:var(--text3);font-size:9px">${escH(abbrCurr)}</span></div>
+            <div class="cmpb-cell-prev">${fmtVal(pv,m.fmt,applyAvg)} ${escH(abbrPrev)}</div>
             ${diffHtml(cv,pv,m.fmt)}
           </td>`;
         }).join('')}
@@ -1345,11 +1430,31 @@ function renderCmpBulanTab(tab) {
     bks.forEach(bk => {
       groups.push({isSection: true, label: `📦 ${bk}`});
       const tlsInBk = tls.filter(tl => currRows.some(r=>r.bucket===bk&&r.teamLeader===tl));
-      tlsInBk.forEach(tl => groups.push({
-        label: tl,
-        currRows: currRows.filter(r=>r.bucket===bk&&r.teamLeader===tl),
-        prevRows: prevRows.filter(r=>r.bucket===bk&&r.teamLeader===tl),
-      }));
+      tlsInBk.forEach(tl => {
+        const tlCurrRows = currRows.filter(r=>r.bucket===bk&&r.teamLeader===tl);
+        const tlPrevRows = prevRows.filter(r=>r.bucket===bk&&r.teamLeader===tl);
+        // Ringkasan badge: berapa agent baru/pindah di bawah TL ini (di bucket ini)
+        const agentsUnderTl = [...new Set(tlCurrRows.map(r=>r.agent).filter(Boolean))];
+        let nBaru = 0, nPindah = 0;
+        if (Object.keys(_prevAgentMap).length) {
+          agentsUnderTl.forEach(ag => {
+            const prev = _prevAgentMap[ag];
+            if (!prev) { nBaru++; return; }
+            const curApp = tlCurrRows.find(r=>r.agent===ag)?.aplikasi || '';
+            const movedApp    = prev.aplikasi && curApp && prev.aplikasi !== curApp;
+            const movedBucket = !movedApp && prev.bucket && prev.bucket !== bk;
+            if (movedApp || movedBucket) nPindah++;
+          });
+        }
+        let badge = '';
+        if (nBaru || nPindah) {
+          const parts = [];
+          if (nBaru)   parts.push(`✨ ${nBaru} baru`);
+          if (nPindah) parts.push(`🔄 ${nPindah} pindah`);
+          badge = ` <span style="margin-left:4px;font-size:9px;font-weight:700;color:var(--text3);white-space:nowrap">(${parts.join(', ')})</span>`;
+        }
+        groups.push({ label: tl, currRows: tlCurrRows, prevRows: tlPrevRows, badge });
+      });
     });
   } else if (tab === 'agent') {
     const ags = [...new Set([...currRows,...prevRows].map(r=>r.agent).filter(Boolean))].sort();
@@ -1357,11 +1462,17 @@ function renderCmpBulanTab(tab) {
     bks.forEach(bk => {
       groups.push({isSection: true, label: `📦 ${bk}`});
       const agsInBk = ags.filter(ag => currRows.some(r=>r.bucket===bk&&r.agent===ag));
-      agsInBk.forEach(ag => groups.push({
-        label: ag,
-        currRows: currRows.filter(r=>r.bucket===bk&&r.agent===ag),
-        prevRows: prevRows.filter(r=>r.bucket===bk&&r.agent===ag),
-      }));
+      agsInBk.forEach(ag => {
+        const agCurrRows = currRows.filter(r=>r.bucket===bk&&r.agent===ag);
+        const agPrevRows  = prevRows.filter(r=>r.bucket===bk&&r.agent===ag);
+        const curApp = agCurrRows[0]?.aplikasi || '';
+        groups.push({
+          label: ag,
+          currRows: agCurrRows,
+          prevRows: agPrevRows,
+          badge: _cmpMoveBadge(ag, curApp, bk),
+        });
+      });
     });
   }
 
@@ -1369,7 +1480,23 @@ function renderCmpBulanTab(tab) {
 }
 
 function closeCmpBulan() {
-  document.getElementById('cmpBulanModal').classList.remove('open');
+  const overlay = document.getElementById('cmpBulanModal');
+  const box     = overlay.querySelector('.cmpb-box');
+  const btn     = document.getElementById('cmpbFsBtn');
+  box.classList.remove('fullscreen');
+  overlay.classList.remove('fullscreen-mode');
+  if (btn) { btn.textContent = '⛶'; btn.title = 'Fullscreen'; }
+  overlay.classList.remove('open');
+}
+
+function toggleCmpbFullscreen() {
+  const overlay = document.getElementById('cmpBulanModal');
+  const box     = overlay.querySelector('.cmpb-box');
+  const btn     = document.getElementById('cmpbFsBtn');
+  const isFs    = box.classList.toggle('fullscreen');
+  overlay.classList.toggle('fullscreen-mode', isFs);
+  btn.textContent = isFs ? '⊠' : '⛶';
+  btn.title = isFs ? 'Keluar Fullscreen' : 'Fullscreen';
 }
 
 // ── Bucket Target Payment ─────────────────────────────────────
