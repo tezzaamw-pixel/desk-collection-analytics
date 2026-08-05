@@ -3599,7 +3599,9 @@ document.addEventListener('click', e => {
     document.querySelectorAll('.cmp-ms-trigger.open').forEach(el=>el.classList.remove('open'));
   }
 });
-document.addEventListener('scroll', () => {
+document.addEventListener('scroll', (e) => {
+  // Jangan tutup kalau scroll terjadi di dalam dropdown itu sendiri
+  if (e.target && e.target.closest && e.target.closest('.cmp-ms-dropdown')) return;
   document.querySelectorAll('.cmp-ms-dropdown.open').forEach(el=>el.classList.remove('open'));
   document.querySelectorAll('.cmp-ms-trigger.open').forEach(el=>el.classList.remove('open'));
 }, true);
