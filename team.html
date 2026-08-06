@@ -442,6 +442,16 @@ select:focus{border-color:var(--accent);}
 .insight-item:last-child{margin-bottom:0;}
 .insight-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;margin-top:3px;}
 .dot-green{background:var(--success);} .dot-warn{background:var(--warning);} .dot-red{background:var(--danger);} .dot-blue{background:var(--accent);}
+.insight-item.insight-expandable{flex-wrap:wrap;cursor:pointer;}
+.insight-item.insight-expandable:hover{background:var(--surface2);border-radius:var(--radius-sm);margin-left:-4px;margin-right:-4px;padding-left:4px;padding-right:4px;}
+.insight-toggle-arrow{color:var(--accent);font-size:10px;font-weight:600;margin-left:2px;white-space:nowrap;}
+.insight-detail{flex-basis:100%;margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);color:var(--text3);font-size:10.5px;line-height:1.5;}
+.insight-box-toprow{display:flex;align-items:center;margin-bottom:8px;}
+.insight-toggle-tabs{display:flex;gap:4px;background:var(--surface2);border-radius:var(--radius-sm);padding:3px;}
+.insight-toggle-tab{border:none;background:transparent;color:var(--text3);font-size:11px;font-weight:600;padding:4px 10px;border-radius:6px;cursor:pointer;transition:background .12s,color .12s;}
+.insight-toggle-tab.active{background:var(--accent);color:#fff;}
+.insight-toggle-tab:not(.active):hover{background:var(--border);}
+.insight-view .insight-box-title{margin-bottom:8px;}
 .divider-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.07em;text-transform:uppercase;margin:10px 0 6px;display:flex;align-items:center;gap:6px;}
 .divider-label::after{content:'';flex:1;height:1px;background:var(--border);}
 .analysis-empty{color:var(--text3);font-size:12px;text-align:center;padding:30px 0;}
@@ -1772,13 +1782,18 @@ function _fmtRankDateLabel(t) {
 
 function _fmtRankVal(v, fmt, short) {
   if (v===null||v===undefined||isNaN(v)) return '—';
+  if (v === 0) v = 0; // normalisasi -0 (mis. dari Math.round(-0.2)) supaya tidak nongol sebagai "-0"
   if (fmt==='rp') {
     if (short) return v>=1e9?(v/1e9).toFixed(1)+'M':v>=1e6?(v/1e6).toFixed(1)+'jt':v>=1e3?(v/1e3).toFixed(0)+'rb':Math.round(v);
     return 'Rp '+Math.round(v).toLocaleString('id-ID');
   }
   if (fmt==='rate') return (v*100).toFixed(2)+'%';
   if (fmt==='rank') return '#'+Math.round(v);
-  return Math.round(v).toLocaleString('id-ID');
+  // 'num' generik (dipakai utk Gap) — SEBELUMNYA selalu Math.round(), jadi nilai
+  // pecahan kecil (mis. -0,35) hilang jadi "0" walau datanya jelas bukan nol. Ini
+  // yang bikin chart Gap keliatan flat 0 semua. Sekarang: kalau memang bilangan
+  // bulat tampilkan bulat, kalau tidak tampilkan dgn 2 desimal (termasuk minus).
+  return v%1===0 ? Math.round(v).toLocaleString('id-ID') : v.toLocaleString('id-ID',{minimumFractionDigits:2,maximumFractionDigits:2});
 }
 
 function renderRankChart() {
@@ -3632,7 +3647,7 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
   if(saranList.length===0)saranList.push('Performa baik! Pertahankan dan jadikan benchmark tim.');
   if(score>=60)saranList.push('⚠ Risiko tinggi — pertimbangkan monitoring harian & eskalasi ke manajemen jika tidak ada perbaikan dalam 3 hari.');
 
-  return{score,issues,saranList,s,hadirCount,hadirRatio,offCount,izinCount,sakitCount,alphaCount,totalHari,catatanCount,catatanRows,hadirTapiNolPayment,waBlokRatio,callConnRatio,ptpBayarRatio,peerAvg,peerAgents};
+  return{score,issues,saranList,s,hadirCount,hadirRatio,offCount,izinCount,sakitCount,alphaCount,totalHari,hariKerja,catatanCount,catatanRows,hadirTapiNolPayment,waBlokRatio,callConnRatio,ptpBayarRatio,peerAvg,peerAgents};
 }
 
 // ── Gemini AI Integration ─────────────────────────────────────
@@ -3749,6 +3764,32 @@ function saveGeminiKeyAndGenerate(safeSpvId) {
   generateBucketAI(safeSpvId);
 }
 
+// Toggle antara Temuan "Akumulasi" (tgl 1 s/d sekarang) dan "Hari Ini" — kedua versi
+// sudah dirender sekaligus di buildBucketSummaryHtml (lihat insView-akumulasi-*/
+// insView-hariini-*), jadi tinggal show/hide, gak perlu hitung ulang.
+function setTemuanMode(safeSpvId, mode){
+  const viewAkumulasi=document.getElementById('insView-akumulasi-'+safeSpvId);
+  const viewHariIni=document.getElementById('insView-hariini-'+safeSpvId);
+  if(!viewAkumulasi||!viewHariIni)return;
+  viewAkumulasi.style.display=mode==='akumulasi'?'':'none';
+  viewHariIni.style.display=mode==='hariini'?'':'none';
+  const tabs=document.getElementById('insTabs-'+safeSpvId);
+  if(tabs)tabs.querySelectorAll('.insight-toggle-tab').forEach(btn=>{
+    btn.classList.toggle('active', btn.getAttribute('data-tmode')===mode);
+  });
+}
+
+// Klik item Temuan yang teksnya terpotong (ada tombol "lihat semua") untuk buka/tutup
+// daftar lengkapnya di bawah item tsb, supaya nama yang kepotong "..." tetap bisa dibaca semua.
+function toggleInsightDetail(el){
+  const detail=el.querySelector('.insight-detail');
+  const arrow=el.querySelector('.insight-toggle-arrow');
+  if(!detail)return;
+  const willShow=detail.style.display==='none';
+  detail.style.display=willShow?'block':'none';
+  if(arrow)arrow.textContent=willShow?'▴ sembunyikan':'▾ lihat semua';
+}
+
 // ── Bucket Summary HTML ───────────────────────────────────────
 function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentScores){
   if(!bucketRows||!bucketRows.length)return'';
@@ -3773,6 +3814,14 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
 
   // Insights bucket
   const insights=[];
+  // Helper: bikin teks daftar nama yang dipotong (tampil showN nama pertama),
+  // sisanya disimpan di fullText supaya bisa ditampilkan lengkap saat item
+  // temuan di-klik (expandable), bukan hilang begitu saja jadi "...".
+  function _truncList(list, showN){
+    const shown=list.slice(0,showN).join(', ');
+    if(list.length<=showN)return{shownText:shown, fullText:null};
+    return{shownText:shown+', ...', fullText:list.join(', ')};
+  }
   const topAgent=ranked[0];
   const bottomAgent=ranked[ranked.length-1];
 
@@ -3783,7 +3832,10 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
   }
   // 2. Agent payment nol tapi hadir
   const nolPayHadir=ranked.filter(a=>a.payment===0&&a.hadir>0);
-  if(nolPayHadir.length>0)insights.push({dot:'dot-red',text:`<b>${nolPayHadir.length} agent</b> hadir tapi payment Rp 0 sepanjang bulan: ${nolPayHadir.slice(0,3).map(a=>a.ag).join(', ')}${nolPayHadir.length>3?'...':''}`});
+  if(nolPayHadir.length>0){
+    const{shownText,fullText}=_truncList(nolPayHadir.map(a=>a.ag),3);
+    insights.push({dot:'dot-red',text:`<b>${nolPayHadir.length} agent</b> hadir tapi payment Rp 0 sepanjang bulan: ${shownText}`,full:fullText});
+  }
   // 3. Rate rata-rata bucket
   if(s.avgRate>0&&s.avgRate<0.01)insights.push({dot:'dot-warn',text:`Rate rata-rata bucket rendah (${fmtRate(s.avgRate)}) — evaluasi kualitas data akun di bucket ini`});
   if(s.avgRate>=0.03)insights.push({dot:'dot-green',text:`Rate rata-rata bucket bagus (${fmtRate(s.avgRate)}) — pertahankan strategi penagihan`});
@@ -3817,7 +3869,8 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
   });
   if(zonkAgents.length>0){
     const worst=zonkAgents.sort((a,b)=>b.streak-a.streak);
-    insights.push({dot:'dot-red',text:`<b>${worst.length} agent</b> hadir berturut-turut tanpa payment: ${worst.slice(0,3).map(a=>`${a.ag} (${a.streak} hari)`).join(', ')}${worst.length>3?'...':''} — evaluasi kendala penagihan`});
+    const{shownText,fullText}=_truncList(worst.map(a=>`${a.ag} (${a.streak} hari)`),3);
+    insights.push({dot:'dot-red',text:`<b>${worst.length} agent</b> hadir berturut-turut tanpa payment: ${shownText} — evaluasi kendala penagihan`,full:fullText});
   }
 
   // 9. Agent pindah project bulan ini
@@ -3835,14 +3888,16 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
   });
   const allPindah=[...new Set([...pindahAgents.map(a=>a.ag),...multiAppAgents.map(a=>a.ag)])];
   if(allPindah.length>0){
-    insights.push({dot:'dot-blue',text:`<b>${allPindah.length} agent</b> baru pindah ke bucket/aplikasi ini: ${allPindah.slice(0,3).join(', ')}${allPindah.length>3?'...':''} — perlu orientasi ulang strategi penagihan`});
+    const{shownText,fullText}=_truncList(allPindah,3);
+    insights.push({dot:'dot-blue',text:`<b>${allPindah.length} agent</b> baru pindah ke bucket/aplikasi ini: ${shownText} — perlu orientasi ulang strategi penagihan`,full:fullText});
   }
 
   // 10. Agent baru (tidak ada di data bulan lalu)
   if(Object.keys(_prevAgentMap).length>0){
     const agentBaru=ranked.filter(a=>!_prevAgentMap[a.ag]);
     if(agentBaru.length>0){
-      insights.push({dot:'dot-blue',text:`<b>${agentBaru.length} agent baru</b> belum ada histori bulan lalu: ${agentBaru.slice(0,3).map(a=>a.ag).join(', ')}${agentBaru.length>3?'...':''} — butuh pendampingan ekstra di awal`});
+      const{shownText,fullText}=_truncList(agentBaru.map(a=>a.ag),3);
+      insights.push({dot:'dot-blue',text:`<b>${agentBaru.length} agent baru</b> belum ada histori bulan lalu: ${shownText} — butuh pendampingan ekstra di awal`,full:fullText});
     }
   }
 
@@ -3861,7 +3916,8 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
   });
   if(turunAgents.length>0){
     const worst=turunAgents.sort((a,b)=>(a.last/a.prev)-(b.last/b.prev));
-    insights.push({dot:'dot-warn',text:`<b>${worst.length} agent</b> payment turun drastis minggu ini: ${worst.slice(0,2).map(a=>`${a.ag} (${fmtRp(a.prev)}→${fmtRp(a.last)})`).join(', ')}${worst.length>2?'...':''}`});
+    const{shownText,fullText}=_truncList(worst.map(a=>`${a.ag} (${fmtRp(a.prev)}→${fmtRp(a.last)})`),2);
+    insights.push({dot:'dot-warn',text:`<b>${worst.length} agent</b> payment turun drastis minggu ini: ${shownText}`,full:fullText});
   }
 
   // 12. TL dengan banyak agent Rp 0 di hari yang sama
@@ -3920,8 +3976,9 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       const parts=[];
       if(kritisAgents.length)parts.push(`${kritisAgents.length} Kritis`);
       if(waspadaAgents.length)parts.push(`${waspadaAgents.length} Waspada`);
+      const{shownText,fullText}=_truncList(agentScores.map(x=>x.ag),5);
       insights.push({dot:kritisAgents.length?'dot-red':'dot-warn',
-        text:`<b>${kritisAgents.length+waspadaAgents.length} dari ${n} agent</b> butuh perhatian khusus (${parts.join(' · ')}) — lihat skor & alasan lengkapnya di panel "Perhatian Khusus Agent per Bucket": ${agentScores.slice(0,5).map(x=>x.ag).join(', ')}${agentScores.length>5?', ...':''}`});
+        text:`<b>${kritisAgents.length+waspadaAgents.length} dari ${n} agent</b> butuh perhatian khusus (${parts.join(' · ')}) — lihat skor & alasan lengkapnya di panel "Perhatian Khusus Agent per Bucket": ${shownText}`,full:fullText});
     }
 
     // Breakdown per tipe masalah paling sering muncul (payment, sentuh WA, absensi, dst),
@@ -3957,11 +4014,123 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       .slice(0,4) // batasi 4 tipe teratas biar Temuan tetap ringkas dibaca
       .forEach(([type,names])=>{
         const meta=ISSUE_TYPE_LABEL[type];
-        insights.push({dot:meta.dot,text:`<b>${names.length} agent</b> ${meta.text}: ${names.slice(0,4).join(', ')}${names.length>4?', ...':''}`});
+        const{shownText,fullText}=_truncList(names,4);
+        insights.push({dot:meta.dot,text:`<b>${names.length} agent</b> ${meta.text}: ${shownText}`,full:fullText});
       });
   }
 
+  // 15. Status Rank Vendor terbaru (dari sheet "DATA RANK", tombol "📈 Tampilkan Rank")
+  // — kalau EDN belum di posisi 1 di bucket ini, jadikan poin kendala di Temuan supaya
+  // SPV langsung tahu tanpa perlu buka modal Rank terpisah. Disimpan ke variabel dulu
+  // (bukan langsung push) karena poin ini relevan baik utk Temuan Akumulasi maupun
+  // Temuan Hari Ini (sama-sama soal posisi rank per tanggal data terbaru).
+  let rankInsightObj=null;
+  try{
+  if(_rankDataCache&&_rankDataCache.daily&&_rankDataCache.daily.length){
+    const bucketNameForRank=(bucketRows[0]?.bucket||'').trim();
+    // Aplikasi bucket ini: bucketRows kadang campur >1 aplikasi (jarang), jadi ambil
+    // yang paling sering muncul (mode) supaya tetap dapat 1 acuan yang representatif.
+    const apCount={};
+    bucketRows.forEach(r=>{const ap=(r.aplikasi||'').trim();if(!ap)return;apCount[ap]=(apCount[ap]||0)+1;});
+    const mainAplikasi=Object.entries(apCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+    const rankRowsBucket=mainAplikasi?_rankDataCache.daily.filter(r=>
+      (r.aplikasi||'').trim().toLowerCase()===mainAplikasi.toLowerCase() && (r.bucket||'').trim()===bucketNameForRank
+    ):[];
+    if(rankRowsBucket.length){
+      const tanggalListRank=[...new Set(rankRowsBucket.map(r=>r.tanggal).filter(Boolean))].sort();
+      const lastTglRank=tanggalListRank[tanggalListRank.length-1];
+      const lastRowsRank=lastTglRank?rankRowsBucket.filter(r=>r.tanggal===lastTglRank):rankRowsBucket;
+      const totalVendorRank=new Set(lastRowsRank.map(r=>r.vendor)).size;
+      const ednRowRank=lastRowsRank.find(r=>(r.vendor||'').trim().toLowerCase()==='edn');
+      if(ednRowRank&&ednRowRank.rank!=null&&!isNaN(ednRowRank.rank)&&totalVendorRank>=2){
+        const rankVal=ednRowRank.rank;
+        const tglLabelRank=lastTglRank?lastTglRank.split('-').reverse().join('/'):'terbaru';
+        if(rankVal===1){
+          rankInsightObj={dot:'dot-green',text:`📈 <b>Rank Vendor</b>: EDN di posisi #1 dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank} — pertahankan performa.`};
+        }else{
+          const leaderRowRank=lastRowsRank.find(r=>r.rank===1);
+          const leaderNameRank=leaderRowRank?leaderRowRank.vendor:'';
+          const gapVal=ednRowRank.gap;
+          const gapTxt=(gapVal!==null&&gapVal!==undefined&&!isNaN(gapVal)&&gapVal!==0)
+            ?` — gap ke posisi 1: ${fmtRp(Math.abs(gapVal))}${gapVal<0?' (masih kurang)':' (sudah unggul)'}`
+            :'';
+          // Streak: sudah berapa hari terakhir (maks 14 hari data yg ada) EDN belum di posisi 1
+          const recentTglsRank=tanggalListRank.slice(-14);
+          let streakRank=0;
+          for(let i=recentTglsRank.length-1;i>=0;i--){
+            const rw=rankRowsBucket.find(r=>r.tanggal===recentTglsRank[i]&&(r.vendor||'').trim().toLowerCase()==='edn');
+            if(rw&&rw.rank>1)streakRank++;else break;
+          }
+          const streakTxt=streakRank>=2?` (sudah ${streakRank} hari berturut-turut belum di posisi 1)`:'';
+          rankInsightObj={dot:rankVal===totalVendorRank?'dot-red':'dot-warn',
+            text:`📈 <b>Rank Vendor</b>: EDN di posisi #${rankVal} dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank}${leaderNameRank?`, kalah dari <b>${escH(leaderNameRank)}</b> (rank 1)`:''}${gapTxt}${streakTxt} — lihat pergerakannya lewat tombol "📈 Tampilkan Rank".`};
+        }
+      }
+    }
+  }
+  }catch(e){ console.warn('Rank insight gagal dihitung:', e); rankInsightObj=null; }
+  if(rankInsightObj)insights.push(rankInsightObj);
+
   if(!insights.length)insights.push({dot:'dot-green',text:'Tidak ada temuan kritis di level bucket — performa relatif merata.'});
+
+  // ── TEMUAN HARI INI ─────────────────────────────────────────
+  // Versi lebih ringkas & fokus dari Temuan di atas (yg mewakili akumulasi tanggal 1
+  // s/d sekarang), tapi cuma pakai baris dgn tanggal = tanggal data TERBARU yang ada
+  // di bucket ini (bukan tanggal kalender persis, karena input SPV kadang telat —
+  // jadi kalau input terakhir kemarin, "Hari Ini" nampilin kemarin, bukan kosong).
+  const todayInsights=[];
+  const allTanggalInBucket=[...new Set(bucketRows.map(r=>r.tanggal).filter(Boolean))].sort();
+  const todayTgl=allTanggalInBucket[allTanggalInBucket.length-1]||'';
+  const todayLabel=todayTgl?todayTgl.split('-').reverse().join('/'):'';
+  const todayRows=todayTgl?bucketRows.filter(r=>r.tanggal===todayTgl):[];
+  try{
+  if(todayRows.length){
+    const byAgentToday={};
+    todayRows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgentToday[ag])byAgentToday[ag]=[];byAgentToday[ag].push(r);});
+    const agToday=Object.keys(byAgentToday);
+    const sToday=summarizeRows(todayRows);
+    const totalHariBulan=allTanggalInBucket.length||1;
+    const avgDailyPaymentBulan=s.dailyPayment/totalHariBulan; // s = summarizeRows(bucketRows), sudah dihitung di atas
+
+    // 1. Alpha hari ini
+    const alphaAgentsToday=[...new Set(todayRows.filter(r=>r.absensi==='Alpha').map(r=>r.agent).filter(Boolean))];
+    if(alphaAgentsToday.length){
+      const{shownText,fullText}=_truncList(alphaAgentsToday,3);
+      todayInsights.push({dot:'dot-red',text:`<b>${alphaAgentsToday.length} agent alpha</b> hari ini (${todayLabel}): ${shownText}`,full:fullText});
+    }
+
+    // 2. Payment hari ini vs rata-rata harian bulan ini
+    if(avgDailyPaymentBulan>0){
+      const ratioToday=sToday.dailyPayment/avgDailyPaymentBulan;
+      if(ratioToday<0.5)todayInsights.push({dot:'dot-red',text:`Payment hari ini (${todayLabel}) ${fmtRp(sToday.dailyPayment)} — cuma ${Math.round(ratioToday*100)}% dari rata-rata harian bulan ini (${fmtRp(Math.round(avgDailyPaymentBulan))}/hari)`});
+      else if(ratioToday>1.3)todayInsights.push({dot:'dot-green',text:`Payment hari ini (${todayLabel}) ${fmtRp(sToday.dailyPayment)} — ${Math.round(ratioToday*100)}% dari rata-rata harian, di atas rata-rata bulan ini`});
+    }
+
+    // 3. Agent hadir tapi payment Rp 0 hari ini
+    const nolPayHadirToday=agToday.filter(ag=>{
+      const rows=byAgentToday[ag];
+      return rows.some(r=>r.absensi==='Hadir')&&rows.reduce((s2,r)=>s2+(r.dailyPayment||0),0)===0;
+    });
+    if(nolPayHadirToday.length){
+      const{shownText,fullText}=_truncList(nolPayHadirToday,3);
+      todayInsights.push({dot:'dot-warn',text:`<b>${nolPayHadirToday.length} agent</b> hadir tapi payment Rp 0 hari ini (${todayLabel}): ${shownText}`,full:fullText});
+    }
+
+    // 4. Rate bayar hari ini
+    if(sToday.avgRate>0&&sToday.avgRate<0.01)todayInsights.push({dot:'dot-warn',text:`Rate bayar hari ini (${todayLabel}) rendah (${fmtRate(sToday.avgRate)})`});
+
+    // 5. WA diblokir hari ini
+    const blokRatioToday=sToday.sentuhWA>0?sToday.waBlokir/sToday.sentuhWA:0;
+    if(blokRatioToday>0.08)todayInsights.push({dot:'dot-warn',text:`Rasio WA diblokir hari ini (${todayLabel}) tinggi (${Math.round(blokRatioToday*100)}%)`});
+
+    // 6. Sentuh WA hari ini vs rata-rata harian bulan ini
+    const avgDailySentuhBulan=s.sentuhWA/totalHariBulan;
+    if(avgDailySentuhBulan>0&&sToday.sentuhWA<avgDailySentuhBulan*0.5)todayInsights.push({dot:'dot-warn',text:`Sentuh WA hari ini (${todayLabel}) cuma ${fmtNum(sToday.sentuhWA)} — jauh di bawah rata-rata harian (${fmtNum(Math.round(avgDailySentuhBulan))})`});
+  }
+  }catch(e){ console.warn('Temuan Hari Ini gagal dihitung:', e); }
+  // Rank Vendor relevan juga utk Hari Ini (sama-sama pakai tanggal data rank terbaru)
+  if(rankInsightObj)todayInsights.push(rankInsightObj);
+  if(!todayInsights.length)todayInsights.push({dot:'dot-green',text:`Tidak ada temuan khusus hari ini${todayLabel?' ('+todayLabel+')':''} — performa normal.`});
 
   // Simpan ke cache untuk Gemini AI
   const bulan = document.getElementById('selBulan')?.value||'';
@@ -3997,6 +4166,14 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       <div class="bucket-rank-val" style="color:var(--text3)">${a.hadir}/${a.total} hadir</div>
     </div>`).join(''):'';
 
+  // Render satu daftar item Temuan (dipakai bareng utk view Akumulasi & Hari Ini,
+  // supaya markup expandable-nya konsisten di kedua mode).
+  const renderInsightItems=(list)=>list.map(ins=>ins.full
+    ?`<div class="insight-item insight-expandable" onclick="toggleInsightDetail(this)"><div class="insight-dot ${ins.dot}"></div><span>${ins.text} <span class="insight-toggle-arrow">▾ lihat semua</span></span><div class="insight-detail" style="display:none">${escH(ins.full)}</div></div>`
+    :`<div class="insight-item"><div class="insight-dot ${ins.dot}"></div><span>${ins.text}</span></div>`
+  ).join('');
+  const countLabel=(list)=>`${list.filter(i=>i.dot==='dot-red').length} kritis · ${list.filter(i=>i.dot==='dot-warn').length} peringatan · ${list.filter(i=>i.dot==='dot-blue').length} info`;
+
   return `<div class="bucket-summary-panel">
     <div class="bucket-sum-title">📊 Ringkasan Bucket</div>
     <div class="bucket-sum-grid">
@@ -4008,8 +4185,20 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       <div class="bucket-sum-stat ${s.waBlokir>s.sentuhWA*0.08?'warn':''}"><div class="lbl">WA Diblokir</div><div class="val">${fmtNum(s.waBlokir)}</div><div class="sub">${s.sentuhWA>0?Math.round(s.waBlokir/s.sentuhWA*100)+'% dari sentuh':'-'}</div></div>
     </div>
     <div class="insight-box">
-      <div class="insight-box-title">📋 Temuan — ${insights.filter(i=>i.dot==='dot-red').length} kritis · ${insights.filter(i=>i.dot==='dot-warn').length} peringatan · ${insights.filter(i=>i.dot==='dot-blue').length} info</div>
-      ${insights.map(ins=>`<div class="insight-item"><div class="insight-dot ${ins.dot}"></div><span>${ins.text}</span></div>`).join('')}
+      <div class="insight-box-toprow">
+        <div class="insight-toggle-tabs" id="insTabs-${safeSpvId}">
+          <button type="button" class="insight-toggle-tab active" data-tmode="akumulasi" onclick="setTemuanMode('${safeSpvId}','akumulasi')">📊 Akumulasi</button>
+          <button type="button" class="insight-toggle-tab" data-tmode="hariini" onclick="setTemuanMode('${safeSpvId}','hariini')">🗓 Hari Ini${todayLabel?` (${todayLabel})`:''}</button>
+        </div>
+      </div>
+      <div id="insView-akumulasi-${safeSpvId}" class="insight-view">
+        <div class="insight-box-title">📋 Temuan Akumulasi (tgl 1 s/d ${todayLabel||'sekarang'}) — ${countLabel(insights)}</div>
+        ${renderInsightItems(insights)}
+      </div>
+      <div id="insView-hariini-${safeSpvId}" class="insight-view" style="display:none">
+        <div class="insight-box-title">📋 Temuan Hari Ini${todayLabel?` (${todayLabel})`:''} — ${countLabel(todayInsights)}</div>
+        ${renderInsightItems(todayInsights)}
+      </div>
     </div>
     <div id="bks-ai-${safeSpvId}" style="margin-top:8px">
       <div style="background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 12px;display:flex;align-items:center;gap:10px">
@@ -4115,7 +4304,7 @@ function onAnalysisBucketChange(spv, safeSpvId){
   renderAttentionPanel(spv, safeSpvId);
 }
 
-function renderAttentionPanel(spv, safeSpvId){
+async function renderAttentionPanel(spv, safeSpvId){
   const selEl=document.getElementById('selAnalysisBucket-'+safeSpvId);
   const listEl=document.getElementById('attList-'+safeSpvId);
   const analysisEl=document.getElementById('attAnalysis-'+safeSpvId);
@@ -4129,6 +4318,11 @@ function renderAttentionPanel(spv, safeSpvId){
   const allSpvRows=spvAgentDataCache[spv]||[];
   const bucketRows=allSpvRows.filter(r=>r.bucket===selectedBucket);
   if(!bucketRows.length){listEl.innerHTML='<div class="no-attention">Tidak ada data di bucket ini.</div>';return;}
+  // Mulai fetch data Rank (sheet "DATA RANK") lebih awal — biar kalau data belum
+  // pernah di-fetch di halaman ini, waktu tunggunya nyatu dgn kalkulasi lain di
+  // bawah (bukan nambah delay terpisah). fetchRankData() sendiri no-op kalau
+  // sudah ada di cache (_rankDataCache), jadi aman dipanggil tiap render.
+  const rankDataPromise=fetchRankData();
 
   // [FITUR 1] Ambil rows sesuai range mode
   const rowsForScoring=getRowsByRange(safeSpvId, bucketRows);
@@ -4207,6 +4401,7 @@ function renderAttentionPanel(spv, safeSpvId){
   // Tampilkan bucket summary di panel kanan — kirim agentScores supaya bagian
   // "Temuan" bisa merefleksikan daftar Kritis/Waspada yang sama dengan panel kiri
   // (bukan mode 1-hari, karena skor per-hari tidak relevan utk agregat bulanan)
+  await rankDataPromise; // pastikan _rankDataCache sudah terisi sebelum buildBucketSummaryHtml baca Rank
   analysisEl.innerHTML=buildBucketSummaryHtml(spv, safeSpvId, rowsForScoring, allSpvRows, isSingleDay?[]:agentScores);
 
   if(!agentScores.length){
@@ -4256,7 +4451,7 @@ function selectAttentionAgent(spv, safeSpvId, idx){
   const analysisEl=document.getElementById('attAnalysis-'+safeSpvId);
   if(!data||!analysisEl)return;
   const{ag,rows,risk,agStatus}=data;
-  const{score,issues,saranList,s,hadirCount,totalHari,catatanCount,catatanRows,alphaCount,izinCount,hadirTapiNolPayment,waBlokRatio,callConnRatio,ptpBayarRatio,peerAvg,peerAgents}=risk;
+  const{score,issues,saranList,s,hadirCount,totalHari,hariKerja,catatanCount,catatanRows,alphaCount,izinCount,hadirTapiNolPayment,waBlokRatio,callConnRatio,ptpBayarRatio,peerAvg,peerAgents}=risk;
   const activeTanggal=window['_attTanggal_'+safeSpvId]||'';
   const isTglMode=!!activeTanggal;
   const isKritis=score>=50;
@@ -4283,10 +4478,19 @@ function selectAttentionAgent(spv, safeSpvId, idx){
   // Pakai agentScores yang sudah dihitung renderAttentionPanel (cache di window),
   // supaya Temuan tetap konsisten dg daftar Kritis/Waspada di panel kiri walau
   // sedang melihat detail 1 agent tertentu.
-  const bucketSummaryHtml=buildBucketSummaryHtml(spv, safeSpvId,
-    (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===(firstRow.bucket||'')),
-    spvAgentDataCache[spv]||[],
-    window['_attData_'+safeSpvId]||[]);
+  // Dibungkus try/catch: kalau bucket summary gagal dibangun karena sebab apapun,
+  // detail agent (bagian paling penting saat klik nama) tetap harus muncul —
+  // jangan sampai 1 error di ringkasan bucket bikin seluruh klik keliatan "gak ngapa-ngapain".
+  let bucketSummaryHtml='';
+  try{
+    bucketSummaryHtml=buildBucketSummaryHtml(spv, safeSpvId,
+      (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===(firstRow.bucket||'')),
+      spvAgentDataCache[spv]||[],
+      window['_attData_'+safeSpvId]||[]);
+  }catch(e){
+    console.warn('buildBucketSummaryHtml gagal:', e);
+    bucketSummaryHtml='';
+  }
 
   // Kelompokkan issues per group untuk tampilan terstruktur
   const groups={};
