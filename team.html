@@ -142,6 +142,10 @@ select:focus{border-color:var(--accent);}
 .cmpb-cell-curr{color:var(--text);font-weight:700;}
 .cmpb-cell-prev{color:var(--text3);font-weight:500;font-size:10.5px;}
 .cmpb-cell-prev b{color:var(--text3);font-weight:600;}
+.cmpb-row-focus td{background:#fef9c3!important;box-shadow:inset 3px 0 0 var(--warning);}
+.cmpb-row-focus td:first-child{font-weight:800!important;}
+.btn-cmp-bulan-bsm{padding:5px 12px;font-size:11px;font-weight:600;background:var(--navy);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer;display:flex;align-items:center;gap:4px;white-space:nowrap;}
+.btn-cmp-bulan-bsm:hover{opacity:.88;}
 .btn-add-setup:hover{border-color:var(--accent);color:var(--accent);}
 
 /* FIXED METRIC BOXES */
@@ -830,6 +834,7 @@ select:focus{border-color:var(--accent);}
         <button class="bsm-mode-btn active" data-mode="payment" onclick="setBsmMode('payment')" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">💰 Payment</button>
         <button class="bsm-mode-btn" data-mode="individual" onclick="setBsmMode('individual')" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">👤 Individual</button>
       </div>
+      <button class="btn-cmp-bulan-bsm" onclick="openCmpBulanFromBsm()" title="Bandingkan bucket ini dengan bulan lalu (apple-to-apple)">📅 vs Bln Lalu</button>
       <button class="bsm-fs-btn" id="bsmFsBtn" onclick="toggleBsmFullscreen()" title="Fullscreen">⛶</button>
       <div style="display:flex;gap:4px">
         <button onclick="exportBsmExcel()" title="Export Excel" style="padding:3px 10px;font-size:11px;font-weight:600;background:#16a34a;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">⬇ Excel</button>
@@ -1197,6 +1202,9 @@ async function loadData(){
 let _cmpBulanState = {spv:'', tab:'spv'};
 let _cmpPrevData   = null; // cache full prev month data
 let _cmpbView      = 'total'; // 'total' = Jumlah, 'avg' = Rata-rata/hari
+// Bucket yang harus di-highlight & di-scroll-ke otomatis saat modal ini dibuka
+// dari tombol "vs Bln Lalu" di dalam modal Summary Bucket (lihat openCmpBulanFromBsm).
+let _cmpbFocusBucket = null;
 const BULAN_ABBR = {Januari:'Jan',Februari:'Feb',Maret:'Mar',April:'Apr',Mei:'Mei',Juni:'Jun',Juli:'Jul',Agustus:'Ags',September:'Sep',Oktober:'Okt',November:'Nov',Desember:'Des'};
 
 function setCmpbView(view) {
@@ -1205,9 +1213,24 @@ function setCmpbView(view) {
   renderCmpBulanTab(_cmpBulanState.tab);
 }
 
+// Dipanggil dari tombol "📅 vs Bln Lalu" di dalam modal Summary Bucket, supaya saat
+// presentasi bisa langsung buka perbandingan bulan lalu untuk SPV yang sama, dan
+// otomatis loncat ke tab Bucket dengan baris bucket yang sedang dibuka di-highlight.
+async function openCmpBulanFromBsm() {
+  const {spv, bucket} = _bsmState || {};
+  if (!spv) return;
+  const safeSpvId = btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+  await openCmpBulan(spv, safeSpvId);
+  if (bucket) {
+    _cmpbFocusBucket = bucket;
+    setCmpBulanTab('bucket');
+  }
+}
+
 async function openCmpBulan(spv, safeSpvId) {
   _cmpBulanState = {spv, tab:'spv'};
   _cmpbView = 'total';
+  _cmpbFocusBucket = null;
   document.querySelectorAll('.cmpb-view-btn').forEach(b => b.classList.toggle('active', b.dataset.view === 'total'));
   document.getElementById('cmpBulanModal').classList.add('open');
   document.getElementById('cmpbBody').innerHTML = '<div class="cmpb-loading">⏳ Memuat data bulan lalu...</div>';
@@ -1284,6 +1307,8 @@ async function openCmpBulan(spv, safeSpvId) {
 }
 
 function setCmpBulanTab(tab) {
+  // Highlight bucket (dari openCmpBulanFromBsm) cuma relevan selama masih di tab Bucket.
+  if (tab !== 'bucket') _cmpbFocusBucket = null;
   _cmpBulanState.tab = tab;
   document.querySelectorAll('.cmpb-tab').forEach(b =>
     b.classList.toggle('active', b.textContent.includes(tab==='spv'?'SPV':tab==='bucket'?'Bucket':tab==='tl'?'Team Leader':'Agent'))
@@ -1400,7 +1425,9 @@ function renderCmpBulanTab(tab) {
       const ps = sumRows(g.prevRows);
       const daysCurr = daysInGroup(g.currRows);
       const daysPrev = daysInGroup(g.prevRows);
-      return `<tr>
+      // Highlight baris bucket yang jadi asal klik tombol "vs Bln Lalu" di modal Summary Bucket
+      const isFocusRow = tab === 'bucket' && _cmpbFocusBucket && g.label === _cmpbFocusBucket;
+      return `<tr class="${isFocusRow?'cmpb-row-focus':''}"${isFocusRow?' id="cmpbFocusRow"':''}>
         <td style="font-weight:600;color:var(--text)">${escH(g.label)}${g.badge||''}</td>
         ${METRICS.map(m => {
           const rawCv = m.key==='avgRate'?(cs.avgRate||0)
@@ -1513,6 +1540,11 @@ function renderCmpBulanTab(tab) {
   }
 
   document.getElementById('cmpbBody').innerHTML = buildTable(groups);
+
+  if (tab === 'bucket' && _cmpbFocusBucket) {
+    const rowEl = document.getElementById('cmpbFocusRow');
+    if (rowEl) rowEl.scrollIntoView({block:'center', behavior:'smooth'});
+  }
 }
 
 function closeCmpBulan() {
@@ -1523,6 +1555,7 @@ function closeCmpBulan() {
   overlay.classList.remove('fullscreen-mode');
   if (btn) { btn.textContent = '⛶'; btn.title = 'Fullscreen'; }
   overlay.classList.remove('open');
+  _cmpbFocusBucket = null;
 }
 
 function toggleCmpbFullscreen() {
@@ -2130,6 +2163,81 @@ function setBsmView(view) {
   _renderBucketSummary();
 }
 
+// Preview klik-nama-agent di Summary Bucket — pakai komponen & class yang sama
+// dengan preview di halaman utama (agent-preview, toggleAgentPreview dst),
+// supaya tampilannya konsisten dan togglenya reuse fungsi yg sudah ada.
+function _buildBsmAgentPreviewRow(a, agId, colspanTotal, previewSetupCols, bsmRotasiInfo, bulan, tahun) {
+  // Hitung ulang dari a._rows (bukan pakai a.s) — a.s di caller dijumlah dari
+  // key ALL_METRICS yang beberapa di antaranya (avgRate, jumlahAlatWA/Gojek)
+  // adalah field turunan yang tidak ada di baris mentah, jadi selalu 0 kalau
+  // dijumlah langsung. summarizeRows() menghitungnya dengan benar.
+  const s = summarizeRows(a._rows);
+  const _abs = calcAbsensi(a._rows);
+  const namaAkun = (a._rows[0] && a._rows[0].namaAkun) || '—';
+  const hasCatatan = a._rows.some(r => r.catatanSPV && r.catatanSPV.trim() !== '');
+  const catatanDot = hasCatatan ? `<span class="catatan-dot" title="Ada catatan SPV"></span>` : '';
+
+  const rotasi = bsmRotasiInfo[a.ag] || null;
+  let rotasiLabel = '';
+  if (rotasi) {
+    if (rotasi.status === 'baru') {
+      rotasiLabel = formatRotasiLabel('pengganti', (rotasi.lawanFirstName || (rotasi.lawan||'').split(' ')[0]), rotasi.changeDate);
+    } else if (rotasi.bucketAktif) {
+      rotasiLabel = formatRotasiLabel('pindah', '', rotasi.changeDate, rotasi.bucketAktif);
+    } else {
+      rotasiLabel = formatRotasiLabel('nonaktif', '', rotasi.changeDate);
+    }
+  }
+
+  const previewGridItems = [
+    {lbl:'Payment',   val: fmtRp(s.dailyPayment || a.total || 0)},
+    {lbl:'Rate',      val: fmtRate(s.avgRate || 0)},
+    {lbl:'Call Manual', val: fmtNum(s.callManual || 0)},
+    {lbl:'Sentuh WA', val: fmtNum(s.sentuhWA || 0)},
+    {lbl:'PTP',       val: fmtNum(s.ptp || 0)},
+    {lbl:'PTP Bayar', val: fmtNum(s.ptpBayar || 0)},
+  ].map(x => `<div class="preview-stat"><div class="lbl">${x.lbl}</div><div class="val">${x.val}</div></div>`).join('');
+
+  const dailyRows = a._rows.slice()
+    .sort((x,y) => (x.tanggal||'').localeCompare(y.tanggal||''))
+    .map(r => `<tr>
+      <td>${r.tanggal||'—'}</td>
+      <td>${r.absensi||'—'}</td>
+      <td style="max-width:160px;white-space:normal;word-break:break-word;color:var(--text2);line-height:1.4">${r.catatanSPV||'—'}</td>
+      <td style="text-align:center">${fmtRp(r.dailyPayment)}</td>
+      ${previewSetupCols.map(m => {
+        const rowKey = m.key==='jumlahAlatWA' ? 'alatWA' : m.key==='jumlahAlatGojek' ? 'alatGojek' : m.key;
+        return `<td>${fmtMetric(m, r[rowKey]||0)}</td>`;
+      }).join('')}
+    </tr>`).join('');
+
+  return `<tr class="agent-preview-row" id="prev-row-${agId}">
+    <td colspan="${colspanTotal}">
+      <div class="agent-preview" id="prev-${agId}">
+        <div class="agent-preview-inner">
+          <div class="agent-preview-header">
+            <div>
+              <div class="agent-preview-name">${escH(a.ag)}${catatanDot}${rotasiLabel}</div>
+              <div class="agent-preview-meta">Akun: ${escH(namaAkun)} · ${_abs.hadir}/${_abs.hariKerja} hari kerja hadir (Off: ${_abs.off??0})${rotasi&&rotasi.status==='lama'?` · Digantikan oleh <strong>${escH(rotasi.lawan)}</strong>`:''}</div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <a class="preview-link" href="agent.html?agent=${encodeURIComponent(a.ag)}&bulan=${encodeURIComponent(bulan)}&tahun=${encodeURIComponent(tahun)}">Detail lengkap →</a>
+              <button class="btn-close-preview" onclick="toggleAgentPreview('${agId}')">Tutup</button>
+            </div>
+          </div>
+          <div class="preview-grid">${previewGridItems}</div>
+          <div class="preview-daily">
+            <table class="preview-daily-table">
+              <thead><tr><th>Tanggal</th><th>Absensi</th><th>Catatan SPV</th><th style="text-align:center">Payment</th>${previewSetupCols.map(m=>`<th style="text-align:center">${m.label}</th>`).join('')}</tr></thead>
+              <tbody>${dailyRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </td>
+  </tr>`;
+}
+
 function _renderBucketSummary() {
   const {bucket, spv, mode, date, view} = _bsmState;
   const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
@@ -2137,6 +2245,10 @@ function _renderBucketSummary() {
   const rows = date ? allRows.filter(r=>r.tanggal===date) : allRows;
   const bulan = document.getElementById('selBulan').value;
   const tahun = document.getElementById('selTahun').value;
+  // Rotasi dihitung dari SELURUH data bucket bulan ini (bukan yg sudah difilter
+  // tanggal), supaya deteksi "lama/baru/nonaktif" tetap akurat lintas tanggal.
+  const bsmRotasiInfo = detectRotasiInfo(allRows, bucket);
+  let _bsmAgIdCounter = 0;
 
   const titleDate = date ? ` — ${(()=>{const dt=new Date(date);const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];return dt.getDate()+' ('+dn[dt.getDay()]+')'})()}` : '';
   document.getElementById('bsmTitle').textContent =
@@ -2222,8 +2334,15 @@ function _renderBucketSummary() {
     }
     const dayHeaders = allDates.map(d =>
       `<th class="bsm-pay-cell" style="text-align:center">${parseInt(d.split('-')[2])}</th>`).join('');
+    const bsmColspanPayment = 5 + allDates.length;
+    const bsmPreviewSetupCols = [
+      {key:'callManual',label:'Call Manual',fmt:'num'},
+      {key:'sentuhWA',label:'Sentuh WA',fmt:'num'},
+      {key:'ptp',label:'PTP',fmt:'num'},
+    ];
 
     const tableRows = agents.map((a,i) => {
+      const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
       const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
       const _abs = calcAbsensi(a._rows);
       const totalDisplay = fmtView(a.total, a, 'rp');
@@ -2243,11 +2362,12 @@ function _renderBucketSummary() {
       return `<tr>
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
         <td style="font-weight:600;color:var(--accent)">${escH(a.tl)}</td>
-        <td><span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500">${escH(a.ag)}</span>${moveBadge}</td>
+        <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}</td>
         <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
         <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
         ${dayCells}
-      </tr>`;
+      </tr>
+      ${_buildBsmAgentPreviewRow(a, agId, bsmColspanPayment, bsmPreviewSetupCols, bsmRotasiInfo, bulan, tahun)}`;
     }).join('');
 
     // ── GROUP mode: agents dikelompokkan per TL ──
@@ -2279,6 +2399,7 @@ function _renderBucketSummary() {
 
         // Agent rows within this TL
         const agentRows = g.agts.map((a, ai) => {
+          const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
           const _abs = calcAbsensi(a._rows);
           const totalDisplay = fmtView(a.total, a, 'rp');
           const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
@@ -2298,11 +2419,12 @@ function _renderBucketSummary() {
           return `<tr>
             <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
             <td style="font-weight:600;color:var(--accent);padding-left:16px">${escH(g.tl)}</td>
-            <td><span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500">${escH(a.ag)}</span>${moveBadge}</td>
+            <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}</td>
             <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
             <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
             ${dayCells}
-          </tr>`;
+          </tr>
+          ${_buildBsmAgentPreviewRow(a, agId, bsmColspanPayment, bsmPreviewSetupCols, bsmRotasiInfo, bulan, tahun)}`;
         }).join('');
         return tlRow + agentRows;
       }).join('');
@@ -2335,10 +2457,12 @@ function _renderBucketSummary() {
     // Kolom header: Rank | TL+Agent (merged) | Hadir | Rate | Payment | ...setupCols
     const colHeaders = setupCols.map(m=>`<th style="text-align:center">${m.label}${escH(viewLabel)}</th>`).join('');
 
+    const bsmColspanIndividual = 5 + setupCols.length;
     const tableRows = agents.map((a,i) => {
       const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
       const _abs = calcAbsensi(a._rows);
       const s = summarizeRows(a._rows);
+      const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
 
       // Fix 2: Rate = dailyPayment / osDataBaru (sama seperti logika rank)
       const agentRate = s.osDataBaru > 0 ? s.dailyPayment / s.osDataBaru : (s.avgRate||0);
@@ -2357,7 +2481,7 @@ function _renderBucketSummary() {
           <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(a.tl)}
         </div>
         <div style="font-weight:600;color:var(--text)">
-          <span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}">${escH(a.ag)}</span>${moveBadge}
+          <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}
         </div>
       </td>`;
 
@@ -2368,7 +2492,7 @@ function _renderBucketSummary() {
         <td style="text-align:center;width:64px;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
         <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
         ${metricCells}
-      </tr>`;
+      </tr>${_buildBsmAgentPreviewRow(a, agId, bsmColspanIndividual, setupCols, bsmRotasiInfo, bulan, tahun)}`;
     }).join('');
 
     let indBodyHtml = tableRows;
@@ -2399,6 +2523,7 @@ function _renderBucketSummary() {
           const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
           const _abs = calcAbsensi(a._rows);
           const s = summarizeRows(a._rows);
+          const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
           const agentRate = s.osDataBaru>0 ? s.dailyPayment/s.osDataBaru : (s.avgRate||0);
           const rateDisplay = (agentRate*100).toFixed(2)+'%';
           const metricCells = setupCols.map(m => {
@@ -2410,7 +2535,7 @@ function _renderBucketSummary() {
               <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(g.tl)}
             </div>
             <div style="font-weight:600;color:var(--text)">
-              <span data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}">${escH(a.ag)}</span>${moveBadge}
+              <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}
             </div>
           </td>`;
           return `<tr>
@@ -2420,7 +2545,7 @@ function _renderBucketSummary() {
             <td style="text-align:center;width:64px;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
             <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
             ${metricCells}
-          </tr>`;
+          </tr>${_buildBsmAgentPreviewRow(a, agId, 5+setupCols.length, setupCols, bsmRotasiInfo, bulan, tahun)}`;
         }).join('');
         return tlHeaderRow + agentRowsInd;
       }).join('');
