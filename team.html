@@ -1326,16 +1326,17 @@ function renderCmpBulanTab(tab) {
       hintEl.style.display = 'block';
       const dataReady = Object.keys(_prevAgentMap).length > 0;
       hintEl.innerHTML = dataReady
-        ? `<span class="agent-new-badge">✨</span> Agent baru (tidak ada histori bulan lalu) &nbsp;&nbsp;
-           <span class="agent-move-badge">🔄</span> Pindah aplikasi/bucket dari bulan lalu
-           — <b style="color:var(--text2)">bukan bug</b>: payment 0 di bulan lalu karena agent belum ada di bucket ini.`
-        : `⏳ Data histori agent bulan lalu masih dimuat di background, badge ✨/🔄 akan muncul begitu siap...`;
+        ? `<span class="agent-new-badge">✨</span> Baru (tak ada histori bulan lalu) &nbsp;&nbsp;
+           <span class="agent-move-badge">🔄</span> Pindah aplikasi/bucket dari bulan lalu &nbsp;&nbsp;
+           <span class="agent-move-badge" style="background:#fee2e2;border-color:#fecaca">🚪</span> Sudah tidak ada di bucket ini bulan sekarang
+           — <b style="color:var(--text2)">bukan bug</b>: badge ini menjelaskan kenapa payment 0 di salah satu bulan.`
+        : `⏳ Data histori agent bulan lalu masih dimuat di background, badge ✨/🔄/🚪 akan muncul begitu siap...`;
     } else {
       hintEl.style.display = 'none';
     }
   }
 
-  const METRICS = [
+  const BASE_METRICS = [
     {key:'dailyPayment', label:'Payment', fmt:'rp'},
     {key:'avgRate',      label:'Rate',    fmt:'rate'},
     {key:'totalData',    label:'Total Data', fmt:'num'},
@@ -1348,6 +1349,11 @@ function renderCmpBulanTab(tab) {
     {key:'ptpBayar',     label:'PTP Bayar',  fmt:'num'},
     {key:'jumlahAlatWA', label:'Alat WA',    fmt:'num'},
   ];
+  // Kolom "Agent Aktif" cuma berguna kalau 1 baris bisa berisi >1 agent
+  // (SPV/Bucket/Team Leader). Di tab Agent, 1 baris = 1 agent, jadi dilewati.
+  const METRICS = tab === 'agent'
+    ? BASE_METRICS
+    : [{key:'agentAktif', label:'Agent Aktif', fmt:'num'}, ...BASE_METRICS];
 
   function sumRows(rows) {
     const s = summarizeRows(rows);
@@ -1360,8 +1366,9 @@ function renderCmpBulanTab(tab) {
   }
 
   // Metrik yang TIDAK dibagi hari walau mode Rata-rata aktif:
-  // Rate sudah berupa persentase, jadi tidak masuk akal dibagi hari lagi.
-  const NO_AVG_CMP = new Set(['avgRate']);
+  // Rate sudah berupa persentase, dan Agent Aktif itu headcount (jumlah kepala),
+  // keduanya tidak masuk akal dibagi hari.
+  const NO_AVG_CMP = new Set(['avgRate','agentAktif']);
 
   function fmtVal(val, fmt, isAvgVal) {
     if (fmt==='rp')   return 'Rp '+Math.round(val).toLocaleString('id-ID');
@@ -1385,7 +1392,7 @@ function renderCmpBulanTab(tab) {
     // groups = [{label, currRows, prevRows, isSection?}]
     const header = `<tr>
       <th>Nama</th>
-      ${METRICS.map(m=>`<th>${m.label} <span style="font-weight:400;opacity:.7;font-size:9px">(${escH(abbrCurr)}/${escH(abbrPrev)})</span></th>`).join('')}
+      ${METRICS.map(m=>`<th${m.key==='agentAktif'?' title="Jumlah agent yang benar-benar aktif — agent yang sudah digantikan/pindah akun dalam bulan berjalan tidak ikut dihitung"':''}>${m.label} <span style="font-weight:400;opacity:.7;font-size:9px">(${escH(abbrCurr)}/${escH(abbrPrev)})</span></th>`).join('')}
     </tr>`;
     const body = groups.map(g => {
       if (g.isSection) return `<tr class="cmpb-section-head"><td colspan="${METRICS.length+1}">${g.label}</td></tr>`;
@@ -1396,8 +1403,12 @@ function renderCmpBulanTab(tab) {
       return `<tr>
         <td style="font-weight:600;color:var(--text)">${escH(g.label)}${g.badge||''}</td>
         ${METRICS.map(m => {
-          const rawCv = m.key==='avgRate'?(cs.avgRate||0):(cs[m.key]||0);
-          const rawPv = m.key==='avgRate'?(ps.avgRate||0):(ps[m.key]||0);
+          const rawCv = m.key==='avgRate'?(cs.avgRate||0)
+            : m.key==='agentAktif'?computeActiveAgentCount(g.currRows)
+            : (cs[m.key]||0);
+          const rawPv = m.key==='avgRate'?(ps.avgRate||0)
+            : m.key==='agentAktif'?computeActiveAgentCount(g.prevRows)
+            : (ps[m.key]||0);
           const applyAvg = _cmpbView==='avg' && !NO_AVG_CMP.has(m.key);
           const cv = applyAvg ? rawCv/daysCurr : rawCv;
           const pv = applyAvg ? rawPv/daysPrev : rawPv;
@@ -1425,52 +1436,77 @@ function renderCmpBulanTab(tab) {
     }));
   } else if (tab === 'tl') {
     const tls = [...new Set([...currRows,...prevRows].map(r=>r.teamLeader).filter(Boolean))].sort();
-    // Group by bucket
-    const bks = [...new Set(currRows.map(r=>r.bucket).filter(Boolean))].sort();
+    // Group by bucket — pakai UNION bucket bulan ini & bulan lalu, supaya bucket yang
+    // bulan ini kosong (tim pindah semua/bubar) tetap muncul sectionnya.
+    const bks = [...new Set([...currRows,...prevRows].map(r=>r.bucket).filter(Boolean))].sort();
     bks.forEach(bk => {
       groups.push({isSection: true, label: `📦 ${bk}`});
-      const tlsInBk = tls.filter(tl => currRows.some(r=>r.bucket===bk&&r.teamLeader===tl));
+      // Pakai UNION juga utk TL — supaya TL yg bulan lalu ada di bucket ini tapi
+      // bulan ini sudah tidak ada lagi (bukan cuma "0 payment") tetap tampil.
+      const tlsInBk = tls.filter(tl =>
+        currRows.some(r=>r.bucket===bk&&r.teamLeader===tl) ||
+        prevRows.some(r=>r.bucket===bk&&r.teamLeader===tl)
+      );
       tlsInBk.forEach(tl => {
         const tlCurrRows = currRows.filter(r=>r.bucket===bk&&r.teamLeader===tl);
         const tlPrevRows = prevRows.filter(r=>r.bucket===bk&&r.teamLeader===tl);
-        // Ringkasan badge: berapa agent baru/pindah di bawah TL ini (di bucket ini)
-        const agentsUnderTl = [...new Set(tlCurrRows.map(r=>r.agent).filter(Boolean))];
-        let nBaru = 0, nPindah = 0;
-        if (Object.keys(_prevAgentMap).length) {
-          agentsUnderTl.forEach(ag => {
-            const prev = _prevAgentMap[ag];
-            if (!prev) { nBaru++; return; }
-            const curApp = tlCurrRows.find(r=>r.agent===ag)?.aplikasi || '';
-            const movedApp    = prev.aplikasi && curApp && prev.aplikasi !== curApp;
-            const movedBucket = !movedApp && prev.bucket && prev.bucket !== bk;
-            if (movedApp || movedBucket) nPindah++;
-          });
-        }
         let badge = '';
-        if (nBaru || nPindah) {
-          const parts = [];
-          if (nBaru)   parts.push(`✨ ${nBaru} baru`);
-          if (nPindah) parts.push(`🔄 ${nPindah} pindah`);
-          badge = ` <span style="margin-left:4px;font-size:9px;font-weight:700;color:var(--text3);white-space:nowrap">(${parts.join(', ')})</span>`;
+        if (tlCurrRows.length === 0 && tlPrevRows.length > 0) {
+          // TL ini sudah tidak tercatat sama sekali di bucket ini bulan ini
+          badge = ` <span class="agent-move-badge" style="background:#fee2e2;border-color:#fecaca"
+            onmouseenter="showMoveTooltipRaw(event,'<b>🚪 Sudah Tidak Ada di Bucket Ini</b><br>Tidak tercatat di ${escH(bulan)} ${escH(tahun)} — cek apakah tim pindah ke bucket/aplikasi lain')"
+            onmouseleave="hideMoveTooltip()">🚪</span>`;
+        } else {
+          // Ringkasan badge: berapa agent baru/pindah di bawah TL ini (di bucket ini)
+          const agentsUnderTl = [...new Set(tlCurrRows.map(r=>r.agent).filter(Boolean))];
+          let nBaru = 0, nPindah = 0;
+          if (Object.keys(_prevAgentMap).length) {
+            agentsUnderTl.forEach(ag => {
+              const prev = _prevAgentMap[ag];
+              if (!prev) { nBaru++; return; }
+              const curApp = tlCurrRows.find(r=>r.agent===ag)?.aplikasi || '';
+              const movedApp    = prev.aplikasi && curApp && prev.aplikasi !== curApp;
+              const movedBucket = !movedApp && prev.bucket && prev.bucket !== bk;
+              if (movedApp || movedBucket) nPindah++;
+            });
+          }
+          if (nBaru || nPindah) {
+            const parts = [];
+            if (nBaru)   parts.push(`✨ ${nBaru} baru`);
+            if (nPindah) parts.push(`🔄 ${nPindah} pindah`);
+            badge = ` <span style="margin-left:4px;font-size:9px;font-weight:700;color:var(--text3);white-space:nowrap">(${parts.join(', ')})</span>`;
+          }
         }
         groups.push({ label: tl, currRows: tlCurrRows, prevRows: tlPrevRows, badge });
       });
     });
   } else if (tab === 'agent') {
     const ags = [...new Set([...currRows,...prevRows].map(r=>r.agent).filter(Boolean))].sort();
-    const bks = [...new Set(currRows.map(r=>r.bucket).filter(Boolean))].sort();
+    // UNION bucket bulan ini & bulan lalu (sama seperti tab TL)
+    const bks = [...new Set([...currRows,...prevRows].map(r=>r.bucket).filter(Boolean))].sort();
     bks.forEach(bk => {
       groups.push({isSection: true, label: `📦 ${bk}`});
-      const agsInBk = ags.filter(ag => currRows.some(r=>r.bucket===bk&&r.agent===ag));
+      // UNION agent juga — agent yg bulan lalu ada di bucket ini tapi bulan ini
+      // sudah keluar/pindah sepenuhnya (bukan cuma "muncul dengan 0") tetap tampil.
+      const agsInBk = ags.filter(ag =>
+        currRows.some(r=>r.bucket===bk&&r.agent===ag) ||
+        prevRows.some(r=>r.bucket===bk&&r.agent===ag)
+      );
       agsInBk.forEach(ag => {
         const agCurrRows = currRows.filter(r=>r.bucket===bk&&r.agent===ag);
         const agPrevRows  = prevRows.filter(r=>r.bucket===bk&&r.agent===ag);
-        const curApp = agCurrRows[0]?.aplikasi || '';
+        const curApp = agCurrRows[0]?.aplikasi || agPrevRows[0]?.aplikasi || '';
+        const leftBucket = agCurrRows.length === 0 && agPrevRows.length > 0;
+        const badge = leftBucket
+          ? ` <span class="agent-move-badge" style="background:#fee2e2;border-color:#fecaca"
+              onmouseenter="showMoveTooltipRaw(event,'<b>🚪 Sudah Tidak Di Bucket Ini</b><br>Tidak ada data di ${escH(bulan)} ${escH(tahun)} — cek apakah pindah bucket/aplikasi lain atau nonaktif')"
+              onmouseleave="hideMoveTooltip()">🚪</span>`
+          : _cmpMoveBadge(ag, curApp, bk);
         groups.push({
           label: ag,
           currRows: agCurrRows,
           prevRows: agPrevRows,
-          badge: _cmpMoveBadge(ag, curApp, bk),
+          badge,
         });
       });
     });
@@ -1713,7 +1749,9 @@ function _buildBsmBucketNav(spv, activeBucket) {
   if (buckets.length <= 1) { nav.style.display='none'; return; }
   nav.style.display = 'flex';
   nav.innerHTML = buckets.map(bk => {
-    const count = new Set(allSpvRows.filter(r=>r.bucket===bk).map(r=>r.agent)).size;
+    // Rotasi-aware: agent yg sudah digantikan/nonaktif/pindah akun dlm bulan ini
+    // tidak ikut dihitung — konsisten dgn header bucket/TL/SPV di halaman utama.
+    const count = computeActiveAgentCount(allSpvRows.filter(r=>r.bucket===bk));
     return `<button class="bsm-bucket-tab ${bk===activeBucket?'active':''}"
       onclick="switchBsmBucket('${escA(bk)}','${escA(spv)}')" title="${escH(bk)}">
       ${escH(bk)}<span class="bsm-bucket-tab-count">${count}</span>
@@ -5142,7 +5180,7 @@ function buildPresentation(){
   modeRows.forEach(r=>{const ap=r.aplikasi||'(Tidak Diketahui)';if(!byApp[ap])byApp[ap]=[];byApp[ap].push(r);});
   const apps=Object.keys(byApp).sort();
   const globalS=summarizeRows(modeRows);
-  const globalAgents=new Set(modeRows.map(r=>r.agent)).size;
+  const globalAgents=computeActiveAgentCount(modeRows);
 
   presSlides=[];
 
@@ -5163,14 +5201,14 @@ function buildPresentation(){
     const apRows=byApp[ap];
     const apS=summarizeRows(apRows);
     const color=getColor(ap);
-    const agentCnt=new Set(apRows.map(r=>r.agent)).size;
+    const agentCnt=computeActiveAgentCount(apRows);
 
     // Bucket list untuk aplikasi ini, sort by payment desc
     const byBkt={};
     apRows.forEach(r=>{const bk=r.bucket||'(Tanpa Bucket)';if(!byBkt[bk])byBkt[bk]=[];byBkt[bk].push(r);});
     const bkList=Object.keys(byBkt).map(bk=>{
       return{bk,s:summarizeRows(byBkt[bk]),rows:byBkt[bk],
-        agents:new Set(byBkt[bk].map(r=>r.agent)).size};
+        agents:computeActiveAgentCount(byBkt[bk])};
     }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
 
     // Overview slide aplikasi
@@ -5215,7 +5253,7 @@ function buildPresentation(){
     const apSlideIdx=slideIdx; // index slide overview aplikasi
     const color=getColor(ap);
     const apRows=byApp[ap];
-    const agCnt=new Set(apRows.map(r=>r.agent)).size;
+    const agCnt=computeActiveAgentCount(apRows);
     const apS=summarizeRows(apRows);
     const byBkt={};
     apRows.forEach(r=>{const bk=r.bucket||'(Tanpa Bucket)';if(!byBkt[bk])byBkt[bk]=[];byBkt[bk].push(r);});
@@ -5239,7 +5277,7 @@ function buildPresentation(){
     slideIdx++; // lewati slide app overview
     bkKeys.forEach(bk=>{
       const bkS=summarizeRows(byBkt[bk]);
-      const bkAgCnt=new Set(byBkt[bk].map(r=>r.agent)).size;
+      const bkAgCnt=computeActiveAgentCount(byBkt[bk]);
       const bkTrend=trendLabel(weeklyPayments(byBkt[bk]));
       navHtml+=`<div class="pres-nav-item pres-nav-child" id="presNavItem-${slideIdx}" onclick="presNavigateTo(${slideIdx})">
         <div class="pres-dot" style="background:${color};width:6px;height:6px;flex-shrink:0;opacity:0.7"></div>
@@ -5287,14 +5325,14 @@ function presNavigate(delta){presNavigateTo(presCurrentIdx+delta);}
 
 function buildGlobalSlide(s, byApp, bulan, tahun){
   const apps=Object.keys(byApp).sort();
-  const totalAgents=new Set(allRows.map(r=>r.agent)).size;
+  const totalAgents=computeActiveAgentCount(allRows);
   const _pAbs=calcAbsensi(allRows);
   const hadirCount=_pAbs.hadir;
   const hadirRatio=_pAbs.hariKerja>0?hadirCount/_pAbs.hariKerja:0;
 
   const appRows=apps.map(ap=>{
     const rs=summarizeRows(byApp[ap]);
-    const ags=new Set(byApp[ap].map(r=>r.agent)).size;
+    const ags=computeActiveAgentCount(byApp[ap]);
     return{ap,s:rs,ags};
   }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
 
@@ -5386,7 +5424,7 @@ const SAFE_ID=s=>s.replace(/[^a-zA-Z0-9]/g,'_');
 
 function buildAppSlide(ap, rows, s, color, bulan, tahun){
   const sid=SAFE_ID(ap);
-  const agents=new Set(rows.map(r=>r.agent)).size;
+  const agents=computeActiveAgentCount(rows);
   const hadirRows=rows.filter(r=>r.absensi==='Hadir');
   const _bAbs=calcAbsensi(rows);
   const hadirRatio=_bAbs.hariKerja>0?_bAbs.hadir/_bAbs.hariKerja:0;
@@ -5422,7 +5460,7 @@ function buildAppSlide(ap, rows, s, color, bulan, tahun){
   const bkRanked=Object.keys(byBucket).map(bk=>{
     const bkRows=byBucket[bk];
     const rs=summarizeRows(bkRows);
-    const ags=new Set(bkRows.map(r=>r.agent)).size;
+    const ags=computeActiveAgentCount(bkRows);
     const wPays=weeklyPayments(bkRows);
     const trend=trendLabel(wPays);
     const hadirR=bkRows.filter(r=>r.absensi==='Hadir').length/Math.max(bkRows.length,1);
@@ -5681,8 +5719,9 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
   const otherBktRows=allApRows.filter(r=>r.bucket!==bk);
   const otherS=summarizeRows(otherBktRows);
   const otherN=new Set(otherBktRows.map(r=>r.bucket)).size||1;
-  const peerAvgPay=otherS.dailyPayment/Math.max(new Set(otherBktRows.map(r=>r.agent)).size,1);
-  const peerAvgWA=otherS.sentuhWA/Math.max(new Set(otherBktRows.map(r=>r.agent)).size,1);
+  const otherActiveAgents=computeActiveAgentCount(otherBktRows);
+  const peerAvgPay=otherS.dailyPayment/Math.max(otherActiveAgents,1);
+  const peerAvgWA=otherS.sentuhWA/Math.max(otherActiveAgents,1);
 
   // ── Temuan & Kendala ─────────────────────────────────────────
   const kendala=[];
