@@ -103,6 +103,30 @@ select:focus{border-color:var(--accent);}
 .btn-add-setup{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:var(--radius-sm);border:1px dashed var(--border);background:none;font-size:12px;color:var(--text3);cursor:pointer;transition:all .15s;}
 .btn-cmp-bulan{padding:5px 12px;font-size:11px;font-weight:600;background:rgba(99,102,241,.12);color:#818cf8;border:1px solid rgba(99,102,241,.3);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;white-space:nowrap;}
 .btn-cmp-bulan:hover{background:rgba(99,102,241,.25);border-color:#818cf8;}
+.btn-rank-chart{padding:5px 12px;font-size:11px;font-weight:600;background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn-rank-chart:hover{background:rgba(16,185,129,.25);border-color:#059669;}
+#rankModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:center;justify-content:center;padding:20px;}
+#rankModal.open{display:flex;}
+.rankm-box{background:var(--surface);border-radius:var(--radius);width:95vw;max-width:960px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;}
+.rankm-box.fullscreen{width:100vw!important;max-width:100vw!important;max-height:100vh!important;height:100vh;border-radius:0;margin:0;}
+#rankModal.fullscreen-mode{padding:0;align-items:stretch;}
+.rankm-fs-btn{background:none;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:16px;cursor:pointer;color:var(--text2);padding:3px 8px;transition:all .15s;}
+.rankm-fs-btn:hover{border-color:var(--accent);color:var(--accent);}
+.rankm-head{padding:14px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px;flex-shrink:0;}
+.rankm-title{font-size:14px;font-weight:700;color:var(--text);flex:1;}
+.rankm-close{background:none;border:none;font-size:18px;cursor:pointer;color:var(--text3);}
+.rankm-toolbar{display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--border);background:var(--surface2);flex-shrink:0;flex-wrap:wrap;}
+.rankm-select{padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none;}
+.rankm-toggle{display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;flex-shrink:0;}
+.rankm-toggle-btn{padding:5px 12px;font-size:11px;font-weight:600;background:var(--surface);color:var(--text2);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
+.rankm-toggle-btn.active{background:var(--accent);color:#fff;}
+.rankm-toggle-btn:not(.active):hover{background:var(--surface);opacity:.8;}
+.rankm-metric-tabs{display:flex;gap:6px;flex-wrap:wrap;}
+.rankm-metric-tab{padding:5px 14px;font-size:11px;font-weight:600;border-radius:20px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);white-space:nowrap;transition:all .15s;}
+.rankm-metric-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
+.rankm-body{flex:1;overflow:auto;padding:16px;position:relative;}
+.rankm-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;min-height:260px;color:var(--text3);text-align:center;gap:8px;font-size:13px;line-height:1.6;}
+.rankm-empty .icon{font-size:32px;}
 #cmpBulanModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:center;justify-content:center;padding:20px;}
 #cmpBulanModal.open{display:flex;}
 .cmpb-box{background:var(--surface);border-radius:var(--radius);width:95vw;max-width:960px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;}
@@ -824,6 +848,42 @@ select:focus{border-color:var(--accent);}
     <div class="cmpb-legend" id="cmpbLegend"></div>
     <div class="cmpb-hint" id="cmpbHint" style="display:none"></div>
     <div class="cmpb-body" id="cmpbBody"><div class="cmpb-loading">⏳ Memuat data...</div></div>
+  </div>
+</div>
+<!-- RANK VENDOR MODAL (sheet "DATA RANK") -->
+<div id="rankModal" onclick="if(event.target===this)closeRankModal()">
+  <div class="rankm-box">
+    <div class="rankm-head">
+      <div class="rankm-title" id="rankmTitle">📈 Rank Vendor per Bucket</div>
+      <button class="rankm-fs-btn" id="rankmFsBtn" onclick="toggleRankmFullscreen()" title="Fullscreen">⛶</button>
+      <button class="rankm-close" onclick="closeRankModal()">✕</button>
+    </div>
+    <div class="rankm-toolbar">
+      <select class="rankm-select" id="rankAplikasiSel" onchange="onRankAplikasiChange()"></select>
+      <select class="rankm-select" id="rankBucketSel" onchange="onRankBucketChange()"></select>
+      <div class="rankm-toggle">
+        <button class="rankm-toggle-btn active" data-mode="daily" onclick="setRankMode('daily')">📆 Rank Daily</button>
+        <button class="rankm-toggle-btn" data-mode="monthly" onclick="setRankMode('monthly')">🗓 Rank Monthly</button>
+      </div>
+      <button class="rankm-toggle-btn" id="rankLabelsBtn" onclick="toggleRankLabels()" style="border:1px solid var(--border);border-radius:var(--radius-sm);margin-left:auto" title="Tampilkan/sembunyikan angka nilai di tiap titik/bar">🔢 Tampilkan Angka</button>
+      <div class="rankm-toggle">
+        <button class="rankm-toggle-btn active" data-ctype="line" onclick="setRankChartType('line')">📈 Line</button>
+        <button class="rankm-toggle-btn" data-ctype="bar" onclick="setRankChartType('bar')">📊 Bar</button>
+      </div>
+    </div>
+    <div class="rankm-toolbar" style="border-top:1px dashed var(--border)">
+      <span style="font-size:11px;font-weight:600;color:var(--text3)">Tampilkan:</span>
+      <div class="rankm-metric-tabs" id="rankMetricTabs">
+        <button class="rankm-metric-tab" data-metric="os" onclick="setRankMetric('os')">OS</button>
+        <button class="rankm-metric-tab active" data-metric="payment" onclick="setRankMetric('payment')">Payment</button>
+        <button class="rankm-metric-tab" data-metric="rate" onclick="setRankMetric('rate')">Rate</button>
+        <button class="rankm-metric-tab" data-metric="rank" onclick="setRankMetric('rank')">Rank</button>
+        <button class="rankm-metric-tab" data-metric="gap" onclick="setRankMetric('gap')">Gap</button>
+      </div>
+    </div>
+    <div class="rankm-body" id="rankmBody">
+      <div style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div>
+    </div>
   </div>
 </div>
 <div id="modalBucketSummary" onclick="if(event.target===this)closeBucketSummary()">
@@ -1566,6 +1626,274 @@ function toggleCmpbFullscreen() {
   overlay.classList.toggle('fullscreen-mode', isFs);
   btn.textContent = isFs ? '⊠' : '⛶';
   btn.title = isFs ? 'Keluar Fullscreen' : 'Fullscreen';
+}
+
+// ── Rank Vendor per Bucket (sheet "DATA RANK") ────────────────
+// Data ini TERPISAH dari "All Data" — nggak ada relasi ke agent/TL/SPV,
+// cuma dikelompokkan per (Aplikasi, Bucket, Vendor) + tanggal. Tombol
+// "📈 Tampilkan Rank" di header SPV cuma dipakai utk mempersempit pilihan
+// Aplikasi ke aplikasi yang SPV itu pegang — datanya sendiri scope-nya
+// Aplikasi+Bucket+Vendor, bukan per-SPV.
+let _rankDataCache = null;      // {daily:[...], monthly:[...]} — hasil action=rankdata
+let _rankChartInstance = null;
+let _rankState = { spv:'', aplikasi:'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false };
+
+const RANK_METRIC_META = {
+  os:      {label:'OS',      fmt:'rp'},
+  payment: {label:'Payment', fmt:'rp'},
+  rate:    {label:'Rate',    fmt:'rate'},
+  rank:    {label:'Rank',    fmt:'rank'},
+  gap:     {label:'Gap',     fmt:'num'},
+};
+
+async function fetchRankData() {
+  if (_rankDataCache) return _rankDataCache;
+  try {
+    const data = await fetchJSON(API_URL + '?action=rankdata');
+    _rankDataCache = (data && data.success) ? { daily: data.daily||[], monthly: data.monthly||[] } : { daily: [], monthly: [] };
+  } catch(e) {
+    _rankDataCache = { daily: [], monthly: [] };
+  }
+  return _rankDataCache;
+}
+
+async function openRankModal(spv, safeSpvId) {
+  const rows = spvAgentDataCache[spv] || [];
+  // Dropdown Aplikasi cuma berisi aplikasi yang SPV ini pegang (sesuai halaman yg dibuka)
+  const appList = [...new Set(rows.map(r=>r.aplikasi).filter(Boolean))];
+  _rankState = { spv, aplikasi: appList[0]||'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false };
+
+  document.getElementById('rankModal').classList.add('open');
+  document.getElementById('rankmTitle').textContent = `📈 Rank Vendor — ${spv}`;
+  document.querySelectorAll('.rankm-toggle-btn[data-mode]').forEach(b=>b.classList.toggle('active', b.dataset.mode==='daily'));
+  document.querySelectorAll('.rankm-toggle-btn[data-ctype]').forEach(b=>b.classList.toggle('active', b.dataset.ctype==='line'));
+  document.querySelectorAll('.rankm-metric-tab').forEach(b=>b.classList.toggle('active', b.dataset.metric==='payment'));
+  const labelsBtn = document.getElementById('rankLabelsBtn');
+  if (labelsBtn) labelsBtn.classList.remove('active');
+
+  const aplikasiSel = document.getElementById('rankAplikasiSel');
+  aplikasiSel.innerHTML = appList.length
+    ? appList.map(ap=>`<option value="${escH(ap)}">${escH(ap)}</option>`).join('')
+    : '<option value="">(SPV ini belum punya aplikasi)</option>';
+
+  document.getElementById('rankmBody').innerHTML = '<div class="rankm-empty"><div class="icon">⏳</div>Memuat data rank...</div>';
+
+  await fetchRankData();
+  onRankAplikasiChange();
+}
+
+function closeRankModal() {
+  const overlay = document.getElementById('rankModal');
+  const box     = overlay.querySelector('.rankm-box');
+  const btn     = document.getElementById('rankmFsBtn');
+  box.classList.remove('fullscreen');
+  overlay.classList.remove('fullscreen-mode');
+  if (btn) { btn.textContent = '⛶'; btn.title = 'Fullscreen'; }
+  overlay.classList.remove('open');
+  if (_rankChartInstance) { try{_rankChartInstance.destroy();}catch(e){} _rankChartInstance = null; }
+}
+
+function toggleRankmFullscreen() {
+  const overlay = document.getElementById('rankModal');
+  const box     = overlay.querySelector('.rankm-box');
+  const btn     = document.getElementById('rankmFsBtn');
+  const isFs    = box.classList.toggle('fullscreen');
+  overlay.classList.toggle('fullscreen-mode', isFs);
+  btn.textContent = isFs ? '⊠' : '⛶';
+  btn.title = isFs ? 'Keluar Fullscreen' : 'Fullscreen';
+}
+
+function _rankDataset() {
+  return _rankState.mode === 'daily' ? (_rankDataCache?.daily||[]) : (_rankDataCache?.monthly||[]);
+}
+
+// Rebuild dropdown Bucket berdasarkan aplikasi terpilih + mode (daily/monthly bisa
+// beda cakupan bucket-nya, mis. monthly belum sempat diisi utk semua bucket).
+function _rebuildRankBucketOptions(keepPrev) {
+  const apLow = (_rankState.aplikasi||'').toLowerCase();
+  const dataset = _rankDataset();
+  const buckets = [...new Set(dataset.filter(r=>r.aplikasi.toLowerCase()===apLow).map(r=>r.bucket).filter(Boolean))].sort();
+  const bucketSel = document.getElementById('rankBucketSel');
+  bucketSel.innerHTML = buckets.length
+    ? buckets.map(bk=>`<option value="${escH(bk)}">${escH(bk)}</option>`).join('')
+    : '<option value="">(Tidak ada bucket)</option>';
+  const prevBucket = _rankState.bucket;
+  _rankState.bucket = (keepPrev && buckets.includes(prevBucket)) ? prevBucket : (buckets[0]||'');
+  bucketSel.value = _rankState.bucket;
+}
+
+function onRankAplikasiChange() {
+  _rankState.aplikasi = document.getElementById('rankAplikasiSel').value;
+  _rebuildRankBucketOptions(false);
+  renderRankChart();
+}
+
+function onRankBucketChange() {
+  _rankState.bucket = document.getElementById('rankBucketSel').value;
+  renderRankChart();
+}
+
+function setRankMode(mode) {
+  _rankState.mode = mode;
+  document.querySelectorAll('.rankm-toggle-btn[data-mode]').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
+  _rebuildRankBucketOptions(true);
+  renderRankChart();
+}
+
+function setRankChartType(ctype) {
+  _rankState.chartType = ctype;
+  document.querySelectorAll('.rankm-toggle-btn[data-ctype]').forEach(b=>b.classList.toggle('active', b.dataset.ctype===ctype));
+  renderRankChart();
+}
+
+function setRankMetric(metric) {
+  _rankState.metric = metric;
+  document.querySelectorAll('.rankm-metric-tab').forEach(b=>b.classList.toggle('active', b.dataset.metric===metric));
+  renderRankChart();
+}
+
+function toggleRankLabels() {
+  _rankState.showLabels = !_rankState.showLabels;
+  const btn = document.getElementById('rankLabelsBtn');
+  if (btn) btn.classList.toggle('active', _rankState.showLabels);
+  renderRankChart();
+}
+
+// Parse manual dari string 'YYYY-MM-DD' — HINDARI `new Date(str)` di sini karena
+// decode ISO date-only selalu dianggap UTC midnight oleh JS, lalu getDate()/getMonth()
+// membacanya balik pakai timezone LOKAL browser. Kalau browser ada di timezone yang
+// lebih belakang dari UTC, tanggalnya mundur 1 hari (mis. 1/8 tampil sebagai 31/7).
+// Parsing manual dari teks-nya langsung menghindari konversi timezone sama sekali.
+function _fmtRankDateLabel(t) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  if (!m) return t; // bukan format tanggal standar (mis. placeholder teks) — tampilkan apa adanya
+  return `${parseInt(m[3],10)}/${parseInt(m[2],10)}`;
+}
+
+function _fmtRankVal(v, fmt, short) {
+  if (v===null||v===undefined||isNaN(v)) return '—';
+  if (fmt==='rp') {
+    if (short) return v>=1e9?(v/1e9).toFixed(1)+'M':v>=1e6?(v/1e6).toFixed(1)+'jt':v>=1e3?(v/1e3).toFixed(0)+'rb':Math.round(v);
+    return 'Rp '+Math.round(v).toLocaleString('id-ID');
+  }
+  if (fmt==='rate') return (v*100).toFixed(2)+'%';
+  if (fmt==='rank') return '#'+Math.round(v);
+  return Math.round(v).toLocaleString('id-ID');
+}
+
+function renderRankChart() {
+  const body = document.getElementById('rankmBody');
+  if (_rankChartInstance) { try{_rankChartInstance.destroy();}catch(e){} _rankChartInstance = null; }
+
+  const titleBits = [_rankState.spv, _rankState.aplikasi, _rankState.bucket].filter(Boolean);
+  document.getElementById('rankmTitle').textContent = `📈 Rank Vendor — ${titleBits.join(' · ')}`;
+
+  const apLow = (_rankState.aplikasi||'').toLowerCase();
+  const dataset = _rankDataset();
+  const apRows = dataset.filter(r => r.aplikasi.toLowerCase() === apLow);
+
+  if (!apRows.length) {
+    body.innerHTML = `<div class="rankm-empty"><div class="icon">📭</div><div>Belum ada data yang di-input untuk aplikasi <b>${escH(_rankState.aplikasi||'ini')}</b> di sheet "DATA RANK".</div></div>`;
+    return;
+  }
+
+  const bkRows = apRows.filter(r => r.bucket === _rankState.bucket);
+  if (!bkRows.length) {
+    body.innerHTML = `<div class="rankm-empty"><div class="icon">📭</div><div>Belum ada data yang di-input untuk bucket ini.</div></div>`;
+    return;
+  }
+
+  body.innerHTML = `<div style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div>`;
+
+  const metric = _rankState.metric;
+  const meta = RANK_METRIC_META[metric];
+
+  // X-axis: tanggal unik terurut. Kalau tanggal kosong semua (mis. blok Rank Monthly
+  // belum diisi tanggalnya krn baru 1 bulan berjalan), fallback 1 kategori "Bulan ini"
+  // supaya tetap bisa dibandingkan antar vendor (bar/point tunggal per vendor).
+  const tanggalSet = [...new Set(bkRows.map(r=>r.tanggal).filter(Boolean))].sort();
+  const hasTanggal = tanggalSet.length > 0;
+  const labels = hasTanggal
+    ? tanggalSet.map(_fmtRankDateLabel)
+    : ['Bulan ini'];
+
+  const vendors = [...new Set(bkRows.map(r=>r.vendor).filter(Boolean))].sort();
+  const PALETTE = ['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#6366f1'];
+
+  // Metrik "Rank": #1 = TERBAIK, jadi nilainya semakin besar semakin buruk — kebalikan
+  // dari kebiasaan chart (nilai besar biasanya "bagus"/di atas/bar tinggi). Dulu ini
+  // "diakalin" dengan reverse:true di axis, tapi itu bikin bar chart menggantung dari
+  // ATAS ke bawah (base bar Chart.js tetap di 0/scale-min, cuma tampilan axis yang
+  // dibalik — jadi bar-nya salah arah). Solusinya: balik NILAI DATA-nya sendiri
+  // (bukan axis), supaya bar tetap tumbuh dari bawah seperti biasa, lalu balik lagi
+  // pas ditampilkan (tooltip/tick/label) supaya tetap kebaca sebagai "#1, #2, ...".
+  const isRankMetric = metric === 'rank';
+  let maxRankVal = 1;
+  if (isRankMetric) {
+    const allRanks = bkRows.map(r=>r.rank).filter(v=>v!==null&&v!==undefined&&!isNaN(v));
+    maxRankVal = allRanks.length ? Math.max(...allRanks) : 1;
+  }
+  const toChartVal = raw => (raw===null||raw===undefined||isNaN(raw)) ? null : (isRankMetric ? (maxRankVal+1-raw) : raw);
+  const fromChartVal = v => (v===null||v===undefined||isNaN(v)) ? null : (isRankMetric ? (maxRankVal+1-v) : v);
+
+  const datasets = vendors.map((vd, i) => {
+    const vRows = bkRows.filter(r=>r.vendor===vd);
+    const byTgl = {};
+    vRows.forEach(r => { byTgl[r.tanggal||''] = r[metric]; });
+    const data = hasTanggal
+      ? tanggalSet.map(t => toChartVal(byTgl[t]===undefined?null:byTgl[t]))
+      : [toChartVal(vRows[0]?.[metric] ?? null)];
+    const color = PALETTE[i % PALETTE.length];
+    return {
+      label: vd,
+      data,
+      borderColor: color,
+      backgroundColor: _rankState.chartType==='bar' ? color+'cc' : color+'22',
+      borderWidth: 2, fill: false, tension: .3, pointRadius: 3, spanGaps: true,
+    };
+  });
+
+  const isBar = _rankState.chartType === 'bar';
+  const DL = window.ChartDataLabels;
+  const ctx = document.getElementById('rankmChart');
+  _rankChartInstance = new Chart(ctx.getContext('2d'), {
+    type: _rankState.chartType,
+    plugins: DL ? [DL] : [],
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: true, position: 'bottom', labels:{font:{size:10},boxWidth:12,padding:8} },
+        tooltip: { callbacks: {
+          label: c => ` ${c.dataset.label}: ${_fmtRankVal(fromChartVal(c.parsed.y), meta.fmt)}`
+        }},
+        ...(DL ? { datalabels: {
+          display: (dctx) => _rankState.showLabels && dctx.dataset.data[dctx.dataIndex] !== null && dctx.dataset.data[dctx.dataIndex] !== undefined,
+          color: isBar ? '#fff' : (dctx) => dctx.dataset.borderColor,
+          backgroundColor: null,
+          borderRadius: 3, padding: 2,
+          font: { size: 9, weight: 'bold' },
+          anchor: isBar ? 'center' : 'end',
+          align: isBar ? 'center' : 'top',
+          offset: isBar ? 0 : 4,
+          formatter: v => _fmtRankVal(fromChartVal(v), meta.fmt, true),
+          clamp: true,
+        }} : {}),
+      },
+      scales: {
+        x: { ticks:{font:{size:10}}, grid:{display:false} },
+        y: {
+          // SELALU mulai dari 0 (termasuk utk metrik Rank). Sebelumnya Rank pakai
+          // beginAtZero:false, jadi axis-min auto-scale ke nilai chart terkecil yang
+          // tampil (mis. 1) — akibatnya vendor rank TERBURUK (yg nilai chart-nya jadi
+          // paling kecil setelah dibalik) punya tinggi bar 0 karena base bar = axis-min
+          // = nilainya sendiri, jadi keliatan "hilang" padahal datanya ada.
+          beginAtZero: true,
+          ticks: { font:{size:10}, callback: v => _fmtRankVal(fromChartVal(v), meta.fmt, true) }
+        }
+      }
+    }
+  });
 }
 
 // ── Bucket Target Payment ─────────────────────────────────────
@@ -2953,6 +3281,7 @@ function buildSPVBlock(spv,rows,bulan,tahun){
         <div><div class="spv-name">${escH(spv)}</div><div class="spv-meta">${escH(appList)} · ${Object.keys(byBucket).length} bucket · ${agentCount} agent</div></div>
       </div>
       <div class="spv-header-right">
+        <button class="btn-rank-chart" onclick="openRankModal('${safeSpv}','${safeSpvId}')" title="Lihat ranking vendor per bucket (data dari sheet DATA RANK)">📈 Tampilkan Rank</button>
         <span class="pill-blue">${bulan} ${tahun}</span>
         <button class="btn-cmp-bulan" onclick="openCmpBulan('${safeSpv}','${safeSpvId}')" title="Bandingkan dengan bulan lalu (apple-to-apple)">📅 vs Bln Lalu</button>
         <button class="btn-add-setup" onclick="openSetupModal('${safeSpv}',null)">+ Setup baru</button>
@@ -3307,7 +3636,10 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
 }
 
 // ── Gemini AI Integration ─────────────────────────────────────
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-8b:generateContent?key=';
+// NB: model "gemini-1.5-flash-8b" sudah di-retire oleh Google (per Agustus 2026),
+// makanya request selalu balas 404. Diganti ke "gemini-2.5-flash-lite" — varian
+// termurah/tercepat yang masih aktif, setara perannya dengan 1.5-flash-8b dulu.
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=';
 
 function getGeminiKey() {
   return localStorage.getItem('tz_gemini_key')||'';
@@ -3418,8 +3750,9 @@ function saveGeminiKeyAndGenerate(safeSpvId) {
 }
 
 // ── Bucket Summary HTML ───────────────────────────────────────
-function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
+function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentScores){
   if(!bucketRows||!bucketRows.length)return'';
+  agentScores = agentScores || []; // hasil calcRiskScore per agent (sama dengan daftar "Perhatian Khusus" di kiri)
   const s=summarizeRows(bucketRows);
   const byAgent={};
   bucketRows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
@@ -3575,6 +3908,57 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows){
     if(firstTL[1].payment>0&&lastTL[1].payment<firstTL[1].payment*0.4){
       insights.push({dot:'dot-warn',text:`TL <b>${lastTL[0]}</b> posisi terbawah di bucket ini — payment ${fmtRpFull(lastTL[1].payment)} vs TL terbaik ${fmtRpFull(firstTL[1].payment)} (${Math.round(lastTL[1].payment/firstTL[1].payment*100)}%) — perlu evaluasi strategi tim`});
     }
+  }
+
+  // 14. Rekap agent Kritis/Waspada dari panel "Perhatian Khusus" kiri (calcRiskScore) —
+  // supaya Temuan tidak jadi analisa terpisah, tapi merefleksikan daftar yang sama
+  // dengan yang dilihat SPV di panel kiri, lengkap dengan alasan per tipe masalah.
+  if(agentScores.length){
+    const kritisAgents=agentScores.filter(x=>x.risk.score>=50);
+    const waspadaAgents=agentScores.filter(x=>x.risk.score>=20&&x.risk.score<50);
+    if(kritisAgents.length||waspadaAgents.length){
+      const parts=[];
+      if(kritisAgents.length)parts.push(`${kritisAgents.length} Kritis`);
+      if(waspadaAgents.length)parts.push(`${waspadaAgents.length} Waspada`);
+      insights.push({dot:kritisAgents.length?'dot-red':'dot-warn',
+        text:`<b>${kritisAgents.length+waspadaAgents.length} dari ${n} agent</b> butuh perhatian khusus (${parts.join(' · ')}) — lihat skor & alasan lengkapnya di panel "Perhatian Khusus Agent per Bucket": ${agentScores.slice(0,5).map(x=>x.ag).join(', ')}${agentScores.length>5?', ...':''}`});
+    }
+
+    // Breakdown per tipe masalah paling sering muncul (payment, sentuh WA, absensi, dst),
+    // supaya jelas KENAPA mereka masuk kategori Kritis/Waspada — bukan cuma angka skor.
+    const issueTypeAgents={};
+    agentScores.forEach(x=>{
+      const seenTypes=new Set(); // 1 agent dihitung sekali per tipe walau ada beberapa issue dg tipe sama
+      x.risk.issues.forEach(iss=>{
+        if(seenTypes.has(iss.type))return;
+        seenTypes.add(iss.type);
+        if(!issueTypeAgents[iss.type])issueTypeAgents[iss.type]=[];
+        issueTypeAgents[iss.type].push(x.ag);
+      });
+    });
+    const ISSUE_TYPE_LABEL={
+      payment:{text:'payment-nya di bawah rata-rata tim — jadi pemberat performa bucket',dot:'dot-red'},
+      rate:{text:'rate bayarnya rendah',dot:'dot-red'},
+      alpha:{text:'ada alpha (tidak hadir tanpa keterangan)',dot:'dot-red'},
+      absensi:{text:'tingkat kehadirannya rendah',dot:'dot-warn'},
+      sentuhWA:{text:'sentuh WA-nya jauh di bawah rata-rata tim',dot:'dot-warn'},
+      callManual:{text:'call manual-nya di bawah rata-rata tim',dot:'dot-warn'},
+      zonkStreak:{text:'hadir berturut-turut tanpa payment',dot:'dot-warn'},
+      catatan:{text:'banyak catatan SPV — perlu pembinaan',dot:'dot-warn'},
+      ptp:{text:'realisasi PTP-nya rendah (janji tidak ditepati)',dot:'dot-warn'},
+      nolPayment:{text:'sering hadir tapi payment Rp 0',dot:'dot-warn'},
+      waBlokir:{text:'rasio WA diblokirnya tinggi',dot:'dot-warn'},
+      callConn:{text:'rasio call terhubungnya rendah',dot:'dot-warn'},
+      pindahProject:{text:'baru pindah dari project/aplikasi lain',dot:'dot-blue'},
+    };
+    Object.entries(issueTypeAgents)
+      .filter(([type,names])=>names.length>=2&&ISSUE_TYPE_LABEL[type]) // minimal 2 agent biar tidak berisik
+      .sort((a,b)=>b[1].length-a[1].length)
+      .slice(0,4) // batasi 4 tipe teratas biar Temuan tetap ringkas dibaca
+      .forEach(([type,names])=>{
+        const meta=ISSUE_TYPE_LABEL[type];
+        insights.push({dot:meta.dot,text:`<b>${names.length} agent</b> ${meta.text}: ${names.slice(0,4).join(', ')}${names.length>4?', ...':''}`});
+      });
   }
 
   if(!insights.length)insights.push({dot:'dot-green',text:'Tidak ada temuan kritis di level bucket — performa relatif merata.'});
@@ -3810,9 +4194,6 @@ function renderAttentionPanel(spv, safeSpvId){
     byAgent[ag].push(r);
   });
 
-  // Tampilkan bucket summary di panel kanan
-  analysisEl.innerHTML=buildBucketSummaryHtml(spv, safeSpvId, rowsForScoring, allSpvRows);
-
   const agentScores=Object.entries(byAgent).map(([ag,rows])=>{
     const risk=calcRiskScore(rows, allSpvRows, isSingleDay);
     const agStatus=agentStatusMap[ag]||{status:'aktif'};
@@ -3822,6 +4203,11 @@ function renderAttentionPanel(spv, safeSpvId){
   .sort((a,b)=>isSingleDay
     ?(b.rows.reduce((s,r)=>s+(r.dailyPayment||0),0))-(a.rows.reduce((s,r)=>s+(r.dailyPayment||0),0))
     :b.risk.score-a.risk.score);
+
+  // Tampilkan bucket summary di panel kanan — kirim agentScores supaya bagian
+  // "Temuan" bisa merefleksikan daftar Kritis/Waspada yang sama dengan panel kiri
+  // (bukan mode 1-hari, karena skor per-hari tidak relevan utk agregat bulanan)
+  analysisEl.innerHTML=buildBucketSummaryHtml(spv, safeSpvId, rowsForScoring, allSpvRows, isSingleDay?[]:agentScores);
 
   if(!agentScores.length){
     listEl.innerHTML=`<div class="no-attention" style="color:var(--success);padding:20px 0">✅ ${isFiltered?`Tidak ada masalah di ${getRangeLabel()}.`:'Semua agent dalam kondisi baik!'}</div>`;
@@ -3894,9 +4280,13 @@ function selectAttentionAgent(spv, safeSpvId, idx){
   </div>`:'';
 
   // Simpan bucket summary dulu, lalu append detail agent
+  // Pakai agentScores yang sudah dihitung renderAttentionPanel (cache di window),
+  // supaya Temuan tetap konsisten dg daftar Kritis/Waspada di panel kiri walau
+  // sedang melihat detail 1 agent tertentu.
   const bucketSummaryHtml=buildBucketSummaryHtml(spv, safeSpvId,
     (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===(firstRow.bucket||'')),
-    spvAgentDataCache[spv]||[]);
+    spvAgentDataCache[spv]||[],
+    window['_attData_'+safeSpvId]||[]);
 
   // Kelompokkan issues per group untuk tampilan terstruktur
   const groups={};

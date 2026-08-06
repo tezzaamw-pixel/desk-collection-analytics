@@ -9,8 +9,10 @@ const CFG = {
   SHEET_ALL_DATA: 'All Data',
   SHEET_REFERENSI: 'Referensi Akun',
   SHEET_VIOLATION: 'VIOLATION',
+  SHEET_RANK: 'DATA RANK',
   HEADER_ROW: 1,
-  DATA_START_ROW: 2
+  DATA_START_ROW: 2,
+  RANK_DATA_START_ROW: 3 // sheet "DATA RANK": row 1 = judul blok, row 2 = header kolom, data mulai row 3
 };
 
 /*** ============ VIOLATION COLUMN MAPPING (0-based, A=0) ============ ***/
@@ -369,7 +371,7 @@ function _cacheRemove(key) {
 
 /** Panggil dari trigger / manual setelah update sheet agar cache segar */
 function clearAllServerCache() {
-  const keys = ['svc_referensi', 'svc_violation', 'svc_agentdata_raw'];
+  const keys = ['svc_referensi', 'svc_violation', 'svc_agentdata_raw', 'svc_rankdata'];
   keys.forEach(k => _cacheRemove(k));
   Logger.log('Server cache cleared: ' + keys.join(', '));
 }
@@ -385,6 +387,7 @@ function doGet(e) {
       case 'referensi': result = endpointReferensi_(e); break;
       case 'violation': result = endpointViolation_(e); break;
       case 'jumlahakun': result = endpointJumlahAkun_(e); break;
+      case 'rankdata':  result = endpointRankData_(e);  break;
       default: result = { success: false, message: 'Unknown action: ' + action };
     }
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -698,4 +701,125 @@ function endpointJumlahAkun_(e) {
 
 function TEST_jumlahakun() {
   Logger.log(JSON.stringify(endpointJumlahAkun_({parameter:{}}), null, 2));
+}
+
+/*** ============ RANK DATA (Sheet "DATA RANK") ============ ***
+ * Sheet berisi 2 blok tabel berdampingan di sheet yang sama:
+ *   - RANK DAILY   : kolom A–I  (TANGGAL, NAMA APLIKASI, BUCKET, VENDOR, OS, PAYMENT, RATE, RANK, GAP)
+ *   - kolom J       : pemisah kosong
+ *   - RANK MONTHLY : kolom K–S  (TANGGAL, NAMA APLIKASI, BUCKET, VENDOR, OS, PAYMENT, RATE, RANK, GAP)
+ * Row 1 = judul blok (merged), row 2 = header kolom, data mulai row 3.
+ * VENDOR = entitas yang di-ranking di dalam 1 bucket (mis. EDN, TEAM B, TEAM C...,
+ * atau S1-3 Old EDN, HRO-MKM-A, dst tergantung aplikasi) — dipakai utk chart
+ * multi-line/bar perbandingan antar vendor dari waktu ke waktu di team.html.
+ *************************************************************/
+const RANKCOL = {
+  // Blok DAILY (0-based, relatif ke awal baris yang dibaca mulai kolom A)
+  D_TANGGAL:0, D_APLIKASI:1, D_BUCKET:2, D_VENDOR:3, D_OS:4, D_PAYMENT:5, D_RATE:6, D_RANK:7, D_GAP:8,
+  // Blok MONTHLY — kolom K adalah index 10 (A=0 ... J=9, K=10)
+  M_TANGGAL:10, M_APLIKASI:11, M_BUCKET:12, M_VENDOR:13, M_OS:14, M_PAYMENT:15, M_RATE:16, M_RANK:17, M_GAP:18
+};
+const RANK_TOTAL_COLS = 19; // A sampai S
+
+// Konversi khusus serial tanggal utk sheet "DATA RANK" — SENGAJA TIDAK memakai
+// normTanggal_() yang dipakai sheet "All Data", karena normTanggal_() membangun
+// epoch pakai `new Date(1899,11,30)` (LOCAL time, ikut timezone project Apps
+// Script). Itu terbukti menghasilkan tanggal MUNDUR 1 HARI kalau timezone project-
+// nya di zona GMT+ (mis. Asia/Jakarta) — sudah dites: serial 46235 salah jadi
+// 2026-07-31, padahal seharusnya 2026-08-01. Di sini pakai Date.UTC() murni supaya
+// hasilnya selalu benar apa pun timezone project-nya. Kolom TANGGAL "All Data"
+// tidak disentuh sama sekali (biar tidak berisiko me-regresi pipeline yang sudah
+// berjalan baik — di sana sepertinya kolomnya sudah ke-format Date, bukan serial
+// mentah, jadi tidak pernah lewat cabang ini).
+function _rankSerialToDate_(serial) {
+  const epochUTC = Date.UTC(1899, 11, 30);
+  const dateUTC = new Date(epochUTC + Number(serial) * 86400000);
+  if (dateUTC.getUTCFullYear() > 1900) {
+    return dateUTC.getUTCFullYear() + '-' +
+      String(dateUTC.getUTCMonth() + 1).padStart(2, '0') + '-' +
+      String(dateUTC.getUTCDate()).padStart(2, '0');
+  }
+  return null;
+}
+
+function _rankNormTanggal_(val) {
+  if (val === null || val === undefined || val === '') return '';
+  if (val instanceof Date) {
+    if (val.getFullYear() > 1900) {
+      const y = val.getFullYear();
+      const m = String(val.getMonth() + 1).padStart(2, '0');
+      const d = String(val.getDate()).padStart(2, '0');
+      return y + '-' + m + '-' + d;
+    }
+    return '';
+  }
+  const s = String(val).trim();
+  if (/^\d+$/.test(s) && Number(s) > 40000) {
+    return _rankSerialToDate_(s) || s;
+  }
+  return s; // fallback teks apa adanya (mis. placeholder blok monthly yg blm diisi tanggal)
+}
+
+function _normRankRow_(row, tglIdx, apIdx, bkIdx, vdIdx, osIdx, payIdx, rateIdx, rankIdx, gapIdx) {
+  return {
+    tanggal: _rankNormTanggal_(row[tglIdx]),
+    aplikasi: normText_(row[apIdx]),
+    bucket: normText_(row[bkIdx]),
+    vendor: normText_(row[vdIdx]),
+    os: normRupiah_(row[osIdx]),
+    payment: normRupiah_(row[payIdx]),
+    rate: normRate_(row[rateIdx]),
+    rank: normNumber_(row[rankIdx]),
+    gap: normNumber_(row[gapIdx])
+  };
+}
+
+function endpointRankData_(e) {
+  const CACHE_KEY = 'svc_rankdata';
+  const hit = _cacheGet(CACHE_KEY);
+  if (hit) return hit;
+
+  const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+  const sheet = ss.getSheetByName(CFG.SHEET_RANK);
+  if (!sheet) return { success: false, message: 'Sheet "' + CFG.SHEET_RANK + '" tidak ditemukan.' };
+
+  const lastRow = sheet.getLastRow();
+  const lastCol = Math.max(sheet.getLastColumn(), RANK_TOTAL_COLS);
+  if (lastRow < CFG.RANK_DATA_START_ROW) {
+    const empty = { success: true, action: 'rankdata', totalDaily: 0, totalMonthly: 0, daily: [], monthly: [] };
+    _cachePut(CACHE_KEY, empty);
+    return empty;
+  }
+
+  const raw = sheet.getRange(
+    CFG.RANK_DATA_START_ROW, 1,
+    lastRow - CFG.RANK_DATA_START_ROW + 1,
+    lastCol
+  ).getValues();
+
+  const daily = [], monthly = [];
+  raw.forEach(row => {
+    // Baris dianggap valid kalau VENDOR terisi (bukan cuma TANGGAL, karena blok
+    // monthly bisa saja belum diisi tanggalnya tapi datanya sudah valid).
+    if (normText_(row[RANKCOL.D_VENDOR])) {
+      daily.push(_normRankRow_(row, RANKCOL.D_TANGGAL, RANKCOL.D_APLIKASI, RANKCOL.D_BUCKET,
+        RANKCOL.D_VENDOR, RANKCOL.D_OS, RANKCOL.D_PAYMENT, RANKCOL.D_RATE, RANKCOL.D_RANK, RANKCOL.D_GAP));
+    }
+    if (normText_(row[RANKCOL.M_VENDOR])) {
+      monthly.push(_normRankRow_(row, RANKCOL.M_TANGGAL, RANKCOL.M_APLIKASI, RANKCOL.M_BUCKET,
+        RANKCOL.M_VENDOR, RANKCOL.M_OS, RANKCOL.M_PAYMENT, RANKCOL.M_RATE, RANKCOL.M_RANK, RANKCOL.M_GAP));
+    }
+  });
+
+  const result = {
+    success: true, action: 'rankdata',
+    totalDaily: daily.length, totalMonthly: monthly.length,
+    daily, monthly
+  };
+  _cachePut(CACHE_KEY, result);
+  return result;
+}
+
+function TEST_rankdata() {
+  Logger.log(JSON.stringify(endpointRankData_({parameter:{}}), null, 2));
 }
