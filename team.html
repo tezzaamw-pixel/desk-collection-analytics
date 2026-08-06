@@ -3651,10 +3651,15 @@ function calcRiskScore(agentRows, allSpvRows, isSingleDay){
 }
 
 // ── Gemini AI Integration ─────────────────────────────────────
-// NB: model "gemini-1.5-flash-8b" sudah di-retire oleh Google (per Agustus 2026),
-// makanya request selalu balas 404. Diganti ke "gemini-2.5-flash-lite" — varian
-// termurah/tercepat yang masih aktif, setara perannya dengan 1.5-flash-8b dulu.
-const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-lite:generateContent?key=';
+// NB: model Gemini yang di-hardcode di sini sudah 2x ketiban masalah "404" karena
+// Google pensiunin versi lama (dulu "gemini-1.5-flash-8b", lalu "gemini-2.5-flash-lite"
+// juga masuk daftar legacy). Supaya gak berulang terus tiap beberapa bulan, sekarang
+// dibuat daftar model yg dicoba BERURUTAN: pertama model spesifik yg masih stabil per
+// Agustus 2026 ("gemini-3.5-flash-lite"), kalau itu 404 (di-retire lagi di masa depan)
+// otomatis coba lagi pakai alias "gemini-flash-latest" — alias ini SELALU nunjuk ke versi
+// flash terbaru yg direkomendasikan Google, jadi gak akan pernah expired/pensiun.
+const GEMINI_MODELS = ['gemini-3.5-flash-lite', 'gemini-flash-latest'];
+const GEMINI_URL_BASE = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
 function getGeminiKey() {
   return localStorage.getItem('tz_gemini_key')||'';
@@ -3700,42 +3705,140 @@ async function generateBucketAI(safeSpvId) {
   if (!cache) { btn.disabled=false; btn.textContent='✨ Generate'; return; }
 
   try {
-    const prompt = `Kamu adalah analis kinerja tim collection (penagihan hutang) yang berpengalaman. 
-Berdasarkan data berikut, tulis analisis dalam 2 paragraf bahasa Indonesia yang natural, spesifik, dan actionable.
+    // Konteks Rank Vendor BULANAN (bukan harian) — ini yang relevan buat laporan ke
+    // atasan, karena standing bulanan mencerminkan performa sebulan penuh, bukan cuma
+    // 1 tanggal. Kalau belum ada datanya (blm ke-input di sheet DATA RANK), dilewati.
+    const rankMonthlyLine = cache.rankMonthly
+      ? `Posisi Rank Vendor bulan ini (data RANK MONTHLY): EDN peringkat #${cache.rankMonthly.rank} dari ${cache.rankMonthly.totalVendor} vendor${cache.rankMonthly.leaderName?`, kalah dari vendor ${cache.rankMonthly.leaderName} (peringkat 1)`:''}${(cache.rankMonthly.gap!==null&&cache.rankMonthly.gap!==0)?`, gap ke posisi 1 sebesar ${fmtRp(Math.abs(cache.rankMonthly.gap))} (${cache.rankMonthly.gap<0?'masih kurang':'sudah unggul'})`:''}.`
+      : '';
+
+    // Tren pergerakan Rank Vendor HARIAN sepanjang bulan berjalan (awal vs akhir data
+    // yg ada) — supaya laporan gak cuma bilang "standing sekarang", tapi juga cerita
+    // apakah sedang membaik/memburuk dibanding awal bulan.
+    let rankTrendLine = '';
+    if (cache.rankDailyTrend) {
+      const t = cache.rankDailyTrend;
+      const tglA = t.firstTgl.split('-').reverse().join('/');
+      const tglB = t.lastTgl.split('-').reverse().join('/');
+      const rankDir = t.lastRank < t.firstRank ? 'membaik' : t.lastRank > t.firstRank ? 'memburuk' : 'stabil';
+      let gapPart = '';
+      if (t.firstGap !== null && t.lastGap !== null) {
+        const gapDir = Math.abs(t.lastGap) < Math.abs(t.firstGap) ? 'mengecil'
+          : Math.abs(t.lastGap) > Math.abs(t.firstGap) ? 'membesar' : 'stabil';
+        gapPart = `, gap ke posisi 1 bergerak dari ${fmtRp(Math.abs(t.firstGap))} (${tglA}) menjadi ${fmtRp(Math.abs(t.lastGap))} (${tglB}) — ${gapDir}`;
+      }
+      rankTrendLine = `Tren Rank Vendor HARIAN sepanjang bulan ini (data RANK DAILY): EDN mulai dari peringkat #${t.firstRank} (${tglA}) menjadi #${t.lastRank} (${tglB}) — ${rankDir}${gapPart}.`;
+    }
+
+    // Tren mingguan payment bucket (M1-M4) — supaya AI bisa cerita progresnya minggu
+    // per minggu, bukan cuma total 1 bulan (poin yg diminta user: "perkembangan weekly").
+    let weeklyTrendLine = '';
+    if (cache.weeklyTrend && cache.weeklyTrend.weeks.some(w=>w>0)) {
+      const wLabel=['Minggu 1','Minggu 2','Minggu 3','Minggu 4'];
+      const wText=cache.weeklyTrend.weeks.map((w,i)=>`${wLabel[i]}: ${w>0?fmtRp(w):'—'}`).join(', ');
+      weeklyTrendLine = `Tren payment MINGGUAN bucket ini bulan ini: ${wText} (${cache.weeklyTrend.label}).`;
+    }
+
+    // Perbandingan apple-to-apple vs bulan lalu (payment & rate) — pertanyaan pertama
+    // yang biasa ditanya atasan: "naik/turun dibanding bulan lalu?"
+    let vsBulanLaluLine = '';
+    if (cache.vsBulanLalu) {
+      const v = cache.vsBulanLalu;
+      const payDir = v.paymentDeltaPct===null?'':(v.paymentDeltaPct>0?`naik ${v.paymentDeltaPct}%`:v.paymentDeltaPct<0?`turun ${Math.abs(v.paymentDeltaPct)}%`:'stabil');
+      const rateDir = v.rateDeltaPct===null?'':(v.rateDeltaPct>0?`naik ${v.rateDeltaPct}%`:v.rateDeltaPct<0?`turun ${Math.abs(v.rateDeltaPct)}%`:'stabil');
+      vsBulanLaluLine = `Perbandingan apple-to-apple vs ${v.bulanPrev} ${v.tahunPrev}: total payment ${payDir?payDir+' ('+fmtRp(v.prevPayment)+' → '+cache.totalPayment+')':'tidak bisa dibandingkan'}${rateDir?`, avg rate ${rateDir} (${fmtRate(v.prevRate)} → ${cache.avgRate})`:''}.`;
+    }
+
+    // Snapshot KPI mentah lain yang mungkin gak lolos threshold "Temuan otomatis" tapi
+    // tetap relevan buat gambaran lengkap operasional bucket ini.
+    let rawKpiLine = '';
+    if (cache.rawKpi) {
+      const k = cache.rawKpi;
+      rawKpiLine = `Aktivitas operasional bulan ini: Sentuh WA ${fmtNum(k.sentuhWA)} (respon ${fmtNum(k.responWA)}), Call Manual ${fmtNum(k.callManual)} (terhubung ${fmtNum(k.callTerhubung)}), PTP ${fmtNum(k.ptp)} (bayar ${fmtNum(k.ptpBayar)}), WA Diblokir ${fmtNum(k.waBlokir)}, Total Data ${fmtNum(k.totalData)}, Payment Overtime ${fmtRp(k.paymentOvertime)}.`;
+    }
+
+    // Top & bottom agent dgn angka lengkap — biar AI bisa sebut nama+angka spesifik,
+    // bukan cuma yg kebetulan lolos jadi "Temuan" (misal agent bagus tanpa masalah apapun
+    // tetap layak disebut sbg top performer).
+    let topBottomLine = '';
+    if (cache.topAgents && cache.topAgents.length) {
+      const fmtAgent=a=>`${a.ag} (${fmtRp(a.payment)}, rate ${fmtRate(a.rate)}, hadir ${a.hadir}/${a.hariKerja})`;
+      topBottomLine = `Top performer: ${cache.topAgents.map(fmtAgent).join('; ')}. Bottom performer: ${(cache.bottomAgents||[]).map(fmtAgent).join('; ')}.`;
+    }
+
+    // Benchmark ke bucket lain yg dipegang SPV yang sama, dan info rotasi/turnover agent.
+    let peerLine = '';
+    if (cache.peerBenchmark && cache.peerBenchmark.peerAvgPayment>0) {
+      const pb=cache.peerBenchmark;
+      const cmpTxt=pb.currentAvgPayment>pb.peerAvgPayment?'lebih tinggi':pb.currentAvgPayment<pb.peerAvgPayment?'lebih rendah':'setara';
+      peerLine = `Benchmark internal: avg payment/agent di bucket ini ${fmtRp(Math.round(pb.currentAvgPayment))} — ${cmpTxt} dibanding rata-rata ${pb.otherBucketCount} bucket lain yang dipegang SPV yang sama (${fmtRp(Math.round(pb.peerAvgPayment))}).`;
+    }
+    let rotasiLine = '';
+    if (cache.rotasi && (cache.rotasi.baru.length || cache.rotasi.lama.length)) {
+      const parts=[];
+      if (cache.rotasi.baru.length) parts.push(`agent baru masuk: ${cache.rotasi.baru.join(', ')}`);
+      if (cache.rotasi.lama.length) parts.push(`agent yang digantikan: ${cache.rotasi.lama.join(', ')}`);
+      rotasiLine = `Ada rotasi/pergantian agent bulan ini — ${parts.join('; ')}. Pertimbangkan ini saat menilai naik/turunnya performa (jangan disamakan dengan penurunan performa agent lama).`;
+    }
+
+    const prompt = `Kamu adalah manajer collection senior yang mereview laporan kinerja SPV — posisimu SATU TINGKAT LEBIH TINGGI dari SPV, dan tulisan ini akan dipakai SPV untuk presentasi/lapor ke atasannya (manajemen di atasmu). Jadi tulis dengan sudut pandang evaluatif-strategis seperti manajer yang menyimpulkan performa tim ke pihak yang lebih senior, BUKAN sekadar laporan operasional harian dari sudut pandang SPV.
+
+Berdasarkan data berikut, tulis analisis dalam 3 paragraf bahasa Indonesia yang natural, spesifik, dan actionable.
 
 Bucket: ${cache.bucket}
 Bulan: ${cache.bulan} ${cache.tahun}
 Total Agent: ${cache.totalAgent}
 Total Payment: ${cache.totalPayment}
 Avg Rate: ${cache.avgRate}
+${rankMonthlyLine}
+${rankTrendLine}
+${weeklyTrendLine}
+${vsBulanLaluLine}
+${rawKpiLine}
+${topBottomLine}
+${peerLine}
+${rotasiLine}
 
 Temuan otomatis sistem:
 ${cache.insights.map((ins,i)=>`${i+1}. [${ins.level}] ${ins.text.replace(/<[^>]+>/g,'')}`).join('\n')}
 
 Instruksi:
-- Paragraf 1: Kesimpulan kondisi bucket — sebutkan nama agent/TL spesifik yang bermasalah dan yang berprestasi, sertakan angka nyata
-- Paragraf 2: Rekomendasi tindakan konkret yang harus dilakukan SPV/TL dalam 3-5 hari ke depan
-- Gunakan bahasa profesional tapi mudah dipahami
-- Tidak perlu header atau bullet — tulis paragraf mengalir
-- Maksimal 150 kata total`;
+- Paragraf 1: Kesimpulan kondisi bucket bulan ini — sebutkan nama agent/TL spesifik yang bermasalah dan yang berprestasi (pakai data Top/Bottom performer), sertakan angka nyata. Kalau ada data "Posisi Rank Vendor bulan ini", jadikan itu acuan standing kompetitif (JANGAN pakai rank harian dari Temuan, pakai yang bulanan ini).
+- Paragraf 2: Progres/tren — gabungkan cerita tren MINGGUAN (naik/turun tiap minggu, bukan cuma total), perbandingan vs BULAN LALU (naik/turun berapa persen), dan tren Rank Vendor HARIAN (membaik/memburuk, gap mengecil/membesar) kalau datanya ada. Sebutkan juga kalau ada rotasi/pergantian agent yang relevan dengan naik-turunnya angka. Ini penting biar atasan tau apakah usaha yang sudah dilakukan berhasil atau belum, bukan cuma tau posisi statisnya sekarang.
+- Paragraf 3: Rekomendasi tindakan konkret yang harus dilakukan SPV/TL dalam 3-5 hari ke depan, boleh singgung benchmark ke bucket lain kalau relevan (misal kalau bucket ini tertinggal jauh dari bucket lain yang dipegang SPV yang sama).
+- Gunakan bahasa profesional, tegas, dan mudah dipahami pihak manajemen yang gak familiar dengan detail operasional harian
+- Tidak perlu header atau bullet — tulis paragraf mengalir, pisahkan tiap paragraf dengan baris kosong
+- Maksimal 220 kata total`;
 
-    const resp = await fetch(GEMINI_URL + apiKey, {
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({
-        contents:[{parts:[{text:prompt}]}],
-        generationConfig:{temperature:0.7, maxOutputTokens:300}
-      })
-    });
-
-    if (!resp.ok) {
+    // Coba tiap model di GEMINI_MODELS berurutan — kalau satu 404 (di-retire Google),
+    // otomatis lanjut ke model berikutnya, jangan langsung nyerah. Auth error (400/403)
+    // gak ada gunanya dicoba ulang ke model lain (key-nya yg salah, bukan modelnya),
+    // jadi langsung berhenti begitu ketemu error jenis itu.
+    let resp=null, lastErr=null;
+    for (const model of GEMINI_MODELS) {
+      try {
+        resp = await fetch(GEMINI_URL_BASE + model + ':generateContent?key=' + apiKey, {
+          method:'POST',
+          headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({
+            contents:[{parts:[{text:prompt}]}],
+            generationConfig:{temperature:0.7, maxOutputTokens:420}
+          })
+        });
+      } catch(networkErr) {
+        lastErr = networkErr; resp = null; continue;
+      }
+      if (resp.ok) break; // model ini jalan, stop looping
       if (resp.status===400||resp.status===403) {
-        // API key salah — hapus dari localStorage
+        // API key salah — hapus dari localStorage, gak ada gunanya coba model lain
         localStorage.removeItem('tz_gemini_key');
         throw new Error('API key tidak valid. Key dihapus, silakan masukkan ulang.');
       }
-      throw new Error('API error: '+resp.status);
+      lastErr = new Error('API error: '+resp.status+' (model '+model+')');
+      // status lain (mis. 404 krn model di-retire) — lanjut coba model berikutnya
     }
+    if (!resp||!resp.ok) throw (lastErr||new Error('Semua model Gemini gagal direspon.'));
+
     const data = await resp.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text||'Tidak ada hasil.';
 
@@ -3790,6 +3893,131 @@ function toggleInsightDetail(el){
   if(arrow)arrow.textContent=willShow?'▴ sembunyikan':'▾ lihat semua';
 }
 
+// ── Helper Rank Vendor (dipakai bareng oleh Temuan Tim/buildBucketSummaryHtml DAN
+// slide bucket di Mode Presentasi/buildBucketSlide, biar logikanya gak dobel-tulis
+// dan gak berisiko beda hasil antara 2 tempat) ─────────────────────────────────
+
+// Cari aplikasi yg paling representatif utk sekumpulan bucketRows (kadang campur
+// >1 aplikasi kalau data ganjil), dipakai sbg kriteria filter ke _rankDataCache.
+function _mainAplikasiOf(bucketRows){
+  const apCount={};
+  bucketRows.forEach(r=>{const ap=(r.aplikasi||'').trim();if(!ap)return;apCount[ap]=(apCount[ap]||0)+1;});
+  return Object.entries(apCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
+}
+
+// Status Rank Vendor per tanggal data TERBARU yg ada (dari RANK DAILY) — dipakai
+// sbg 1 poin Temuan ("EDN posisi #X dari Y vendor per tanggal Z, streak sekian hari").
+function computeRankInsightObj(bucketRows){
+  try{
+    if(!(_rankDataCache&&_rankDataCache.daily&&_rankDataCache.daily.length))return null;
+    const bucketName=(bucketRows[0]?.bucket||'').trim();
+    const mainAplikasi=_mainAplikasiOf(bucketRows);
+    const rankRowsBucket=mainAplikasi?_rankDataCache.daily.filter(r=>
+      (r.aplikasi||'').trim().toLowerCase()===mainAplikasi.toLowerCase() && (r.bucket||'').trim()===bucketName
+    ):[];
+    if(!rankRowsBucket.length)return null;
+    const tanggalListRank=[...new Set(rankRowsBucket.map(r=>r.tanggal).filter(Boolean))].sort();
+    const lastTglRank=tanggalListRank[tanggalListRank.length-1];
+    const lastRowsRank=lastTglRank?rankRowsBucket.filter(r=>r.tanggal===lastTglRank):rankRowsBucket;
+    const totalVendorRank=new Set(lastRowsRank.map(r=>r.vendor)).size;
+    const ednRowRank=lastRowsRank.find(r=>(r.vendor||'').trim().toLowerCase()==='edn');
+    if(!(ednRowRank&&ednRowRank.rank!=null&&!isNaN(ednRowRank.rank)&&totalVendorRank>=2))return null;
+    const rankVal=ednRowRank.rank;
+    const tglLabelRank=lastTglRank?lastTglRank.split('-').reverse().join('/'):'terbaru';
+    if(rankVal===1){
+      return {dot:'dot-green',text:`📈 <b>Rank Vendor</b>: EDN di posisi #1 dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank} — pertahankan performa.`};
+    }
+    const leaderRowRank=lastRowsRank.find(r=>r.rank===1);
+    const leaderNameRank=leaderRowRank?leaderRowRank.vendor:'';
+    const gapVal=ednRowRank.gap;
+    const gapTxt=(gapVal!==null&&gapVal!==undefined&&!isNaN(gapVal)&&gapVal!==0)
+      ?` — gap ke posisi 1: ${fmtRp(Math.abs(gapVal))}${gapVal<0?' (masih kurang)':' (sudah unggul)'}`
+      :'';
+    const recentTglsRank=tanggalListRank.slice(-14);
+    let streakRank=0;
+    for(let i=recentTglsRank.length-1;i>=0;i--){
+      const rw=rankRowsBucket.find(r=>r.tanggal===recentTglsRank[i]&&(r.vendor||'').trim().toLowerCase()==='edn');
+      if(rw&&rw.rank>1)streakRank++;else break;
+    }
+    const streakTxt=streakRank>=2?` (sudah ${streakRank} hari berturut-turut belum di posisi 1)`:'';
+    return {dot:rankVal===totalVendorRank?'dot-red':'dot-warn',
+      text:`📈 <b>Rank Vendor</b>: EDN di posisi #${rankVal} dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank}${leaderNameRank?`, kalah dari <b>${escH(leaderNameRank)}</b> (rank 1)`:''}${gapTxt}${streakTxt} — lihat pergerakannya lewat tombol "📈 Tampilkan Rank".`};
+  }catch(e){ console.warn('computeRankInsightObj gagal:', e); return null; }
+}
+
+// Standing BULANAN (dari RANK MONTHLY) — utk laporan ke atasan, lebih relevan drpd
+// snapshot 1 tanggal karena mencerminkan performa sebulan penuh.
+function computeRankMonthlySummary(bucketRows){
+  try{
+    if(!(_rankDataCache&&_rankDataCache.monthly&&_rankDataCache.monthly.length))return null;
+    const bucketName=(bucketRows[0]?.bucket||'').trim();
+    const mainAplikasi=_mainAplikasiOf(bucketRows);
+    const rowsMonthly=mainAplikasi?_rankDataCache.monthly.filter(r=>
+      (r.aplikasi||'').trim().toLowerCase()===mainAplikasi.toLowerCase() && (r.bucket||'').trim()===bucketName
+    ):[];
+    if(!rowsMonthly.length)return null;
+    const totalVendorM=new Set(rowsMonthly.map(r=>r.vendor)).size;
+    const ednRowM=rowsMonthly.find(r=>(r.vendor||'').trim().toLowerCase()==='edn');
+    if(!(ednRowM&&ednRowM.rank!=null&&!isNaN(ednRowM.rank)&&totalVendorM>=2))return null;
+    const leaderRowM=rowsMonthly.find(r=>r.rank===1);
+    return {
+      rank: ednRowM.rank, totalVendor: totalVendorM,
+      leaderName: leaderRowM?leaderRowM.vendor:'',
+      gap: (ednRowM.gap!==null&&ednRowM.gap!==undefined&&!isNaN(ednRowM.gap))?ednRowM.gap:null,
+    };
+  }catch(e){ console.warn('computeRankMonthlySummary gagal:', e); return null; }
+}
+
+// Tren HARIAN sepanjang bulan berjalan (titik data paling awal vs paling akhir) —
+// biar kelihatan arah pergerakannya (membaik/memburuk), bukan cuma standing statis.
+function computeRankDailyTrend(bucketRows){
+  try{
+    if(!(_rankDataCache&&_rankDataCache.daily&&_rankDataCache.daily.length))return null;
+    const bucketName=(bucketRows[0]?.bucket||'').trim();
+    const mainAplikasi=_mainAplikasiOf(bucketRows);
+    const rowsTrend=mainAplikasi?_rankDataCache.daily.filter(r=>
+      (r.aplikasi||'').trim().toLowerCase()===mainAplikasi.toLowerCase() && (r.bucket||'').trim()===bucketName
+    ):[];
+    const ednRowsSorted=rowsTrend
+      .filter(r=>(r.vendor||'').trim().toLowerCase()==='edn'&&r.tanggal&&r.rank!=null&&!isNaN(r.rank))
+      .sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+    if(ednRowsSorted.length<2)return null;
+    const firstR=ednRowsSorted[0], lastR=ednRowsSorted[ednRowsSorted.length-1];
+    if(firstR.tanggal===lastR.tanggal)return null;
+    return {
+      firstTgl:firstR.tanggal, lastTgl:lastR.tanggal,
+      firstRank:firstR.rank, lastRank:lastR.rank,
+      firstGap:(firstR.gap!==null&&firstR.gap!==undefined&&!isNaN(firstR.gap))?firstR.gap:null,
+      lastGap:(lastR.gap!==null&&lastR.gap!==undefined&&!isNaN(lastR.gap))?lastR.gap:null,
+    };
+  }catch(e){ console.warn('computeRankDailyTrend gagal:', e); return null; }
+}
+
+// Pastikan cache global _cmpPrevData (data bulan lalu) sudah terisi utk bulan/tahun
+// yg lagi dibuka. Dipakai bareng oleh 3 fitur: modal "📅 vs Bln Lalu" (openCmpBulan),
+// Mode Presentasi (fetchPresPrevMonthData), DAN sekarang Kesimpulan Eksekutif AI di
+// Tim page (buildBucketSummaryHtml) — semua baca/tulis _cmpPrevData yg sama, jadi
+// kalau salah satu fitur sudah pernah fetch bulan yg sama, yg lain tinggal pakai cache,
+// gak fetch dobel.
+async function ensurePrevMonthDataCached(bulan, tahun){
+  const BULAN_IDX=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const idxNow=BULAN_IDX.indexOf(bulan);
+  if(idxNow<0)return;
+  const idxPrev=idxNow===0?11:idxNow-1;
+  const thnPrev=idxNow===0?String(parseInt(tahun)-1):tahun;
+  const bulanPrev=BULAN_IDX[idxPrev];
+  try{
+    if(!_cmpPrevData||_cmpPrevData._bulan!==bulanPrev||_cmpPrevData._tahun!==thnPrev){
+      const url=API_URL+`?action=agentdata&bulan=${encodeURIComponent(bulanPrev)}&tahun=${encodeURIComponent(thnPrev)}`;
+      const res=await fetch(url);
+      const d=await res.json();
+      _cmpPrevData={rows:d.rows||[], _bulan:bulanPrev, _tahun:thnPrev};
+    }
+  }catch(e){
+    console.warn('ensurePrevMonthDataCached gagal:', e);
+  }
+}
+
 // ── Bucket Summary HTML ───────────────────────────────────────
 function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentScores){
   if(!bucketRows||!bucketRows.length)return'';
@@ -3798,7 +4026,12 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
   const byAgent={};
   bucketRows.forEach(r=>{const ag=r.agent||'(?)';if(!byAgent[ag])byAgent[ag]=[];byAgent[ag].push(r);});
   const agList=Object.keys(byAgent);
-  const n=agList.length||1;
+  // [FIX] Pakai computeActiveAgentCount, BUKAN agList.length — agList masih menghitung
+  // agent 'lama' (sudah digantikan/rotasi keluar bulan ini) sbg 1 headcount, padahal
+  // seharusnya tidak dihitung aktif (konsisten dgn "Agent Aktif" di bucket lain/bulan
+  // lalu yg sudah pakai fungsi ini). Tanpa fix ini, "Agent Aktif" kelihatan lebih
+  // tinggi drpd yg sebenarnya (mis. 15 padahal cuma 14 yg aktif).
+  const n=computeActiveAgentCount(bucketRows)||1;
 
   // Rank by payment
   const ranked=agList.map(ag=>{
@@ -4019,57 +4252,13 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       });
   }
 
-  // 15. Status Rank Vendor terbaru (dari sheet "DATA RANK", tombol "📈 Tampilkan Rank")
-  // — kalau EDN belum di posisi 1 di bucket ini, jadikan poin kendala di Temuan supaya
-  // SPV langsung tahu tanpa perlu buka modal Rank terpisah. Disimpan ke variabel dulu
-  // (bukan langsung push) karena poin ini relevan baik utk Temuan Akumulasi maupun
-  // Temuan Hari Ini (sama-sama soal posisi rank per tanggal data terbaru).
-  let rankInsightObj=null;
-  try{
-  if(_rankDataCache&&_rankDataCache.daily&&_rankDataCache.daily.length){
-    const bucketNameForRank=(bucketRows[0]?.bucket||'').trim();
-    // Aplikasi bucket ini: bucketRows kadang campur >1 aplikasi (jarang), jadi ambil
-    // yang paling sering muncul (mode) supaya tetap dapat 1 acuan yang representatif.
-    const apCount={};
-    bucketRows.forEach(r=>{const ap=(r.aplikasi||'').trim();if(!ap)return;apCount[ap]=(apCount[ap]||0)+1;});
-    const mainAplikasi=Object.entries(apCount).sort((a,b)=>b[1]-a[1])[0]?.[0]||'';
-    const rankRowsBucket=mainAplikasi?_rankDataCache.daily.filter(r=>
-      (r.aplikasi||'').trim().toLowerCase()===mainAplikasi.toLowerCase() && (r.bucket||'').trim()===bucketNameForRank
-    ):[];
-    if(rankRowsBucket.length){
-      const tanggalListRank=[...new Set(rankRowsBucket.map(r=>r.tanggal).filter(Boolean))].sort();
-      const lastTglRank=tanggalListRank[tanggalListRank.length-1];
-      const lastRowsRank=lastTglRank?rankRowsBucket.filter(r=>r.tanggal===lastTglRank):rankRowsBucket;
-      const totalVendorRank=new Set(lastRowsRank.map(r=>r.vendor)).size;
-      const ednRowRank=lastRowsRank.find(r=>(r.vendor||'').trim().toLowerCase()==='edn');
-      if(ednRowRank&&ednRowRank.rank!=null&&!isNaN(ednRowRank.rank)&&totalVendorRank>=2){
-        const rankVal=ednRowRank.rank;
-        const tglLabelRank=lastTglRank?lastTglRank.split('-').reverse().join('/'):'terbaru';
-        if(rankVal===1){
-          rankInsightObj={dot:'dot-green',text:`📈 <b>Rank Vendor</b>: EDN di posisi #1 dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank} — pertahankan performa.`};
-        }else{
-          const leaderRowRank=lastRowsRank.find(r=>r.rank===1);
-          const leaderNameRank=leaderRowRank?leaderRowRank.vendor:'';
-          const gapVal=ednRowRank.gap;
-          const gapTxt=(gapVal!==null&&gapVal!==undefined&&!isNaN(gapVal)&&gapVal!==0)
-            ?` — gap ke posisi 1: ${fmtRp(Math.abs(gapVal))}${gapVal<0?' (masih kurang)':' (sudah unggul)'}`
-            :'';
-          // Streak: sudah berapa hari terakhir (maks 14 hari data yg ada) EDN belum di posisi 1
-          const recentTglsRank=tanggalListRank.slice(-14);
-          let streakRank=0;
-          for(let i=recentTglsRank.length-1;i>=0;i--){
-            const rw=rankRowsBucket.find(r=>r.tanggal===recentTglsRank[i]&&(r.vendor||'').trim().toLowerCase()==='edn');
-            if(rw&&rw.rank>1)streakRank++;else break;
-          }
-          const streakTxt=streakRank>=2?` (sudah ${streakRank} hari berturut-turut belum di posisi 1)`:'';
-          rankInsightObj={dot:rankVal===totalVendorRank?'dot-red':'dot-warn',
-            text:`📈 <b>Rank Vendor</b>: EDN di posisi #${rankVal} dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank}${leaderNameRank?`, kalah dari <b>${escH(leaderNameRank)}</b> (rank 1)`:''}${gapTxt}${streakTxt} — lihat pergerakannya lewat tombol "📈 Tampilkan Rank".`};
-        }
-      }
-    }
-  }
-  }catch(e){ console.warn('Rank insight gagal dihitung:', e); rankInsightObj=null; }
+  // 15. Status Rank Vendor terbaru + standing bulanan + tren harian — dihitung lewat
+  // helper bareng (computeRankInsightObj/computeRankMonthlySummary/computeRankDailyTrend)
+  // yang jg dipakai Mode Presentasi, biar 1 sumber logika aja.
+  const rankInsightObj=computeRankInsightObj(bucketRows);
   if(rankInsightObj)insights.push(rankInsightObj);
+  const rankMonthlySummary=computeRankMonthlySummary(bucketRows);
+  const rankDailyTrend=computeRankDailyTrend(bucketRows);
 
   if(!insights.length)insights.push({dot:'dot-green',text:'Tidak ada temuan kritis di level bucket — performa relatif merata.'});
 
@@ -4132,16 +4321,81 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
   if(rankInsightObj)todayInsights.push(rankInsightObj);
   if(!todayInsights.length)todayInsights.push({dot:'dot-green',text:`Tidak ada temuan khusus hari ini${todayLabel?' ('+todayLabel+')':''} — performa normal.`});
 
+  // ── Data tambahan khusus utk Kesimpulan Eksekutif AI (bukan dipakai di UI Temuan
+  // biasa) — supaya generateBucketAI bisa nulis analisa yg lebih spesifik & mencakup
+  // tren mingguan, vs bulan lalu, benchmark peer bucket, dan rotasi agent. ───────────
+  const bucketNameForAI=bucketRows[0]?.bucket||'';
+
+  // 1. Tren mingguan bucket (M1-M4) — reuse helper yg sama dgn chart "Tren Payment Mingguan"
+  const wPaysBktForAI=weeklyPayments(bucketRows);
+  const bktWeekTrendForAI=trendLabel(wPaysBktForAI);
+
+  // 2. Benchmark vs bucket lain yg dipegang SPV yg sama (allSpvRows = semua bucket SPV ini)
+  const otherBktRowsForAI=(allSpvRows||[]).filter(r=>(r.bucket||'')&&(r.bucket||'')!==bucketNameForAI);
+  let peerBenchmarkForAI=null;
+  if(otherBktRowsForAI.length){
+    const otherSForAI=summarizeRows(otherBktRowsForAI);
+    const otherAgentCountForAI=computeActiveAgentCount(otherBktRowsForAI);
+    peerBenchmarkForAI={
+      otherBucketCount: new Set(otherBktRowsForAI.map(r=>r.bucket)).size,
+      peerAvgPayment: otherAgentCountForAI>0?otherSForAI.dailyPayment/otherAgentCountForAI:0,
+      currentAvgPayment: avgPayment,
+    };
+  }
+
+  // 3. Rotasi/turnover agent bulan ini (dipakai jg utk badge "Pengganti"/"Nonaktif" di tabel)
+  const {rotasiMap: bktRotasiMapForAI}=buildRotasiMap(bucketRows);
+  const rotasiBaruForAI=Object.entries(bktRotasiMapForAI).filter(([,info])=>info.status==='baru').map(([ag])=>ag);
+  const rotasiLamaForAI=Object.entries(bktRotasiMapForAI).filter(([,info])=>info.status==='lama').map(([ag])=>ag);
+
+  // 4. vs Bulan Lalu (apple-to-apple berdasar tanggal data TERBARU yg ada di bucket ini,
+  // bukan tanggal kalender — supaya tetap valid walau input SPV telat atau lagi lihat
+  // rentang tanggal tertentu). Pakai cache _cmpPrevData yg sama dgn modal "📅 vs Bln Lalu".
+  const allTglNumsForAI=bucketRows.map(r=>r.tanggal).filter(Boolean).map(t=>parseInt(t.split('-')[2])).filter(x=>!isNaN(x));
+  const maxDayForAI=allTglNumsForAI.length?Math.max(...allTglNumsForAI):31;
+  const prevBktRowsForAI=(_cmpPrevData?.rows||[]).filter(r=>{
+    const rSpv=r.supervisor||r.spv||'';
+    if(rSpv!==spv)return false;
+    if((r.bucket||'')!==bucketNameForAI)return false;
+    if(!r.tanggal)return false;
+    const day=parseInt(r.tanggal.split('-')[2]);
+    return !isNaN(day)&&day<=maxDayForAI;
+  });
+  let vsBulanLaluForAI=null;
+  if(prevBktRowsForAI.length){
+    const prevSForAI=summarizeRows(prevBktRowsForAI);
+    vsBulanLaluForAI={
+      bulanPrev:_cmpPrevData._bulan, tahunPrev:_cmpPrevData._tahun,
+      paymentDeltaPct: prevSForAI.dailyPayment>0?Math.round((s.dailyPayment/prevSForAI.dailyPayment-1)*100):null,
+      rateDeltaPct: prevSForAI.avgRate>0?Math.round((s.avgRate/prevSForAI.avgRate-1)*100):null,
+      prevPayment: prevSForAI.dailyPayment, prevRate: prevSForAI.avgRate,
+    };
+  }
+
   // Simpan ke cache untuk Gemini AI
   const bulan = document.getElementById('selBulan')?.value||'';
   const tahun = document.getElementById('selTahun')?.value||'';
   _bucketInsightsCache[safeSpvId] = {
-    bucket: bucketRows[0]?.bucket||'',
+    bucket: bucketNameForAI,
     bulan, tahun,
     totalAgent: n,
     totalPayment: fmtRpFull(s.dailyPayment),
     avgRate: fmtRate(s.avgRate),
-    insights: insights.map(i=>({text:i.text, level:i.dot==='dot-red'?'KRITIS':i.dot==='dot-warn'?'PERINGATAN':'INFO'})),
+    // rankInsightObj (Rank Vendor HARIAN) sengaja di-exclude dari list yg dikirim ke AI —
+    // biar gak dobel/ketuker sama rankMonthly di atas yang emang jadi acuan utama utk laporan.
+    // Tetap tampil normal di UI Temuan (insights aslinya gak diubah, cuma versi utk AI ini).
+    insights: insights.filter(i=>i!==rankInsightObj).map(i=>({text:i.text, level:i.dot==='dot-red'?'KRITIS':i.dot==='dot-warn'?'PERINGATAN':'INFO'})),
+    rankMonthly: rankMonthlySummary, // {rank,totalVendor,leaderName,gap} atau null — dipakai khusus di prompt AI
+    rankDailyTrend: rankDailyTrend, // {firstTgl,lastTgl,firstRank,lastRank,firstGap,lastGap} atau null
+    weeklyTrend: {weeks: wPaysBktForAI, label: bktWeekTrendForAI.text}, // [M1,M2,M3,M4] + label naik/turun
+    rawKpi: {sentuhWA:s.sentuhWA, responWA:s.responWA, callManual:s.callManual, callTerhubung:s.callTerhubung,
+      ptp:s.ptp, ptpBayar:s.ptpBayar, waBlokir:s.waBlokir, sentuhGojek:s.sentuhGojek, sentuhWABA:s.sentuhWABA,
+      paymentOvertime:s.paymentOvertime, totalData:s.totalData},
+    topAgents: ranked.slice(0,3).map(a=>({ag:a.ag,payment:a.payment,rate:a.rate,hadir:a.hadir,hariKerja:a.hariKerja})),
+    bottomAgents: ranked.slice(-3).map(a=>({ag:a.ag,payment:a.payment,rate:a.rate,hadir:a.hadir,hariKerja:a.hariKerja})),
+    peerBenchmark: peerBenchmarkForAI, // {otherBucketCount,peerAvgPayment,currentAvgPayment} atau null
+    rotasi: {baru:rotasiBaruForAI, lama:rotasiLamaForAI},
+    vsBulanLalu: vsBulanLaluForAI, // {bulanPrev,tahunPrev,paymentDeltaPct,rateDeltaPct,prevPayment,prevRate} atau null
   };
 
   // Top 3 & bottom 3 agent
@@ -4323,6 +4577,12 @@ async function renderAttentionPanel(spv, safeSpvId){
   // bawah (bukan nambah delay terpisah). fetchRankData() sendiri no-op kalau
   // sudah ada di cache (_rankDataCache), jadi aman dipanggil tiap render.
   const rankDataPromise=fetchRankData();
+  // Sama halnya utk data bulan lalu — dipakai Kesimpulan Eksekutif AI (vs Bulan Lalu).
+  // ensurePrevMonthDataCached() no-op kalau bulan yg sama sudah pernah di-fetch
+  // (mis. lewat modal "📅 vs Bln Lalu" atau Mode Presentasi).
+  const prevMonthPromise=ensurePrevMonthDataCached(
+    document.getElementById('selBulan')?.value||'',
+    document.getElementById('selTahun')?.value||'');
 
   // [FITUR 1] Ambil rows sesuai range mode
   const rowsForScoring=getRowsByRange(safeSpvId, bucketRows);
@@ -4401,7 +4661,7 @@ async function renderAttentionPanel(spv, safeSpvId){
   // Tampilkan bucket summary di panel kanan — kirim agentScores supaya bagian
   // "Temuan" bisa merefleksikan daftar Kritis/Waspada yang sama dengan panel kiri
   // (bukan mode 1-hari, karena skor per-hari tidak relevan utk agregat bulanan)
-  await rankDataPromise; // pastikan _rankDataCache sudah terisi sebelum buildBucketSummaryHtml baca Rank
+  await Promise.all([rankDataPromise, prevMonthPromise]); // pastikan _rankDataCache & _cmpPrevData sudah terisi sebelum buildBucketSummaryHtml baca Rank/vs Bulan Lalu
   analysisEl.innerHTML=buildBucketSummaryHtml(spv, safeSpvId, rowsForScoring, allSpvRows, isSingleDay?[]:agentScores);
 
   if(!agentScores.length){
@@ -4441,7 +4701,7 @@ async function renderAttentionPanel(spv, safeSpvId){
   window['_attRange_'+safeSpvId]=getRangeLabel();
 }
 
-function selectAttentionAgent(spv, safeSpvId, idx){
+async function selectAttentionAgent(spv, safeSpvId, idx){
   // Highlight item terpilih
   document.querySelectorAll('[id^="attItem-'+safeSpvId+'"]').forEach(el=>el.classList.remove('selected'));
   const itemEl=document.getElementById('attItem-'+safeSpvId+'-'+idx);
@@ -4483,6 +4743,11 @@ function selectAttentionAgent(spv, safeSpvId, idx){
   // jangan sampai 1 error di ringkasan bucket bikin seluruh klik keliatan "gak ngapa-ngapain".
   let bucketSummaryHtml='';
   try{
+    // Pastikan data bulan lalu ke-cache dulu (utk vs Bulan Lalu di Kesimpulan Eksekutif AI) —
+    // no-op kalau sudah pernah di-fetch (mis. dari renderAttentionPanel/modal vs Bln Lalu).
+    await ensurePrevMonthDataCached(
+      document.getElementById('selBulan')?.value||'',
+      document.getElementById('selTahun')?.value||'');
     bucketSummaryHtml=buildBucketSummaryHtml(spv, safeSpvId,
       (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===(firstRow.bucket||'')),
       spvAgentDataCache[spv]||[],
@@ -5795,6 +6060,43 @@ let presShowLabels = true;
 let presMode = 'akumulasi';
 let presCompareWeeks = [1, 2];
 
+// Data bulan lalu (apple-to-apple s/d tanggal hari ini) & Rank Vendor — di-fetch SEKALI
+// di awal buildPresentation (pakai cache yg sama dgn fitur "📅 vs Bln Lalu"/"📈 Tampilkan
+// Rank" di Tim page, jadi kalau sudah pernah di-fetch di halaman ini gak fetch ulang),
+// lalu dibaca langsung sbg module-level var oleh buildBucketSlide tiap bikin 1 slide bucket
+// — supaya gak perlu ubah semua signature fungsi slide cuma buat nyalurin data ini.
+let presPrevRows = [];   // rows bulan lalu, sudah difilter apple-to-apple (tanggal<=presMaxDay)
+let presMaxDay = 31;
+let presBulanPrevLabel = '';
+let presTahunPrevLabel = '';
+
+async function fetchPresPrevMonthData(bulan, tahun){
+  const BULAN_IDX=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const idxNow=BULAN_IDX.indexOf(bulan);
+  const idxPrev=idxNow===0?11:idxNow-1;
+  const thnPrev=idxNow===0?String(parseInt(tahun)-1):tahun;
+  const bulanPrev=BULAN_IDX[idxPrev];
+  const today=new Date();
+  const maxDay=(today.getMonth()===idxNow&&today.getFullYear()===parseInt(tahun))?today.getDate():31;
+  presMaxDay=maxDay; presBulanPrevLabel=bulanPrev; presTahunPrevLabel=thnPrev;
+  try{
+    if(!_cmpPrevData||_cmpPrevData._bulan!==bulanPrev||_cmpPrevData._tahun!==thnPrev){
+      const url=API_URL+`?action=agentdata&bulan=${encodeURIComponent(bulanPrev)}&tahun=${encodeURIComponent(thnPrev)}`;
+      const res=await fetch(url);
+      const d=await res.json();
+      _cmpPrevData={rows:d.rows||[], _bulan:bulanPrev, _tahun:thnPrev};
+    }
+    presPrevRows=(_cmpPrevData.rows||[]).filter(r=>{
+      if(!r.tanggal)return false;
+      const day=parseInt(r.tanggal.split('-')[2]);
+      return day<=maxDay;
+    });
+  }catch(e){
+    console.warn('Gagal fetch data bulan lalu utk Mode Presentasi:', e);
+    presPrevRows=[];
+  }
+}
+
 // Filter rows sesuai mode aktif
 // Kembalikan nomor minggu (1-5) dari string tanggal 'YYYY-MM-DD'
 function getWeekNum(tanggal){
@@ -5837,13 +6139,13 @@ function applyCompare(){
   rebuildPresSlides();
 }
 
-function rebuildPresSlides(){
+async function rebuildPresSlides(){
   const curIdx=presCurrentIdx;
   const modeLabel={akumulasi:'Akumulasi',w1:'Week 1',w2:'Week 2',w3:'Week 3',w4:'Week 4',
     compare:`W${presCompareWeeks[0]} vs W${presCompareWeeks[1]}`};
   const metaEl=document.getElementById('presMeta');
   if(metaEl){const parts=metaEl.textContent.split('·');metaEl.textContent=parts[0].trim()+' · '+modeLabel[presMode];}
-  buildPresentation();
+  await buildPresentation(); // sudah cached (data bulan lalu & rank), jadi biasanya instan
   presNavigateTo(Math.min(curIdx,presSlides.length-1));
 }
 
@@ -5863,7 +6165,7 @@ function toggleChartLabels(){
   });
 }
 
-function openPresentation(){
+async function openPresentation(){
   if(!allRows||!allRows.length){alert('Tampilkan data dulu sebelum membuka mode presentasi.');return;}
   // Reset mode ke akumulasi
   presMode='akumulasi';
@@ -5876,9 +6178,13 @@ function openPresentation(){
   const ca=document.getElementById('presCompareApply');
   if(cr)cr.classList.remove('visible');
   if(ca)ca.classList.remove('visible');
-  buildPresentation();
+  // Buka overlay dulu dgn status loading — data bulan lalu & Rank Vendor di-fetch di
+  // buildPresentation (biasanya instan kalau sudah pernah di-fetch di halaman ini).
   document.getElementById('presOverlay').classList.add('open');
   document.body.style.overflow='hidden';
+  const contentEl=document.getElementById('presContent');
+  if(contentEl)contentEl.innerHTML='<div style="padding:60px;text-align:center;color:var(--text3)"><div class="spinner" style="margin:0 auto 12px"></div>Menyiapkan slide presentasi...</div>';
+  await buildPresentation();
   presNavigateTo(0);
 }
 function closePresentation(){
@@ -5888,9 +6194,17 @@ function closePresentation(){
   presCharts=[];
 }
 
-function buildPresentation(){
+async function buildPresentation(){
   const bulan=document.getElementById('selBulan').value;
   const tahun=document.getElementById('selTahun').value;
+
+  // Data pendukung slide bucket (Tren vs Bulan Lalu, Rank Vendor) — kedua-duanya
+  // sudah pakai cache masing2 (_cmpPrevData / _rankDataCache), jadi cuma benar2
+  // nge-fetch network sekali per bulan/tahun aktif, sisanya instan.
+  await Promise.all([
+    fetchPresPrevMonthData(bulan, tahun),
+    fetchRankData(),
+  ]);
 
   // Filter rows sesuai mode yang dipilih
   const modeRows=getRowsForMode(allRows);
@@ -6425,7 +6739,13 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
     return b.s.dailyPayment-a.s.dailyPayment;
   });
 
-  const n=agRanked.length||1;
+  // [FIX] Pakai computeActiveAgentCount, BUKAN agRanked.length — agRanked masih
+  // menghitung agent 'lama' (sudah digantikan/rotasi keluar bulan ini) sebagai 1
+  // headcount, padahal harusnya tidak dihitung aktif (sama seperti perhitungan
+  // "Agent Aktif" di peer bucket/bulan lalu di bawah, yg sudah benar pakai fungsi ini).
+  // Tanpa fix ini, "Agent Aktif" bucket ini kelihatan lebih tinggi drpd yg sebenarnya
+  // (mis. 15 padahal cuma 14 yg aktif) dan gak apple-to-apple dgn perbandingan lain.
+  const n=computeActiveAgentCount(bkRows)||1;
   const wPaysBkt=weeklyPayments(bkRows);
   const hadirR=bkRows.filter(r=>r.absensi==='Hadir').length/Math.max(bkRows.length,1);
   const avgPayment=bkS.dailyPayment/n;
@@ -6470,7 +6790,27 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
   // Tren 2 minggu berturut turun
   const dblDrop=agRanked.filter(a=>a.trend.icon==='⚠');
   if(dblDrop.length)kendala.push({dot:'dot-red',text:`⚠ ${dblDrop.length} agent tren turun 2 minggu berturut: ${dblDrop.map(a=>a.ag.split(' ')[0]).join(', ')} — butuh intervensi segera`});
+  // Rank Vendor — pakai helper yg sama dgn Temuan di Tim page (computeRankInsightObj/
+  // computeRankMonthlySummary/computeRankDailyTrend), supaya 1 sumber logika & angka.
+  const rankInsightSlide=computeRankInsightObj(bkRows);
+  if(rankInsightSlide){
+    (rankInsightSlide.dot==='dot-green'?positif:kendala).push({dot:rankInsightSlide.dot,text:rankInsightSlide.text.replace(/<[^>]+>/g,'')});
+  }
+  const rankMonthlySlide=computeRankMonthlySummary(bkRows);
+  const rankTrendSlide=computeRankDailyTrend(bkRows);
+
   if(!kendala.length&&!positif.length)positif.push({dot:'dot-green',text:'Tidak ada kendala signifikan — bucket ini berjalan dengan baik.'});
+
+  // ── Tren vs Bulan Lalu (apple-to-apple) ────────────────────────
+  // presPrevRows sudah di-fetch & difilter apple-to-apple (tanggal<=presMaxDay) di
+  // buildPresentation(), sebelum semua slide dibangun.
+  const prevBkRows=presPrevRows.filter(r=>(r.aplikasi||'')===ap&&(r.bucket||'')===bk);
+  const hasPrevData=prevBkRows.length>0;
+  const prevBkS=hasPrevData?summarizeRows(prevBkRows):null;
+  const prevAgentCnt=hasPrevData?computeActiveAgentCount(prevBkRows):0;
+  const cmpDelta=(curr,prev)=>prev>0?Math.round((curr/prev-1)*100):null;
+  const paymentDeltaPct=hasPrevData?cmpDelta(bkS.dailyPayment,prevBkS.dailyPayment):null;
+  const rateDeltaPct=hasPrevData?cmpDelta(bkS.avgRate,prevBkS.avgRate):null;
 
   // ── Saran ────────────────────────────────────────────────────
   const saran=[];
@@ -6481,11 +6821,136 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
   if(kendala.some(k=>k.text.includes('nomor')))saran.push('Lakukan pembaruan data nomor kontak, prioritaskan akun dengan nomor aktif');
   if(kendala.some(k=>k.text.includes('payment Rp 0')))saran.push('Identifikasi hari hadir tanpa payment — apakah akun sudah disentuh? Buat checklist harian');
   if(dblDrop.length)saran.push(`Coaching 1-on-1 segera untuk: ${dblDrop.map(a=>a.ag.split(' ')[0]).join(', ')} — buat action plan tertulis dan pantau mingguan`);
+  if(rankInsightSlide&&rankInsightSlide.dot!=='dot-green')saran.push('Evaluasi strategi penagihan dibanding vendor lain di bucket ini — cek detail pergerakan Rank Vendor untuk lihat vendor mana yang lebih unggul dan kenapa.');
   if(!saran.length)saran.push('Pertahankan strategi yang ada, jadikan benchmark untuk bucket lain.');
 
   // ── Agent naik / turun ───────────────────────────────────────
   const agTumbuh=agRanked.filter(a=>a.trend.icon==='📈');
   const agTurun=agRanked.filter(a=>a.trend.icon==='📉'||a.trend.icon==='⚠');
+
+  // ── 1. KESIMPULAN EKSEKUTIF (AI) ────────────────────────────
+  // Isi _bucketInsightsCache pakai sid slide ini, supaya bisa pakai ulang
+  // generateBucketAI()/saveGeminiKeyAndGenerate() yg sama persis dgn Tim page —
+  // 1 sumber kode, dan prompt-nya otomatis sudah termasuk konteks Rank Monthly +
+  // tren Rank Daily (lihat generateBucketAI di bagian atas file).
+  // Data tambahan yg sama dgn Tim page (weeklyTrend/rawKpi/topAgents/bottomAgents/
+  // peerBenchmark/rotasi/vsBulanLalu) — di Mode Presentasi hampir semuanya SUDAH
+  // dihitung sbg variabel lokal di atas (wPaysBkt, otherS/peerAvgPay, bkRotasiMap,
+  // prevBkS/paymentDeltaPct/dst), jadi tinggal disalurkan ke cache, bukan dihitung ulang.
+  const agRankedByPayment=[...agRanked]
+    .filter(a=>!a.rotasi||a.rotasi.status!=='lama') // exclude agent nonaktif dari top/bottom
+    .sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
+  const rotasiBaruSlide=Object.entries(bkRotasiMap).filter(([,info])=>info.status==='baru').map(([ag])=>ag);
+  const rotasiLamaSlide=Object.entries(bkRotasiMap).filter(([,info])=>info.status==='lama').map(([ag])=>ag);
+
+  _bucketInsightsCache[sid] = {
+    bucket: bk, bulan, tahun,
+    totalAgent: n,
+    totalPayment: fmtRpFull(bkS.dailyPayment),
+    avgRate: fmtRate(bkS.avgRate),
+    insights: [...kendala, ...positif]
+      .filter(i=>!rankInsightSlide||i.text!==rankInsightSlide.text.replace(/<[^>]+>/g,''))
+      .map(i=>({text:i.text, level:i.dot==='dot-red'?'KRITIS':i.dot==='dot-warn'?'PERINGATAN':'INFO'})),
+    rankMonthly: rankMonthlySlide,
+    rankDailyTrend: rankTrendSlide,
+    weeklyTrend: {weeks: wPaysBkt, label: bkTrend.text},
+    rawKpi: {sentuhWA:bkS.sentuhWA, responWA:bkS.responWA, callManual:bkS.callManual, callTerhubung:bkS.callTerhubung,
+      ptp:bkS.ptp, ptpBayar:bkS.ptpBayar, waBlokir:bkS.waBlokir, sentuhGojek:bkS.sentuhGojek, sentuhWABA:bkS.sentuhWABA,
+      paymentOvertime:bkS.paymentOvertime, totalData:bkS.totalData},
+    topAgents: agRankedByPayment.slice(0,3).map(a=>({ag:a.ag,payment:a.s.dailyPayment,rate:a.s.avgRate,hadir:a.hadir,hariKerja:a.total})),
+    bottomAgents: agRankedByPayment.slice(-3).map(a=>({ag:a.ag,payment:a.s.dailyPayment,rate:a.s.avgRate,hadir:a.hadir,hariKerja:a.total})),
+    peerBenchmark: {otherBucketCount: otherN, peerAvgPayment: peerAvgPay, currentAvgPayment: avgPayment},
+    rotasi: {baru: rotasiBaruSlide, lama: rotasiLamaSlide},
+    vsBulanLalu: hasPrevData?{
+      bulanPrev: presBulanPrevLabel, tahunPrev: presTahunPrevLabel,
+      paymentDeltaPct, rateDeltaPct,
+      prevPayment: prevBkS.dailyPayment, prevRate: prevBkS.avgRate,
+    }:null,
+  };
+  const kesimpulanBoxHtml = `
+    <div class="pres-insight-box" style="margin-bottom:16px;border-color:var(--accent);background:var(--accent-bg)">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:2px">
+        <div class="pres-insight-title" style="color:var(--accent);margin-bottom:0">✨ Kesimpulan Eksekutif</div>
+        <button onclick="generateBucketAI('${sid}')" id="bks-ai-btn-${sid}"
+          style="margin-left:auto;padding:4px 12px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">
+          ✨ Generate
+        </button>
+      </div>
+      <div style="font-size:10px;color:var(--text3);margin-bottom:4px">Ringkasan siap-presentasi — klik Generate utk analisa AI berdasarkan seluruh temuan di bucket ini</div>
+      <div id="bks-ai-result-${sid}" style="display:none"></div>
+    </div>`;
+
+  // ── 2. TREN VS BULAN LALU (apple-to-apple) ──────────────────
+  const cmpCard=(lbl,curr,prev,deltaPct,fmt)=>{
+    const goodUp = deltaPct===null?false:deltaPct>0;
+    const clr = deltaPct===null?'var(--text3)':(goodUp?'var(--success)':deltaPct<0?'var(--danger)':'var(--text3)');
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 14px;min-width:150px;flex:1">
+      <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">${lbl}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--text)">${fmt(curr)}</div>
+      <div style="font-size:11px;color:${clr};font-weight:600">${deltaPct===null?'—':(deltaPct>0?'▲ +':deltaPct<0?'▼ ':'▬ ')+Math.abs(deltaPct)+'%'} <span style="color:var(--text3);font-weight:400">vs ${fmt(prev)} bulan lalu</span></div>
+    </div>`;
+  };
+  // Metrik yg dibandingkan — disamakan dgn BASE_METRICS di modal "📅 vs Bln Lalu"
+  // (renderCmpBulanTab), supaya slide presentasi ini gak "kurang lengkap" dibanding
+  // fitur aslinya (dulu cuma 3 kartu: Payment/Rate/Agent Aktif).
+  const cmpMetricDefs=hasPrevData?[
+    {lbl:'Total Payment', curr:bkS.dailyPayment, prev:prevBkS.dailyPayment, fmt:fmtRp},
+    {lbl:'Avg Rate', curr:bkS.avgRate, prev:prevBkS.avgRate, fmt:fmtRate},
+    {lbl:'Agent Aktif', curr:n, prev:prevAgentCnt, fmt:v=>fmtNum(v)},
+    {lbl:'Total Data', curr:bkS.totalData, prev:prevBkS.totalData, fmt:v=>fmtNum(v)},
+    {lbl:'Data Baru', curr:bkS.dataBaru, prev:prevBkS.dataBaru, fmt:v=>fmtNum(v)},
+    {lbl:'Data Bayar', curr:bkS.jmlDataBayar, prev:prevBkS.jmlDataBayar, fmt:v=>fmtNum(v)},
+    {lbl:'Sentuh WA', curr:bkS.sentuhWA, prev:prevBkS.sentuhWA, fmt:v=>fmtNum(v)},
+    {lbl:'Respon WA', curr:bkS.responWA, prev:prevBkS.responWA, fmt:v=>fmtNum(v)},
+    {lbl:'Call Manual', curr:bkS.callManual, prev:prevBkS.callManual, fmt:v=>fmtNum(v)},
+    {lbl:'PTP', curr:bkS.ptp, prev:prevBkS.ptp, fmt:v=>fmtNum(v)},
+    {lbl:'PTP Bayar', curr:bkS.ptpBayar, prev:prevBkS.ptpBayar, fmt:v=>fmtNum(v)},
+  ]:[];
+  const cmpBulanBoxHtml = `
+    <div class="pres-chart-wrap" style="margin-bottom:16px">
+      <div class="pres-chart-title">📅 Tren vs Bulan Lalu${hasPrevData?` (${escH(presBulanPrevLabel)} ${escH(presTahunPrevLabel)}, apple-to-apple s/d tgl ${presMaxDay})`:''}</div>
+      ${hasPrevData ? `<div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${cmpMetricDefs.map(m=>cmpCard(m.lbl, m.curr, m.prev, cmpDelta(m.curr,m.prev), m.fmt)).join('')}
+      </div>` : `<div style="font-size:12px;color:var(--text3);padding:8px 0">Belum ada data pembanding bulan lalu untuk bucket ini.</div>`}
+    </div>`;
+
+  // ── 3. RANK VENDOR (standing bulanan + tren harian + chart pilihan metric) ──
+  const rankMetricOptions=['os','payment','rate','rank','gap'].map(m=>
+    `<option value="${m}" ${m==='rank'?'selected':''}>${RANK_METRIC_META[m].label}</option>`).join('');
+  const rankTrendTxt = rankTrendSlide
+    ? (()=>{
+        const dir=rankTrendSlide.lastRank<rankTrendSlide.firstRank?'membaik ▲':rankTrendSlide.lastRank>rankTrendSlide.firstRank?'memburuk ▼':'stabil ▬';
+        const clr=rankTrendSlide.lastRank<rankTrendSlide.firstRank?'var(--success)':rankTrendSlide.lastRank>rankTrendSlide.firstRank?'var(--danger)':'var(--text3)';
+        return `<span style="color:${clr};font-weight:700">#${rankTrendSlide.firstRank} → #${rankTrendSlide.lastRank} (${dir})</span>`;
+      })()
+    : '<span style="color:var(--text3)">— belum cukup data</span>';
+  const rankVendorBoxHtml = `
+    <div class="pres-chart-wrap" style="margin-bottom:16px">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+        <div class="pres-chart-title" style="margin-bottom:0">📈 Rank Vendor — Standing Kompetitif</div>
+        <select id="presRankMetric-${sid}" onchange="setPresRankMetric('${sid}')"
+          style="margin-left:auto;padding:4px 8px;font-size:11px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text)">
+          ${rankMetricOptions}
+        </select>
+      </div>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 14px;min-width:170px;flex:1">
+          <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Standing Bulanan (RANK MONTHLY)</div>
+          ${rankMonthlySlide
+            ? `<div style="font-size:16px;font-weight:700;color:${rankMonthlySlide.rank===1?'var(--success)':'var(--text)'}">#${rankMonthlySlide.rank} <span style="font-size:11px;color:var(--text3);font-weight:400">dari ${rankMonthlySlide.totalVendor} vendor</span></div>
+               <div style="font-size:11px;color:var(--text3)">${rankMonthlySlide.leaderName&&rankMonthlySlide.rank!==1?`kalah dari <b>${escH(rankMonthlySlide.leaderName)}</b>`:'posisi puncak'}${(rankMonthlySlide.gap!==null&&rankMonthlySlide.gap!==0)?` · gap ${fmtRp(Math.abs(rankMonthlySlide.gap))}`:''}</div>`
+            : `<div style="font-size:12px;color:var(--text3)">Belum ada data yang di-input</div>`}
+        </div>
+        <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:9px 14px;min-width:170px;flex:1">
+          <div style="font-size:10px;color:var(--text3);font-weight:600;text-transform:uppercase;margin-bottom:3px">Tren Harian Bulan Ini</div>
+          <div style="font-size:15px">${rankTrendTxt}</div>
+        </div>
+      </div>
+      <div style="position:relative;height:180px">
+        <canvas id="presChart-rank-${sid}"></canvas>
+        <div id="presRankEmpty-${sid}" style="display:none;text-align:center;color:var(--text3);font-size:12px;padding:40px 0">📭 Belum ada data yang di-input untuk bucket ini di sheet DATA RANK.</div>
+      </div>
+    </div>`;
 
   return`<div class="pres-slide active">
     <!-- HEADER -->
@@ -6499,7 +6964,10 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
     </div>
     <div class="pres-slide-sub">${n} agent · ${escH(bulan)} ${escH(tahun)} · vs bucket lain di ${escH(ap)}: avg/agent ${fmtRp(Math.round(peerAvgPay))}</div>
 
-    <!-- A. KPI BUCKET -->
+    <!-- 1. KESIMPULAN EKSEKUTIF -->
+    ${kesimpulanBoxHtml}
+
+    <!-- 2. KPI BUCKET (skala masalah) -->
     <div class="pres-kpi-row">
       <div class="pres-kpi accent"><div class="lbl">Total Payment</div><div class="val">${fmtRp(bkS.dailyPayment)}</div><div class="sub">avg ${fmtRp(Math.round(avgPayment))}/agent</div></div>
       <div class="pres-kpi ${bkS.avgRate>=0.02?'good':bkS.avgRate<0.01?'bad':''}"><div class="lbl">Rate Bayar</div><div class="val">${fmtRate(bkS.avgRate)}</div><div class="sub">${fmtNum(bkS.jmlDataBayar)} data bayar</div></div>
@@ -6514,6 +6982,10 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
       <div class="pres-kpi"><div class="lbl">Payment Overtime</div><div class="val">${fmtRp(bkS.paymentOvertime)}</div><div class="sub">${bkS.dailyPayment>0?Math.round(bkS.paymentOvertime/bkS.dailyPayment*100):0}% dari total</div></div>
       <div class="pres-kpi"><div class="lbl">Total Data</div><div class="val">${fmtNum(bkS.totalData)}</div><div class="sub">${fmtNum(bkS.dataBaru)} data baru · OS ${fmtRp(bkS.osDataBaru)}</div></div>
     </div>
+
+    <!-- 3. TREN VS BULAN LALU -->
+    ${cmpBulanBoxHtml}
+
     <!-- [DERIVED] Rasio penyentuhan otomatis -->
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
       ${[
@@ -6536,7 +7008,10 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
       }).join('')}
     </div>
 
-    <!-- B. GRAFIK TREN -->
+    <!-- 4. RANK VENDOR (kompetitif) -->
+    ${rankVendorBoxHtml}
+
+    <!-- 5. GRAFIK TREN -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       <div class="pres-chart-wrap" style="margin-bottom:0">
         <div class="pres-chart-title">📊 Tren Payment Mingguan — Bucket ${escH(bk)}</div>
@@ -6558,7 +7033,7 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
       </div>
     </div>
 
-    <!-- C. TEMUAN & KENDALA -->
+    <!-- 6. TEMUAN & KENDALA (root cause) -->
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
       ${kendala.length?`<div class="pres-insight-box" style="border-color:var(--danger);margin-bottom:0">
         <div class="pres-insight-title" style="color:var(--danger)">⚠ Kendala & Perhatian</div>
@@ -6569,6 +7044,7 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
         ${positif.map(p=>`<div class="pres-insight-item"><div class="pres-insight-dot ${p.dot}"></div><span>${p.text}</span></div>`).join('')}
       </div>`:''}
     </div>
+    <!-- 7. AGENT EVIDENCE (bukti individual) -->
     ${agTumbuh.length?`<div class="pres-insight-box" style="margin-bottom:8px;border-color:var(--success)">
       <div class="pres-insight-title" style="color:var(--success)">📈 Agent Tren Naik (${agTumbuh.length})</div>
       ${agTumbuh.map(a=>`<div class="pres-insight-item"><div class="pres-insight-dot dot-green"></div>
@@ -6582,13 +7058,13 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
       </div>`).join('')}
     </div>`:''}
 
-    <!-- SARAN TINDAK LANJUT -->
+    <!-- 8. SARAN TINDAK LANJUT -->
     <div class="pres-insight-box" style="margin-bottom:16px;border-color:var(--accent);background:var(--accent-bg)">
       <div class="pres-insight-title" style="color:var(--accent)">💡 Saran Tindak Lanjut</div>
       ${saran.map(s=>`<div class="pres-insight-item"><div class="pres-insight-dot dot-blue"></div><span>${escH(s)}</span></div>`).join('')}
     </div>
 
-    <!-- D. TABEL LENGKAP AGENT -->
+    <!-- 9. TABEL LENGKAP AGENT -->
     <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Detail Semua Agent di Bucket ${escH(bk)}</div>
     <table class="pres-table">
       <thead><tr>
@@ -6816,6 +7292,7 @@ function initPresCharts(slideIdx){
       {label:'Call Manual',data:top5.map(a=>a.call),backgroundColor:'rgba(16,185,129,0.8)'},
       {label:'Sentuh Gojek',data:top5.map(a=>a.gojek),backgroundColor:'rgba(245,158,11,0.8)'},
     ],tooltipAct,true));
+    tryMake(()=>renderPresRankChart(sid,ap,bk));
     return;
   }
 
@@ -6840,6 +7317,104 @@ function initPresCharts(slideIdx){
   tryMakeApp(()=>makeBarMulti('presChart-bkw-'+sid,wkLabels,bkRanked.slice(0,5).map((b,i)=>({label:b.bk,data:b.wPays,backgroundColor:PALETTE[i%PALETTE.length]}))));
   tryMakeApp(()=>makeLineMulti('presChart-agw-'+sid,wkLabels,agRanked.slice(0,5).map((a,i)=>({label:a.ag.split(' ')[0],data:a.wPays,borderColor:PALETTE[i%PALETTE.length],backgroundColor:PALETTE[i%PALETTE.length].replace('0.85','0.15')}))));
   tryMakeApp(()=>makeBarH('presChart-agacc-'+sid,agRanked.slice(0,10).map(x=>x.ag.split(' ')[0]),agRanked.slice(0,10).map(x=>x.pay),PALETTE.concat(PALETTE).slice(0,10)));
+}
+
+// ── Chart Rank Vendor di slide bucket Mode Presentasi ──────────────────────────
+// Dipisah dari initPresCharts krn perlu bisa di-render ULANG kapan aja (waktu SPV
+// ganti pilihan metric OS/Payment/Rate/Rank/Gap di dropdown), tanpa harus rebuild
+// seluruh slide. presRankSlideMeta nyimpen {ap,bk} per slide (sid) supaya dropdown
+// onchange bisa manggil ulang tanpa perlu tau ap/bk lagi.
+let presRankChartInstances={}; // sid → instance Chart.js chart Rank Vendor
+let presRankSlideMeta={};      // sid → {ap,bk}
+
+function renderPresRankChart(sid, ap, bk){
+  if(ap!==undefined) presRankSlideMeta[sid]={ap,bk};
+  const meta=presRankSlideMeta[sid];
+  const canvas=document.getElementById('presChart-rank-'+sid);
+  const emptyEl=document.getElementById('presRankEmpty-'+sid);
+  if(!meta||!canvas)return;
+
+  // Hapus instance lama dulu (ganti metric = rebuild chart yg sama, bukan numpuk)
+  const oldCh=presRankChartInstances[sid];
+  if(oldCh){
+    try{oldCh.destroy();}catch(e){}
+    delete presRankChartInstances[sid];
+    const idx=presCharts.indexOf(oldCh);
+    if(idx>-1)presCharts.splice(idx,1);
+  }
+
+  const metricSel=document.getElementById('presRankMetric-'+sid);
+  const metric=metricSel?metricSel.value:'rank';
+
+  const rankRows=(_rankDataCache&&_rankDataCache.daily)?_rankDataCache.daily.filter(r=>
+    (r.aplikasi||'').trim().toLowerCase()===(meta.ap||'').toLowerCase() && (r.bucket||'').trim()===(meta.bk||'')
+  ):[];
+
+  if(!rankRows.length){
+    canvas.style.display='none';
+    if(emptyEl)emptyEl.style.display='block';
+    return;
+  }
+  canvas.style.display='';
+  if(emptyEl)emptyEl.style.display='none';
+
+  const tanggalSet=[...new Set(rankRows.map(r=>r.tanggal).filter(Boolean))].sort();
+  const labels=tanggalSet.length?tanggalSet.map(t=>_fmtRankDateLabel(t)):['Bulan ini'];
+  const vendors=[...new Set(rankRows.map(r=>r.vendor).filter(Boolean))].sort();
+
+  const isRankMetric=metric==='rank';
+  let maxRankVal=1;
+  if(isRankMetric){
+    const allRanks=rankRows.map(r=>r.rank).filter(v=>v!==null&&v!==undefined&&!isNaN(v));
+    maxRankVal=allRanks.length?Math.max(...allRanks):1;
+  }
+  const toChartVal=raw=>(raw===null||raw===undefined||isNaN(raw))?null:(isRankMetric?(maxRankVal+1-raw):raw);
+  const fromChartVal=v=>(v===null||v===undefined||isNaN(v))?null:(isRankMetric?(maxRankVal+1-v):v);
+
+  const PALETTE_RANK=['#1d60c8','#10b981','#f59e0b','#dc2626','#7c3aed','#0891b2','#db2777','#65a30d'];
+  const datasets=vendors.map((vd,i)=>{
+    const byTgl={};
+    rankRows.filter(r=>r.vendor===vd).forEach(r=>{byTgl[r.tanggal||'']=r[metric];});
+    return {
+      label:vd,
+      data:tanggalSet.length?tanggalSet.map(t=>toChartVal(byTgl[t]===undefined?null:byTgl[t]))
+        :[toChartVal(Object.values(byTgl)[0])],
+      borderColor:PALETTE_RANK[i%PALETTE_RANK.length],
+      backgroundColor:PALETTE_RANK[i%PALETTE_RANK.length]+'22',
+      tension:0.3, borderWidth:2, pointRadius:3, spanGaps:true, fill:false,
+    };
+  });
+
+  const metaFmt=RANK_METRIC_META[metric]||{label:metric,fmt:'num'};
+  const isDark=document.documentElement.getAttribute('data-theme')==='dark';
+  const tc=isDark?'#9aa5be':'#9ca3af';
+  const gc=isDark?'rgba(255,255,255,0.06)':'rgba(0,0,0,0.05)';
+  const DL=(typeof ChartDataLabels!=='undefined')?ChartDataLabels:null;
+
+  const ch=new Chart(canvas,{
+    plugins:DL?[DL]:[],
+    type:'line',
+    data:{labels, datasets},
+    options:{
+      responsive:true, maintainAspectRatio:false,
+      plugins:{
+        legend:{display:true,labels:{color:tc,font:{size:9},boxWidth:10}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${_fmtRankVal(fromChartVal(c.parsed.y),metaFmt.fmt)}`}},
+        datalabels:{display:false},
+      },
+      scales:{
+        x:{grid:{color:gc},ticks:{color:tc,font:{size:9}}},
+        y:{beginAtZero:true,grid:{color:gc},ticks:{color:tc,font:{size:9},callback:v=>_fmtRankVal(fromChartVal(v),metaFmt.fmt,true)}},
+      }
+    }
+  });
+  presRankChartInstances[sid]=ch;
+  presCharts.push(ch); // ikut ke-cleanup pas pindah slide (presNavigateTo destroy semua isi presCharts)
+}
+
+// Dipanggil dari dropdown metric di slide bucket — rebuild chart yg sama tanpa reload slide
+function setPresRankMetric(sid){
+  renderPresRankChart(sid);
 }
 
 // Enable tombol presentasi setelah data load — dilakukan di loadData(), bukan override renderAll
