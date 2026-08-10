@@ -2624,6 +2624,25 @@ function setBsmView(view) {
   _renderBucketSummary();
 }
 
+// Badge rotasi ("Pengganti (X) tgl" / "Nonaktif tgl" / "Pindah ke... tgl") utk baris
+// agent di modal Summary Bucket — dipakai bareng oleh baris utama (payment/individual,
+// grouped/ungrouped) DAN preview row, supaya SATU sumber logika/format persis sama dgn
+// label yg sudah tampil di Tim page (buildTLRow). BUG FIX: sebelum ini rotasiInfo cuma
+// dipakai di preview row (yg collapsed/tersembunyi by default), jadi di baris utama yg
+// keliatan langsung, agent yang sudah digantikan (Nonaktif) tampil normal tanpa tanda —
+// bikin jumlah baris di tabel Summary terbaca lebih banyak drpd badge "X agent" resmi
+// di Tim page (yg sudah exclude agent 'lama'/digantikan dari hitungannya).
+function _bsmRotasiBadge(agentName, bsmRotasiInfo) {
+  const rotasi = (bsmRotasiInfo||{})[agentName] || null;
+  if (!rotasi) return '';
+  if (rotasi.status === 'baru') {
+    return formatRotasiLabel('pengganti', rotasi.lawanFirstName || (rotasi.lawan||'').split(' ')[0], rotasi.changeDate);
+  } else if (rotasi.bucketAktif) {
+    return formatRotasiLabel('pindah', '', rotasi.changeDate, rotasi.bucketAktif);
+  }
+  return formatRotasiLabel('nonaktif', '', rotasi.changeDate);
+}
+
 // Preview klik-nama-agent di Summary Bucket — pakai komponen & class yang sama
 // dengan preview di halaman utama (agent-preview, toggleAgentPreview dst),
 // supaya tampilannya konsisten dan togglenya reuse fungsi yg sudah ada.
@@ -2806,6 +2825,7 @@ function _renderBucketSummary() {
     const tableRows = agents.map((a,i) => {
       const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
       const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
+      const rotasiBadge = _bsmRotasiBadge(a.ag, bsmRotasiInfo);
       const _abs = calcAbsensi(a._rows);
       const totalDisplay = fmtView(a.total, a, 'rp');
       const dayCells = allDates.map(d => {
@@ -2824,7 +2844,7 @@ function _renderBucketSummary() {
       return `<tr>
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
         <td style="font-weight:600;color:var(--accent)">${escH(a.tl)}</td>
-        <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}</td>
+        <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}${rotasiBadge}</td>
         <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
         <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
         ${dayCells}
@@ -2865,6 +2885,7 @@ function _renderBucketSummary() {
           const _abs = calcAbsensi(a._rows);
           const totalDisplay = fmtView(a.total, a, 'rp');
           const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
+      const rotasiBadge = _bsmRotasiBadge(a.ag, bsmRotasiInfo);
           const dayCells = allDates.map(d => {
             const day = parseInt(d.split('-')[2]);
             const info = a.days[day];
@@ -2881,7 +2902,7 @@ function _renderBucketSummary() {
           return `<tr>
             <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
             <td style="font-weight:600;color:var(--accent);padding-left:16px">${escH(g.tl)}</td>
-            <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}</td>
+            <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}${rotasiBadge}</td>
             <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
             <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
             ${dayCells}
@@ -2922,6 +2943,7 @@ function _renderBucketSummary() {
     const bsmColspanIndividual = 5 + setupCols.length;
     const tableRows = agents.map((a,i) => {
       const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
+      const rotasiBadge = _bsmRotasiBadge(a.ag, bsmRotasiInfo);
       const _abs = calcAbsensi(a._rows);
       const s = summarizeRows(a._rows);
       const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
@@ -2943,7 +2965,7 @@ function _renderBucketSummary() {
           <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(a.tl)}
         </div>
         <div style="font-weight:600;color:var(--text)">
-          <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}
+          <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}${rotasiBadge}
         </div>
       </td>`;
 
@@ -2983,6 +3005,7 @@ function _renderBucketSummary() {
 
         const agentRowsInd = g.agts.map((a, ai) => {
           const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
+      const rotasiBadge = _bsmRotasiBadge(a.ag, bsmRotasiInfo);
           const _abs = calcAbsensi(a._rows);
           const s = summarizeRows(a._rows);
           const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
@@ -2997,7 +3020,7 @@ function _renderBucketSummary() {
               <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(g.tl)}
             </div>
             <div style="font-weight:600;color:var(--text)">
-              <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}
+              <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}${rotasiBadge}
             </div>
           </td>`;
           return `<tr>
@@ -3876,6 +3899,17 @@ async function generateBucketAI(safeSpvId) {
       ? `Posisi Rank Vendor bulan ini (data RANK MONTHLY): EDN peringkat #${cache.rankMonthly.rank} dari ${cache.rankMonthly.totalVendor} vendor${cache.rankMonthly.leaderName?`, kalah dari vendor ${cache.rankMonthly.leaderName} (peringkat 1)`:''}${(cache.rankMonthly.gap!==null&&cache.rankMonthly.gap!==0)?`, gap ke posisi 1 sebesar ${fmtRp(Math.abs(cache.rankMonthly.gap))} (${cache.rankMonthly.gap<0?'masih kurang':'sudah unggul'})`:''}.`
       : '';
 
+    // Peringatan eksplisit kalau Rank BULANAN (di atas) beda dgn Rank HARIAN per tanggal
+    // terbaru (yg tampil sbg bullet biru di Temuan) — INI BUKAN BUG, dua-duanya baca blok
+    // data yg SENGAJA terpisah di sheet DATA RANK (snapshot 1 hari vs akumulasi sebulan),
+    // jadi wajar beda. Tapi kalau gak dijelaskan, hasil tulisan AI kelihatan kontradiktif
+    // sama bullet Temuan (mis. Temuan bilang #3, AI bilang #2) — makanya WAJIB disuruh
+    // AI klarifikasi ini kalau kedua angka rank beda.
+    let rankConsistencyLine = '';
+    if (cache.rankMonthly && cache.rankDailyLatest && cache.rankMonthly.rank !== cache.rankDailyLatest.rank) {
+      rankConsistencyLine = `PENTING — catatan konsistensi data: Rank Vendor HARIAN per tanggal terbaru (${cache.rankDailyLatest.tglLabel}) ada di peringkat #${cache.rankDailyLatest.rank} dari ${cache.rankDailyLatest.totalVendor} vendor, BERBEDA dari Rank Vendor BULANAN kumulatif di atas (#${cache.rankMonthly.rank}). Ini WAJAR (bukan salah baca) karena rank harian = snapshot 1 hari, sedangkan rank bulanan = akumulasi performa sebulan penuh — bisa beda. Saat menyebut peringkat di paragraf 1, WAJIB tulis eksplisit bahwa itu versi BULANAN/kumulatif (bukan snapshot hari ini) supaya tidak terbaca kontradiktif dengan angka harian.`;
+    }
+
     // Tren pergerakan Rank Vendor HARIAN sepanjang bulan berjalan (awal vs akhir data
     // yg ada) — supaya laporan gak cuma bilang "standing sekarang", tapi juga cerita
     // apakah sedang membaik/memburuk dibanding awal bulan.
@@ -3955,6 +3989,7 @@ Total Agent: ${cache.totalAgent}
 Total Payment: ${cache.totalPayment}
 Avg Rate: ${cache.avgRate}
 ${rankMonthlyLine}
+${rankConsistencyLine}
 ${rankTrendLine}
 ${weeklyTrendLine}
 ${vsBulanLaluLine}
@@ -3967,7 +4002,7 @@ Temuan otomatis sistem:
 ${cache.insights.map((ins,i)=>`${i+1}. [${ins.level}] ${ins.text.replace(/<[^>]+>/g,'')}`).join('\n')}
 
 Instruksi:
-- Paragraf 1: Kesimpulan kondisi bucket bulan ini — sebutkan nama agent/TL spesifik yang bermasalah dan yang berprestasi (pakai data Top/Bottom performer), sertakan angka nyata. Kalau ada data "Posisi Rank Vendor bulan ini", jadikan itu acuan standing kompetitif (JANGAN pakai rank harian dari Temuan, pakai yang bulanan ini).
+- Paragraf 1: Kesimpulan kondisi bucket bulan ini — sebutkan nama agent/TL spesifik yang bermasalah dan yang berprestasi (pakai data Top/Bottom performer), sertakan angka nyata. Kalau ada data "Posisi Rank Vendor bulan ini", jadikan itu acuan standing kompetitif (JANGAN pakai rank harian dari Temuan, pakai yang bulanan ini). Kalau ada "catatan konsistensi data" soal rank harian vs bulanan yang beda, WAJIB sebutkan singkat kedua angka itu dan jelaskan itu 2 metrik/periode berbeda (bukan kesalahan data).
 - Paragraf 2: Progres/tren — gabungkan cerita tren MINGGUAN (naik/turun tiap minggu, bukan cuma total), perbandingan vs BULAN LALU (naik/turun berapa persen), dan tren Rank Vendor HARIAN (membaik/memburuk, gap mengecil/membesar) kalau datanya ada. Sebutkan juga kalau ada rotasi/pergantian agent yang relevan dengan naik-turunnya angka. Ini penting biar atasan tau apakah usaha yang sudah dilakukan berhasil atau belum, bukan cuma tau posisi statisnya sekarang.
 - Paragraf 3: Rekomendasi tindakan konkret yang harus dilakukan SPV/TL dalam 3-5 hari ke depan, boleh singgung benchmark ke bucket lain kalau relevan (misal kalau bucket ini tertinggal jauh dari bucket lain yang dipegang SPV yang sama).
 - Gunakan bahasa profesional, tegas, dan mudah dipahami pihak manajemen yang gak familiar dengan detail operasional harian
@@ -4013,6 +4048,7 @@ Instruksi:
           <button onclick="localStorage.removeItem('tz_gemini_key')" style="font-size:9px;background:none;border:none;color:var(--text3);cursor:pointer;padding:0">🔑 Ganti Key</button>
         </div>
         <div style="font-size:12px;color:var(--text);line-height:1.75;white-space:pre-line">${escH(text)}</div>
+        ${rankConsistencyLine?`<div style="margin-top:10px;padding:8px 10px;font-size:10.5px;color:var(--text3);background:var(--surface2);border-radius:var(--radius-sm);line-height:1.6">ℹ️ Rank Vendor HARIAN per ${escH(cache.rankDailyLatest.tglLabel)} ada di <b>#${cache.rankDailyLatest.rank}</b> dari ${cache.rankDailyLatest.totalVendor} vendor, sedangkan Rank Vendor BULANAN (dipakai di analisis di atas) ada di <b>#${cache.rankMonthly.rank}</b>. Keduanya angka berbeda karena sumber datanya beda (snapshot 1 hari vs akumulasi sebulan penuh) — bukan kesalahan baca data.</div>`:''}
       </div>`;
     btn.textContent = '🔄 Regenerate';
   } catch(e) {
@@ -4089,7 +4125,8 @@ function computeRankInsightObj(bucketRows){
     const rankVal=ednRowRank.rank;
     const tglLabelRank=lastTglRank?lastTglRank.split('-').reverse().join('/'):'terbaru';
     if(rankVal===1){
-      return {dot:'dot-green',text:`📈 <b>Rank Vendor</b>: EDN di posisi #1 dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank} — pertahankan performa.`};
+      return {dot:'dot-green',text:`📈 <b>Rank Vendor</b>: EDN di posisi #1 dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank} — pertahankan performa.`,
+        rank:1, totalVendor:totalVendorRank, tglLabel:tglLabelRank};
     }
     const leaderRowRank=lastRowsRank.find(r=>r.rank===1);
     const leaderNameRank=leaderRowRank?leaderRowRank.vendor:'';
@@ -4104,8 +4141,13 @@ function computeRankInsightObj(bucketRows){
       if(rw&&rw.rank>1)streakRank++;else break;
     }
     const streakTxt=streakRank>=2?` (sudah ${streakRank} hari berturut-turut belum di posisi 1)`:'';
+    // Field mentah (rank/totalVendor/tglLabel/leaderName) sengaja ikut dikembalikan (bukan
+    // cuma `text` ber-HTML) — dipakai buildBucketSummaryHtml utk bandingin ke rank BULANAN
+    // (computeRankMonthlySummary) tanpa perlu parsing teks HTML, krn keduanya baca blok
+    // data yg beda di sheet DATA RANK (daily vs monthly) dan WAJAR bisa beda angka.
     return {dot:rankVal===totalVendorRank?'dot-red':'dot-warn',
-      text:`📈 <b>Rank Vendor</b>: EDN di posisi #${rankVal} dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank}${leaderNameRank?`, kalah dari <b>${escH(leaderNameRank)}</b> (rank 1)`:''}${gapTxt}${streakTxt} — lihat pergerakannya lewat tombol "📈 Tampilkan Rank".`};
+      text:`📈 <b>Rank Vendor</b>: EDN di posisi #${rankVal} dari ${totalVendorRank} vendor di bucket ini per ${tglLabelRank}${leaderNameRank?`, kalah dari <b>${escH(leaderNameRank)}</b> (rank 1)`:''}${gapTxt}${streakTxt} — lihat pergerakannya lewat tombol "📈 Tampilkan Rank".`,
+      rank:rankVal, totalVendor:totalVendorRank, tglLabel:tglLabelRank, leaderName:leaderNameRank};
   }catch(e){ console.warn('computeRankInsightObj gagal:', e); return null; }
 }
 
@@ -4554,6 +4596,10 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
     // Tetap tampil normal di UI Temuan (insights aslinya gak diubah, cuma versi utk AI ini).
     insights: insights.filter(i=>i!==rankInsightObj).map(i=>({text:i.text, level:i.dot==='dot-red'?'KRITIS':i.dot==='dot-warn'?'PERINGATAN':'INFO'})),
     rankMonthly: rankMonthlySummary, // {rank,totalVendor,leaderName,gap} atau null — dipakai khusus di prompt AI
+    // Rank HARIAN per tanggal terbaru (raw, bukan HTML) — dipakai bareng rankMonthly di atas
+    // utk deteksi selisih rank harian vs bulanan (2 blok data BEDA di sheet DATA RANK, jadi
+    // WAJAR angkanya beda; ini dipakai supaya AI/UI bisa jelasin bedanya, bukan keliatan kontradiktif).
+    rankDailyLatest: rankInsightObj ? {rank:rankInsightObj.rank, totalVendor:rankInsightObj.totalVendor, tglLabel:rankInsightObj.tglLabel} : null,
     rankDailyTrend: rankDailyTrend, // {firstTgl,lastTgl,firstRank,lastRank,firstGap,lastGap} atau null
     weeklyTrend: {weeks: wPaysBktForAI, label: bktWeekTrendForAI.text}, // [M1,M2,M3,M4] + label naik/turun
     rawKpi: {sentuhWA:s.sentuhWA, responWA:s.responWA, callManual:s.callManual, callTerhubung:s.callTerhubung,
@@ -7033,6 +7079,8 @@ function buildBucketSlide(ap, bk, bkRows, bkS, bkTrend, color, bulan, tahun, all
       .filter(i=>!rankInsightSlide||i.text!==rankInsightSlide.text.replace(/<[^>]+>/g,''))
       .map(i=>({text:i.text, level:i.dot==='dot-red'?'KRITIS':i.dot==='dot-warn'?'PERINGATAN':'INFO'})),
     rankMonthly: rankMonthlySlide,
+    // Sama seperti Tim page: rank harian per tanggal terbaru (raw), buat deteksi selisih vs rankMonthly.
+    rankDailyLatest: rankInsightSlide ? {rank:rankInsightSlide.rank, totalVendor:rankInsightSlide.totalVendor, tglLabel:rankInsightSlide.tglLabel} : null,
     rankDailyTrend: rankTrendSlide,
     weeklyTrend: {weeks: wPaysBkt, label: bkTrend.text},
     rawKpi: {sentuhWA:bkS.sentuhWA, responWA:bkS.responWA, callManual:bkS.callManual, callTerhubung:bkS.callTerhubung,
