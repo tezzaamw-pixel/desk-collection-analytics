@@ -188,6 +188,8 @@ select:focus{border-color:var(--accent);}
 .bucket-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
 .bucket-badge{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--border);color:var(--text2);font-weight:500;}
 .bucket-badge-dpd{background:var(--accent-bg);color:var(--accent);font-weight:700;}
+.bucket-badge-app{background:var(--warning-bg);color:var(--warning);font-weight:600;}
+.bsm-bucket-tab-app{font-size:9px;font-weight:600;opacity:.75;margin-left:3px;}
 .btn-bucket-setup{padding:2px 8px;font-size:10px;font-weight:600;background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;}
 .btn-bucket-setup:hover{border-color:var(--accent);color:var(--accent);}
 .btn-bucket-setup.has-custom{color:var(--accent);border-color:var(--accent);background:var(--accent-bg);}
@@ -1293,12 +1295,15 @@ function setCmpbView(view) {
 // presentasi bisa langsung buka perbandingan bulan lalu untuk SPV yang sama, dan
 // otomatis loncat ke tab Bucket dengan baris bucket yang sedang dibuka di-highlight.
 async function openCmpBulanFromBsm() {
-  const {spv, bucket} = _bsmState || {};
+  const {spv, bucket, aplikasi} = _bsmState || {};
   if (!spv) return;
   const safeSpvId = btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
   await openCmpBulan(spv, safeSpvId);
   if (bucket) {
-    _cmpbFocusBucket = bucket;
+    // BUG FIX: simpan pakai bkKeyOf (aplikasi+bucket), bukan cuma nama bucket —
+    // supaya highlight baris di tab Bucket tepat sasaran walau SPV ini pegang
+    // bucket bernama sama di >1 aplikasi.
+    _cmpbFocusBucket = bkKeyOf(aplikasi, bucket);
     setCmpBulanTab('bucket');
   }
 }
@@ -1501,8 +1506,10 @@ function renderCmpBulanTab(tab) {
       const ps = sumRows(g.prevRows);
       const daysCurr = daysInGroup(g.currRows);
       const daysPrev = daysInGroup(g.prevRows);
-      // Highlight baris bucket yang jadi asal klik tombol "vs Bln Lalu" di modal Summary Bucket
-      const isFocusRow = tab === 'bucket' && _cmpbFocusBucket && g.label === _cmpbFocusBucket;
+      // Highlight baris bucket yang jadi asal klik tombol "vs Bln Lalu" di modal Summary Bucket.
+      // Dicocokkan pakai bkKey (aplikasi+bucket), bukan cuma label, supaya tepat
+      // sasaran walau ada bucket senama di aplikasi lain.
+      const isFocusRow = tab === 'bucket' && _cmpbFocusBucket && g.bkKey === _cmpbFocusBucket;
       return `<tr class="${isFocusRow?'cmpb-row-focus':''}"${isFocusRow?' id="cmpbFocusRow"':''}>
         <td style="font-weight:600;color:var(--text)">${escH(g.label)}${g.badge||''}</td>
         ${METRICS.map(m => {
@@ -1531,28 +1538,53 @@ function renderCmpBulanTab(tab) {
   if (tab === 'spv') {
     groups = [{label: _cmpBulanState.spv, currRows, prevRows}];
   } else if (tab === 'bucket') {
-    const bks = [...new Set([...currRows,...prevRows].map(r=>r.bucket).filter(Boolean))].sort();
-    groups = bks.map(bk => ({
+    // BUG FIX: grouping pakai pasangan (aplikasi, bucket) — bukan cuma nama bucket —
+    // supaya bucket senama di aplikasi berbeda (SPV yg pegang >1 aplikasi) tetap
+    // jadi baris terpisah, bukan tergabung jadi 1 baris yg datanya kecampur.
+    const cmpMultiApp = spvHasMultiApp([...currRows, ...prevRows]);
+    const seenBk = new Set(); const bkCombos = [];
+    [...currRows, ...prevRows].forEach(r=>{
+      if(!r.bucket) return;
+      const key = bkKeyOf(r.aplikasi, r.bucket);
+      if(seenBk.has(key)) return;
+      seenBk.add(key);
+      bkCombos.push({aplikasi:r.aplikasi||'', bucket:r.bucket, key});
+    });
+    bkCombos.sort((a,b)=> a.bucket===b.bucket ? a.aplikasi.localeCompare(b.aplikasi) : a.bucket.localeCompare(b.bucket));
+    groups = bkCombos.map(({aplikasi:ap, bucket:bk, key}) => ({
       label: bk,
-      currRows: currRows.filter(r=>r.bucket===bk),
-      prevRows: prevRows.filter(r=>r.bucket===bk),
+      bkKey: key,
+      badge: cmpMultiApp ? ` <span style="font-size:9px;font-weight:600;opacity:.7;margin-left:4px">${escH(ap)}</span>` : '',
+      currRows: currRows.filter(r=>r.bucket===bk&&r.aplikasi===ap),
+      prevRows: prevRows.filter(r=>r.bucket===bk&&r.aplikasi===ap),
     }));
   } else if (tab === 'tl') {
     const tls = [...new Set([...currRows,...prevRows].map(r=>r.teamLeader).filter(Boolean))].sort();
     // Group by bucket — pakai UNION bucket bulan ini & bulan lalu, supaya bucket yang
     // bulan ini kosong (tim pindah semua/bubar) tetap muncul sectionnya.
-    const bks = [...new Set([...currRows,...prevRows].map(r=>r.bucket).filter(Boolean))].sort();
-    bks.forEach(bk => {
-      groups.push({isSection: true, label: `📦 ${bk}`});
+    // BUG FIX: section dikelompokkan per pasangan (aplikasi, bucket), bukan cuma
+    // nama bucket — supaya bucket senama di aplikasi lain tidak nyampur jadi 1 section.
+    const tlMultiApp = spvHasMultiApp([...currRows, ...prevRows]);
+    const seenTlBk = new Set(); const tlBkCombos = [];
+    [...currRows, ...prevRows].forEach(r=>{
+      if(!r.bucket) return;
+      const key = bkKeyOf(r.aplikasi, r.bucket);
+      if(seenTlBk.has(key)) return;
+      seenTlBk.add(key);
+      tlBkCombos.push({aplikasi:r.aplikasi||'', bucket:r.bucket});
+    });
+    tlBkCombos.sort((a,b)=> a.bucket===b.bucket ? a.aplikasi.localeCompare(b.aplikasi) : a.bucket.localeCompare(b.bucket));
+    tlBkCombos.forEach(({aplikasi:bkAp, bucket:bk}) => {
+      groups.push({isSection: true, label: `📦 ${bk}${tlMultiApp?' — '+bkAp:''}`});
       // Pakai UNION juga utk TL — supaya TL yg bulan lalu ada di bucket ini tapi
       // bulan ini sudah tidak ada lagi (bukan cuma "0 payment") tetap tampil.
       const tlsInBk = tls.filter(tl =>
-        currRows.some(r=>r.bucket===bk&&r.teamLeader===tl) ||
-        prevRows.some(r=>r.bucket===bk&&r.teamLeader===tl)
+        currRows.some(r=>r.bucket===bk&&r.aplikasi===bkAp&&r.teamLeader===tl) ||
+        prevRows.some(r=>r.bucket===bk&&r.aplikasi===bkAp&&r.teamLeader===tl)
       );
       tlsInBk.forEach(tl => {
-        const tlCurrRows = currRows.filter(r=>r.bucket===bk&&r.teamLeader===tl);
-        const tlPrevRows = prevRows.filter(r=>r.bucket===bk&&r.teamLeader===tl);
+        const tlCurrRows = currRows.filter(r=>r.bucket===bk&&r.aplikasi===bkAp&&r.teamLeader===tl);
+        const tlPrevRows = prevRows.filter(r=>r.bucket===bk&&r.aplikasi===bkAp&&r.teamLeader===tl);
         let badge = '';
         if (tlCurrRows.length === 0 && tlPrevRows.length > 0) {
           // TL ini sudah tidak tercatat sama sekali di bucket ini bulan ini
@@ -1585,19 +1617,29 @@ function renderCmpBulanTab(tab) {
     });
   } else if (tab === 'agent') {
     const ags = [...new Set([...currRows,...prevRows].map(r=>r.agent).filter(Boolean))].sort();
-    // UNION bucket bulan ini & bulan lalu (sama seperti tab TL)
-    const bks = [...new Set([...currRows,...prevRows].map(r=>r.bucket).filter(Boolean))].sort();
-    bks.forEach(bk => {
-      groups.push({isSection: true, label: `📦 ${bk}`});
+    // UNION bucket bulan ini & bulan lalu (sama seperti tab TL). BUG FIX: section
+    // dikelompokkan per pasangan (aplikasi, bucket), bukan cuma nama bucket.
+    const agMultiApp = spvHasMultiApp([...currRows, ...prevRows]);
+    const seenAgBk = new Set(); const agBkCombos = [];
+    [...currRows, ...prevRows].forEach(r=>{
+      if(!r.bucket) return;
+      const key = bkKeyOf(r.aplikasi, r.bucket);
+      if(seenAgBk.has(key)) return;
+      seenAgBk.add(key);
+      agBkCombos.push({aplikasi:r.aplikasi||'', bucket:r.bucket});
+    });
+    agBkCombos.sort((a,b)=> a.bucket===b.bucket ? a.aplikasi.localeCompare(b.aplikasi) : a.bucket.localeCompare(b.bucket));
+    agBkCombos.forEach(({aplikasi:bkAp, bucket:bk}) => {
+      groups.push({isSection: true, label: `📦 ${bk}${agMultiApp?' — '+bkAp:''}`});
       // UNION agent juga — agent yg bulan lalu ada di bucket ini tapi bulan ini
       // sudah keluar/pindah sepenuhnya (bukan cuma "muncul dengan 0") tetap tampil.
       const agsInBk = ags.filter(ag =>
-        currRows.some(r=>r.bucket===bk&&r.agent===ag) ||
-        prevRows.some(r=>r.bucket===bk&&r.agent===ag)
+        currRows.some(r=>r.bucket===bk&&r.aplikasi===bkAp&&r.agent===ag) ||
+        prevRows.some(r=>r.bucket===bk&&r.aplikasi===bkAp&&r.agent===ag)
       );
       agsInBk.forEach(ag => {
-        const agCurrRows = currRows.filter(r=>r.bucket===bk&&r.agent===ag);
-        const agPrevRows  = prevRows.filter(r=>r.bucket===bk&&r.agent===ag);
+        const agCurrRows = currRows.filter(r=>r.bucket===bk&&r.aplikasi===bkAp&&r.agent===ag);
+        const agPrevRows  = prevRows.filter(r=>r.bucket===bk&&r.aplikasi===bkAp&&r.agent===ag);
         const curApp = agCurrRows[0]?.aplikasi || agPrevRows[0]?.aplikasi || '';
         const leftBucket = agCurrRows.length === 0 && agPrevRows.length > 0;
         const badge = leftBucket
@@ -1704,6 +1746,23 @@ function getDpdForBucket(spv, aplikasi, bucket) {
   );
   return row ? (row.dpd||'') : '';
 }
+
+// ── Identitas Bucket (aplikasi + bucket) ───────────────────────
+// BUG FIX: satu SPV bisa pegang >1 aplikasi (mis. Kredione & Rupiah Cepat, atau
+// Pinjamin & Kreditok), dan kadang 2 aplikasi kebetulan punya nama bucket yang
+// SAMA (mis. sama-sama ada "M2+"). Sebelumnya banyak tempat (kartu bucket Tim
+// page, modal 📊 Summary, panel ⚠ Perhatian Khusus) mengelompokkan/memfilter data
+// SPV cuma pakai nama bucket saja — akibatnya data 2 aplikasi berbeda kecampur
+// jadi 1 kartu/summary yang sama walau sebenarnya beda produk & beda periode
+// aktifnya. Identitas bucket yang benar adalah PASANGAN (aplikasi, bucket), jadi
+// semua tempat itu sekarang pakai key gabungan dari helper ini.
+const BK_SEP = '␟';
+function bkKeyOf(aplikasi, bucket){ return (aplikasi||'')+BK_SEP+(bucket||''); }
+function parseBkKey(key){
+  const i=(key||'').indexOf(BK_SEP);
+  return i===-1 ? {aplikasi:'', bucket:key||''} : {aplikasi:key.slice(0,i), bucket:key.slice(i+1)};
+}
+function spvHasMultiApp(rows){ return new Set(rows.map(r=>r.aplikasi).filter(Boolean)).size>1; }
 
 async function openRankModal(spv, safeSpvId) {
   const rows = spvAgentDataCache[spv] || [];
@@ -2108,12 +2167,14 @@ document.addEventListener('click', e => {
   const dd = document.getElementById('bkSetupDropdown');
   if (dd && !dd.contains(e.target)) dd.classList.remove('open');
 });
-let _bsmState = { bucket:'', spv:'', mode:'payment', date:'', view:'total', grouped:false };
+let _bsmState = { bucket:'', spv:'', aplikasi:'', mode:'payment', date:'', view:'total', grouped:false };
 
-function openBucketSummary(bucket, spv) {
-  const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+// BUG FIX: `aplikasi` sekarang wajib disertakan agar bucket dgn nama sama di
+// aplikasi berbeda (dalam 1 SPV yg sama) tidak kecampur jadi 1 summary.
+function openBucketSummary(bucket, spv, aplikasi) {
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
   if (!rows.length) { alert('Tidak ada data untuk bucket ini.'); return; }
-  _bsmState = { bucket, spv, mode:'payment', date:'', view:'total', grouped:false, tab:'table' };
+  _bsmState = { bucket, spv, aplikasi, mode:'payment', date:'', view:'total', grouped:false, tab:'table' };
   document.querySelectorAll('.bsm-mode-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.mode==='payment'));
   document.querySelectorAll('.bsm-view-btn').forEach(b =>
@@ -2134,7 +2195,7 @@ function openBucketSummary(bucket, spv) {
   if (gb) { gb.style.background='var(--surface2)'; gb.style.color='var(--text2)'; gb.style.borderColor='var(--border)'; gb.textContent='👥 Group'; }
 
   // Build bucket navbar
-  _buildBsmBucketNav(spv, bucket);
+  _buildBsmBucketNav(spv, bucket, aplikasi);
   // Init chart filter dropdown
   _initBsmChartFilter(rows);
 
@@ -2154,29 +2215,47 @@ function openBucketSummary(bucket, spv) {
   _renderBucketSummary();
 }
 
-function _buildBsmBucketNav(spv, activeBucket) {
+// BUG FIX: nav dibangun dari pasangan (aplikasi, bucket) yg unik, bukan cuma nama
+// bucket — supaya 2 bucket senama di aplikasi berbeda tampil sbg 2 tab terpisah,
+// bukan digabung jadi 1. Label tab menampilkan nama aplikasi kalau SPV ini
+// memang pegang >1 aplikasi (kalau cuma 1 aplikasi, tampilannya sama seperti
+// sebelumnya — tidak ada tab tambahan yang bikin bingung).
+function _buildBsmBucketNav(spv, activeBucket, activeAplikasi) {
   const nav = document.getElementById('bsmBucketNav');
   if (!nav) return;
   // Get all buckets for this SPV from allRows
   const allSpvRows = spvAgentDataCache[spv]||[];
-  const buckets = [...new Set(allSpvRows.map(r=>r.bucket).filter(Boolean))].sort();
-  if (buckets.length <= 1) { nav.style.display='none'; return; }
+  const multiApp = spvHasMultiApp(allSpvRows);
+  const seen = new Set();
+  const combos = [];
+  allSpvRows.forEach(r=>{
+    if(!r.bucket) return;
+    const key = bkKeyOf(r.aplikasi, r.bucket);
+    if(seen.has(key)) return;
+    seen.add(key);
+    combos.push({aplikasi:r.aplikasi||'', bucket:r.bucket, key});
+  });
+  combos.sort((a,b)=> a.aplikasi===b.aplikasi ? a.bucket.localeCompare(b.bucket) : a.aplikasi.localeCompare(b.aplikasi));
+  if (combos.length <= 1) { nav.style.display='none'; return; }
   nav.style.display = 'flex';
-  nav.innerHTML = buckets.map(bk => {
+  const activeKey = bkKeyOf(activeAplikasi, activeBucket);
+  nav.innerHTML = combos.map(({aplikasi:ap, bucket:bk, key}) => {
     // Rotasi-aware: agent yg sudah digantikan/nonaktif/pindah akun dlm bulan ini
     // tidak ikut dihitung — konsisten dgn header bucket/TL/SPV di halaman utama.
-    const count = computeActiveAgentCount(allSpvRows.filter(r=>r.bucket===bk));
-    return `<button class="bsm-bucket-tab ${bk===activeBucket?'active':''}"
-      onclick="switchBsmBucket('${escA(bk)}','${escA(spv)}')" title="${escH(bk)}">
-      ${escH(bk)}<span class="bsm-bucket-tab-count">${count}</span>
+    const count = computeActiveAgentCount(allSpvRows.filter(r=>r.bucket===bk&&r.aplikasi===ap));
+    const label = multiApp ? `${escH(bk)} <span class="bsm-bucket-tab-app">${escH(ap)}</span>` : escH(bk);
+    return `<button class="bsm-bucket-tab ${key===activeKey?'active':''}" data-bkkey="${escA(key)}"
+      onclick="switchBsmBucket('${escA(bk)}','${escA(spv)}','${escA(ap)}')" title="${escH(bk)} — ${escH(ap)}">
+      ${label}<span class="bsm-bucket-tab-count">${count}</span>
     </button>`;
   }).join('');
 }
 
-function switchBsmBucket(bucket, spv) {
-  const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+function switchBsmBucket(bucket, spv, aplikasi) {
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
   if (!rows.length) return;
   _bsmState.bucket = bucket;
+  _bsmState.aplikasi = aplikasi;
   _bsmState.date = '';
   _bsmState.grouped = false;
   if (_bsmPayChart) { _bsmPayChart.destroy(); _bsmPayChart = null; }
@@ -2185,8 +2264,9 @@ function switchBsmBucket(bucket, spv) {
   _initBsmChartFilter(rows);
 
   // Update active tab
+  const activeKey = bkKeyOf(aplikasi, bucket);
   document.querySelectorAll('.bsm-bucket-tab').forEach(t =>
-    t.classList.toggle('active', t.textContent.trim().startsWith(bucket)));
+    t.classList.toggle('active', t.dataset.bkkey===activeKey));
 
   // Reset group btn
   const gb = document.getElementById('bsmGroupBtn');
@@ -2213,13 +2293,13 @@ function switchBsmBucket(bucket, spv) {
 
 // ── Export Summary Bucket ─────────────────────────────────────
 function _getBsmExportData() {
-  const {bucket, spv, mode, date, view} = _bsmState;
-  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+  const {bucket, spv, aplikasi, mode, date, view} = _bsmState;
+  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
   const rows = date ? allRows.filter(r=>r.tanggal===date) : allRows;
 
   const bulan = document.getElementById('selBulan').value;
   const tahun = document.getElementById('selTahun').value;
-  const title = `Summary Bucket ${bucket} — ${date||'Semua Tanggal'} — ${bulan} ${tahun}`;
+  const title = `Summary Bucket ${bucket} (${aplikasi}) — ${date||'Semua Tanggal'} — ${bulan} ${tahun}`;
 
   // Build per-agent data
   const byAgent = {};
@@ -2394,8 +2474,8 @@ function _initBsmChartFilter(rows) {
 }
 
 function renderBsmChart() {
-  const {bucket, spv} = _bsmState;
-  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+  const {bucket, spv, aplikasi} = _bsmState;
+  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
   if (!allRows.length) return;
 
   const sel = document.getElementById('bsmChartFilter');
@@ -2620,8 +2700,8 @@ function _buildBsmAgentPreviewRow(a, agId, colspanTotal, previewSetupCols, bsmRo
 }
 
 function _renderBucketSummary() {
-  const {bucket, spv, mode, date, view} = _bsmState;
-  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket);
+  const {bucket, spv, aplikasi, mode, date, view} = _bsmState;
+  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
   // Apply date filter
   const rows = date ? allRows.filter(r=>r.tanggal===date) : allRows;
   const bulan = document.getElementById('selBulan').value;
@@ -2632,8 +2712,9 @@ function _renderBucketSummary() {
   let _bsmAgIdCounter = 0;
 
   const titleDate = date ? ` — ${(()=>{const dt=new Date(date);const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];return dt.getDate()+' ('+dn[dt.getDay()]+')'})()}` : '';
+  const multiAppSpv = spvHasMultiApp(spvAgentDataCache[spv]||[]);
   document.getElementById('bsmTitle').textContent =
-    `📊 Summary Bucket ${bucket}${titleDate} — ${bulan} ${tahun}`;
+    `📊 Summary Bucket ${bucket}${multiAppSpv?' ('+aplikasi+')':''}${titleDate} — ${bulan} ${tahun}`;
 
   // Show target in modal if set
   const bkTarget = getBucketTarget(spv, bucket);
@@ -3239,24 +3320,35 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   const setupMetrics=activeSetup?activeSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):[];
   const metricBoxes=setupMetrics.length?setupMetrics.map(m=>`<div class="metric-box"><div class="lbl">${m.label}</div><div class="val">${fmtMetric(m,s[m.key]||0)}</div></div>`).join(''):'<div style="color:var(--text3);font-size:12px;padding:6px 0">Belum ada setup. Klik "+ Setup baru".</div>';
 
-  // Group TL by bucket
+  // Group TL by bucket.
+  // BUG FIX: key digabung (aplikasi, bucket) — bukan cuma nama bucket. Sebelumnya
+  // kalau 1 SPV pegang >1 aplikasi dan 2 aplikasi itu kebetulan punya bucket
+  // bernama sama (mis. sama-sama ada "M2+"), rows dari kedua aplikasi kecampur
+  // jadi 1 kartu, sehingga total payment/jumlah agent/DPD yang tampil bisa salah
+  // (mis. bucket yg formasinya sudah 0 di 1 aplikasi tetap muncul krn "numpang"
+  // data aplikasi lain yg masih aktif).
   const byBucket={};
+  const bucketMeta={};
   rows.forEach(r=>{
     const bk=r.bucket||'(Tanpa Bucket)';
+    const ap=r.aplikasi||'(Tanpa Aplikasi)';
+    const bkKey=bkKeyOf(ap,bk);
     const tl=r.teamLeader||'(Tanpa TL)';
-    if(!byBucket[bk])byBucket[bk]={};
-    if(!byBucket[bk][tl])byBucket[bk][tl]=[];
-    byBucket[bk][tl].push(r);
+    if(!byBucket[bkKey]){byBucket[bkKey]={};bucketMeta[bkKey]={bucket:bk,aplikasi:ap};}
+    if(!byBucket[bkKey][tl])byBucket[bkKey][tl]=[];
+    byBucket[bkKey][tl].push(r);
   });
+  const multiAppSpv=spvHasMultiApp(rows);
 
   // ============================================================
   // FIX BUG #2: ID TL menggunakan counter unik per-render,
   // bukan btoa yang bisa menghasilkan ID identik atau bentrok.
   // ============================================================
   let tlCounter=0;
-  const bucketBlocks=Object.keys(byBucket).sort().map(bk=>{
-    const tlsInBucket=Object.keys(byBucket[bk]).map(tl=>{
-      const tlRowsRaw=byBucket[bk][tl];
+  const bucketBlocks=Object.keys(byBucket).sort().map(bkKey=>{
+    const {bucket:bk, aplikasi:bkAplikasi}=bucketMeta[bkKey];
+    const tlsInBucket=Object.keys(byBucket[bkKey]).map(tl=>{
+      const tlRowsRaw=byBucket[bkKey][tl];
       const ts=summarizeRows(tlRowsRaw);
       // Agent "lama" (sudah digantikan/nonaktif/pindah akun dalam bulan ini) tidak
       // dihitung sebagai headcount aktif — biar "X agent" match jumlah akun berjalan.
@@ -3266,7 +3358,10 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       return{tl,s:ts,rows:tlRowsRaw,agentCount:activeAgents.size,_activeAgents:activeAgents,_rotasiInfo:rotasiInfo};
     }).sort((a,b)=>b.s.dailyPayment-a.s.dailyPayment);
 
-    // Get setup for this bucket (custom or fallback to SPV default)
+    // Get setup for this bucket (custom or fallback to SPV default). Setup/target
+    // sengaja tetap disimpan per NAMA bucket saja (bukan per aplikasi+bucket) —
+    // ini cuma preferensi tampilan kolom & target angka milik SPV, jadi wajar
+    // dipakai bersama kalau nama bucket-nya sama di aplikasi berbeda.
     const {setup: bkSetup, idx: bkSetupIdx} = getBucketSetup(spv, bk);
     const effectiveSetup = bkSetup || activeSetup; // fallback to SPV active setup
 
@@ -3278,15 +3373,14 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     // Union agent aktif dari semua TL di bucket ini (bukan raw distinct count) —
     // supaya konsisten dgn agentCount per-TL yang sudah exclude agent "lama".
     const bkCount=new Set(tlsInBucket.flatMap(t=>[...(t._activeAgents||[])])).size;
-    const bkTotalRaw = Object.values(byBucket[bk]).flat().reduce((s,r)=>s+(r.dailyPayment||0),0);
+    const bkTotalRaw = Object.values(byBucket[bkKey]).flat().reduce((s,r)=>s+(r.dailyPayment||0),0);
     // DPD (rentang keterlambatan) dari sheet Referensi Akun — dicocokkan lewat
-    // Supervisor+Aplikasi+Bucket. Aplikasi dominan bucket ini dicari pakai helper
-    // yg sama dgn Rank Vendor (_mainAplikasiOf), krn byBucket di sini tidak
-    // dipisah per-aplikasi (1 SPV bisa pegang bucket dgn nama sama di >1 aplikasi).
-    const bkRowsFlatForDpd=Object.values(byBucket[bk]).flat();
-    const bkDpd=getDpdForBucket(spv, _mainAplikasiOf(bkRowsFlatForDpd), bk);
+    // Supervisor+Aplikasi+Bucket. bkAplikasi sekarang didapat langsung dari key
+    // grouping di atas (bukan ditebak via _mainAplikasiOf), krn byBucket sudah
+    // dipisah per-aplikasi.
+    const bkDpd=getDpdForBucket(spv, bkAplikasi, bk);
     const bkTotalPayment = fmtRpFull(bkTotalRaw);
-    const safeBk=escA(bk); const safeSpv2=escA(spv);
+    const safeBk=escA(bk); const safeSpv2=escA(spv); const safeBkAp=escA(bkAplikasi);
     const hasCustom = bkSetupIdx !== -1;
     const setupLabel = hasCustom ? escH(bkSetup.name) : 'Default';
 
@@ -3302,18 +3396,23 @@ function buildSPVBlock(spv,rows,bulan,tahun){
         <span class="bk-target-pct" style="color:${targetColor}">${targetPct.toFixed(0)}%</span>
       </div>` : '';
 
+    // Tag aplikasi cuma ditampilkan kalau SPV ini memang pegang >1 aplikasi —
+    // supaya SPV yg cuma pegang 1 aplikasi (mayoritas) tampilannya tidak berubah.
+    const bkAppTag = multiAppSpv ? `<span class="bucket-badge bucket-badge-app" title="Aplikasi bucket ini">${escH(bkAplikasi)}</span>` : '';
+
     return `<div class="bucket-group">
       <div class="bucket-header">
         <span class="bucket-label">${escH(bk)}</span>
+        ${bkAppTag}
         ${bkDpd?`<span class="bucket-badge bucket-badge-dpd" title="DPD (keterlambatan) dari sheet Referensi Akun">DPD ${escH(bkDpd)}</span>`:''}
-        <span class="bucket-badge">${Object.keys(byBucket[bk]).length} TL · ${bkCount} agent</span>
+        <span class="bucket-badge">${Object.keys(byBucket[bkKey]).length} TL · ${bkCount} agent</span>
         <button class="btn-bucket-setup ${hasCustom?'has-custom':''}"
           onclick="openBkSetupDropdown(event,'${safeBk}','${safeSpv2}')"
           title="Setup kolom untuk bucket ini">⚙ ${setupLabel}</button>
         <span style="font-size:11px;font-weight:700;color:var(--accent);margin-left:auto;margin-right:4px">${bkTotalPayment}</span>
         ${targetHtml}
         <button class="btn-bucket-target" onclick="openTargetInput(event,'${safeBk}','${safeSpv2}')" title="Set target payment">🎯</button>
-        <button class="btn-bucket-summary" onclick="openBucketSummary('${safeBk}','${safeSpv2}')" title="Lihat summary ranking bucket">📊 Summary</button>
+        <button class="btn-bucket-summary" onclick="openBucketSummary('${safeBk}','${safeSpv2}','${safeBkAp}')" title="Lihat summary ranking bucket">📊 Summary</button>
       </div>
       ${tlRows}
     </div>`;
@@ -3331,8 +3430,14 @@ function buildSPVBlock(spv,rows,bulan,tahun){
 
   spvSummaryCache[spv]=s;
 
-  // Build bucket options untuk filter analisa
-  const bucketOptionsHtml=Object.keys(byBucket).sort().map(bk=>`<option value="${escH(bk)}">${escH(bk)}</option>`).join('');
+  // Build bucket options untuk filter analisa. BUG FIX: value pakai bkKey
+  // (aplikasi+bucket) supaya bucket senama di aplikasi berbeda tetap jadi 2
+  // pilihan terpisah di dropdown "Perhatian Khusus", bukan tergabung jadi 1.
+  const bucketOptionsHtml=Object.keys(byBucket).sort().map(bkKey=>{
+    const {bucket:bk, aplikasi:ap}=bucketMeta[bkKey];
+    const label=multiAppSpv?`${bk} — ${ap}`:bk;
+    return `<option value="${escH(bkKey)}">${escH(label)}</option>`;
+  }).join('');
 
   return `<div class="spv-block" id="${spvBlockId}">
     <div class="spv-header">
@@ -4370,19 +4475,23 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
   // biasa) — supaya generateBucketAI bisa nulis analisa yg lebih spesifik & mencakup
   // tren mingguan, vs bulan lalu, benchmark peer bucket, dan rotasi agent. ───────────
   const bucketNameForAI=bucketRows[0]?.bucket||'';
+  const bucketAplikasiForAI=bucketRows[0]?.aplikasi||'';
 
   // 1. Tren mingguan bucket (M1-M4) — reuse helper yg sama dgn chart "Tren Payment Mingguan"
   const wPaysBktForAI=weeklyPayments(bucketRows);
   const bktWeekTrendForAI=trendLabel(wPaysBktForAI);
 
-  // 2. Benchmark vs bucket lain yg dipegang SPV yg sama (allSpvRows = semua bucket SPV ini)
-  const otherBktRowsForAI=(allSpvRows||[]).filter(r=>(r.bucket||'')&&(r.bucket||'')!==bucketNameForAI);
+  // 2. Benchmark vs bucket lain yg dipegang SPV yg sama (allSpvRows = semua bucket SPV ini).
+  // BUG FIX: exclude pakai pasangan (aplikasi, bucket), bukan cuma nama bucket —
+  // kalau tidak, bucket senama di aplikasi lain (mis. Kredione M2+ vs Kreditok M2+)
+  // salah kekecualikan dari benchmark padahal itu bucket yg beda/valid jadi peer.
+  const otherBktRowsForAI=(allSpvRows||[]).filter(r=>(r.bucket||'')&&!(r.bucket===bucketNameForAI&&r.aplikasi===bucketAplikasiForAI));
   let peerBenchmarkForAI=null;
   if(otherBktRowsForAI.length){
     const otherSForAI=summarizeRows(otherBktRowsForAI);
     const otherAgentCountForAI=computeActiveAgentCount(otherBktRowsForAI);
     peerBenchmarkForAI={
-      otherBucketCount: new Set(otherBktRowsForAI.map(r=>r.bucket)).size,
+      otherBucketCount: new Set(otherBktRowsForAI.map(r=>bkKeyOf(r.aplikasi,r.bucket))).size,
       peerAvgPayment: otherAgentCountForAI>0?otherSForAI.dailyPayment/otherAgentCountForAI:0,
       currentAvgPayment: avgPayment,
     };
@@ -4577,14 +4686,15 @@ function getRowsByRange(safeSpvId, bucketRows){
 function onAnalysisBucketChange(spv, safeSpvId){
   const selBucket=document.getElementById('selAnalysisBucket-'+safeSpvId);
   if(!selBucket)return;
-  const selectedBucket=selBucket.value;
+  const selectedBucket=selBucket.value; // bkKey gabungan (aplikasi+bucket) — lihat bkKeyOf/parseBkKey
   // Simpan mapping safeSpvId → spv untuk dipakai di setRangeMode
   window['_spvOfSafeId_'+safeSpvId]=spv;
 
   if(selectedBucket){
+    const {aplikasi:selAp, bucket:selBk}=parseBkKey(selectedBucket);
     const allSpvRows=spvAgentDataCache[spv]||[];
     const tanggalList=[...new Set(
-      allSpvRows.filter(r=>r.bucket===selectedBucket&&r.tanggal).map(r=>r.tanggal)
+      allSpvRows.filter(r=>r.bucket===selBk&&r.aplikasi===selAp&&r.tanggal).map(r=>r.tanggal)
     )].sort();
 
     const fmtTgl=tgl=>{const p=tgl.split('-');return p.length===3?p[2]+'/'+p[1]+'/'+p[0]:tgl;};
@@ -4608,14 +4718,17 @@ async function renderAttentionPanel(spv, safeSpvId){
   const listEl=document.getElementById('attList-'+safeSpvId);
   const analysisEl=document.getElementById('attAnalysis-'+safeSpvId);
   if(!selEl||!listEl||!analysisEl)return;
-  const selectedBucket=selEl.value;
+  const selectedBucket=selEl.value; // bkKey gabungan (aplikasi+bucket)
   if(!selectedBucket){
     listEl.innerHTML='<div class="no-attention">Pilih bucket di atas</div>';
     analysisEl.innerHTML='<div class="analysis-empty">← Pilih bucket lalu klik agent untuk lihat analisa</div>';
     return;
   }
+  const {aplikasi:selAp, bucket:selBk}=parseBkKey(selectedBucket);
   const allSpvRows=spvAgentDataCache[spv]||[];
-  const bucketRows=allSpvRows.filter(r=>r.bucket===selectedBucket);
+  // BUG FIX: filter pakai aplikasi+bucket, bukan cuma bucket — supaya bucket
+  // senama di aplikasi lain tidak ikut kehitung di "Perhatian Khusus" ini.
+  const bucketRows=allSpvRows.filter(r=>r.bucket===selBk&&r.aplikasi===selAp);
   if(!bucketRows.length){listEl.innerHTML='<div class="no-attention">Tidak ada data di bucket ini.</div>';return;}
   // Mulai fetch data Rank (sheet "DATA RANK") lebih awal — biar kalau data belum
   // pernah di-fetch di halaman ini, waktu tunggunya nyatu dgn kalkulasi lain di
@@ -4793,8 +4906,10 @@ async function selectAttentionAgent(spv, safeSpvId, idx){
     await ensurePrevMonthDataCached(
       document.getElementById('selBulan')?.value||'',
       document.getElementById('selTahun')?.value||'');
+    // BUG FIX: filter juga pakai aplikasi dari firstRow, bukan cuma bucket —
+    // supaya tidak kecampur dgn bucket senama di aplikasi lain milik SPV yg sama.
     bucketSummaryHtml=buildBucketSummaryHtml(spv, safeSpvId,
-      (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===(firstRow.bucket||'')),
+      (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===(firstRow.bucket||'')&&r.aplikasi===(firstRow.aplikasi||'')),
       spvAgentDataCache[spv]||[],
       window['_attData_'+safeSpvId]||[]);
   }catch(e){
