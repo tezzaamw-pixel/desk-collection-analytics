@@ -187,7 +187,6 @@ select:focus{border-color:var(--accent);}
 .bucket-header{padding:8px 18px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
 .bucket-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
 .bucket-badge{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--border);color:var(--text2);font-weight:500;}
-.bucket-badge-dpd{background:var(--accent-bg);color:var(--accent);font-weight:700;}
 .bucket-badge-app{background:var(--warning-bg);color:var(--warning);font-weight:600;}
 .bsm-bucket-tab-app{font-size:9px;font-weight:600;opacity:.75;margin-left:3px;}
 .btn-bucket-setup{padding:2px 8px;font-size:10px;font-weight:600;background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;}
@@ -1236,12 +1235,7 @@ async function loadData(){
   const btn=document.getElementById('btnLoad');btn.disabled=true;btn.textContent='⏳ Memuat...';
   document.getElementById('content').innerHTML='<div class="state-box"><div class="spinner"></div><p>Memuat data...</p></div>';
   try{
-    // Referensi Akun (DPD per bucket) di-fetch bareng agentdata — no-op kalau sudah
-    // pernah di-fetch sesi ini (fetchReferensiData pakai cache _referensiCache).
-    const [data]=await Promise.all([
-      fetchJSON(API_URL+'?action=agentdata&bulan='+bulan+'&tahun='+tahun),
-      fetchReferensiData(),
-    ]);
+    const data=await fetchJSON(API_URL+'?action=agentdata&bulan='+bulan+'&tahun='+tahun);
     if(!data.success)throw new Error(data.message);
     allRows=data.rows||[];
     buildBucketMap(allRows);populateAplikasi(allRows);populateBucket('');
@@ -1713,38 +1707,6 @@ async function fetchRankData() {
     _rankDataCache = { daily: [], monthly: [] };
   }
   return _rankDataCache;
-}
-
-// ── Referensi Akun (sheet "Referensi Akun") — dipakai utk ambil DPD (rentang
-// keterlambatan) per kombinasi Supervisor+Aplikasi+Bucket, ditampilkan di badge
-// header bucket pada halaman Tim. Sheet-nya juga punya kolom Jan-Des (jumlah akun
-// per bulan, dipakai index.html) tapi di sini kita cuma butuh field `dpd`.
-let _referensiCache = null; // {rows:[{supervisor,aplikasi,bucket,dpd,...bulan}]}
-async function fetchReferensiData() {
-  if (_referensiCache) return _referensiCache;
-  try {
-    const data = await fetchJSON(API_URL + '?action=referensi');
-    _referensiCache = (data && data.success) ? { rows: data.rows||[] } : { rows: [] };
-  } catch(e) {
-    console.warn('fetchReferensiData gagal:', e);
-    _referensiCache = { rows: [] };
-  }
-  return _referensiCache;
-}
-// Cari nilai DPD utk kombinasi Supervisor+Aplikasi+Bucket tertentu. Match case-
-// insensitive & trim, karena penulisan nama di sheet Referensi Akun vs data harian
-// kadang beda kapitalisasi/spasi.
-function getDpdForBucket(spv, aplikasi, bucket) {
-  if (!_referensiCache || !_referensiCache.rows || !_referensiCache.rows.length) return '';
-  const spvLow = (spv||'').trim().toLowerCase();
-  const apLow = (aplikasi||'').trim().toLowerCase();
-  const bkLow = (bucket||'').trim().toLowerCase();
-  const row = _referensiCache.rows.find(r =>
-    (r.supervisor||'').trim().toLowerCase()===spvLow &&
-    (r.aplikasi||'').trim().toLowerCase()===apLow &&
-    (r.bucket||'').trim().toLowerCase()===bkLow
-  );
-  return row ? (row.dpd||'') : '';
 }
 
 // ── Identitas Bucket (aplikasi + bucket) ───────────────────────
@@ -3220,7 +3182,10 @@ function renderSpvCards(bySPV){
     const rows=bySPV[spv];
     const s=summarizeRows(rows);
     const agentCount=computeActiveAgentCount(rows);
-    const bucketCount=new Set(rows.map(r=>r.bucket).filter(Boolean)).size;
+    // BUG FIX: hitung bucket unik pakai pasangan (aplikasi,bucket) — konsisten dgn
+    // kartu bucket di halaman detail SPV — supaya SPV yg pegang >1 aplikasi dgn
+    // bucket senama tidak keliatan "kurang 1 bucket" dibanding pas dibuka detailnya.
+    const bucketCount=new Set(rows.filter(r=>r.bucket).map(r=>bkKeyOf(r.aplikasi,r.bucket))).size;
     const tlCount=new Set(rows.map(r=>r.teamLeader).filter(Boolean)).size;
     const appList=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))];
     const avatarColor=appList.length===1?getColor(appList[0]):'var(--accent)';
@@ -3327,11 +3292,18 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   // jadi 1 kartu, sehingga total payment/jumlah agent/DPD yang tampil bisa salah
   // (mis. bucket yg formasinya sudah 0 di 1 aplikasi tetap muncul krn "numpang"
   // data aplikasi lain yg masih aktif).
+  // PENTING: `bk`/`ap` di sini pakai nilai MENTAH (bisa string kosong), BUKAN
+  // placeholder tampilan — karena bkKey & bucketMeta.aplikasi ini nantinya dipakai
+  // lagi utk MENCOCOKKAN row asli lewat `r.aplikasi===aplikasi` di openBucketSummary/
+  // dropdown Perhatian Khusus dst. Kalau di sini disubstitusi jadi
+  // "(Tanpa Aplikasi)", pencocokan itu akan gagal terus (row asli aplikasinya '',
+  // bukan literal teks placeholder) dan bucket dgn aplikasi kosong jadi tampil "Tidak
+  // ada data". Placeholder tampilan tetap ada, tapi cuma dipakai pas render <span>.
   const byBucket={};
   const bucketMeta={};
   rows.forEach(r=>{
-    const bk=r.bucket||'(Tanpa Bucket)';
-    const ap=r.aplikasi||'(Tanpa Aplikasi)';
+    const bk=r.bucket||'';
+    const ap=r.aplikasi||'';
     const bkKey=bkKeyOf(ap,bk);
     const tl=r.teamLeader||'(Tanpa TL)';
     if(!byBucket[bkKey]){byBucket[bkKey]={};bucketMeta[bkKey]={bucket:bk,aplikasi:ap};}
@@ -3347,6 +3319,10 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   let tlCounter=0;
   const bucketBlocks=Object.keys(byBucket).sort().map(bkKey=>{
     const {bucket:bk, aplikasi:bkAplikasi}=bucketMeta[bkKey];
+    // Placeholder cuma utk TAMPILAN (label di UI) — bk/bkAplikasi asli (bisa '')
+    // tetap dipakai apa adanya utk semua pencocokan/lookup di bawah.
+    const bkDisplay=bk||'(Tanpa Bucket)';
+    const bkAplikasiDisplay=bkAplikasi||'(Tanpa Aplikasi)';
     const tlsInBucket=Object.keys(byBucket[bkKey]).map(tl=>{
       const tlRowsRaw=byBucket[bkKey][tl];
       const ts=summarizeRows(tlRowsRaw);
@@ -3374,11 +3350,6 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     // supaya konsisten dgn agentCount per-TL yang sudah exclude agent "lama".
     const bkCount=new Set(tlsInBucket.flatMap(t=>[...(t._activeAgents||[])])).size;
     const bkTotalRaw = Object.values(byBucket[bkKey]).flat().reduce((s,r)=>s+(r.dailyPayment||0),0);
-    // DPD (rentang keterlambatan) dari sheet Referensi Akun — dicocokkan lewat
-    // Supervisor+Aplikasi+Bucket. bkAplikasi sekarang didapat langsung dari key
-    // grouping di atas (bukan ditebak via _mainAplikasiOf), krn byBucket sudah
-    // dipisah per-aplikasi.
-    const bkDpd=getDpdForBucket(spv, bkAplikasi, bk);
     const bkTotalPayment = fmtRpFull(bkTotalRaw);
     const safeBk=escA(bk); const safeSpv2=escA(spv); const safeBkAp=escA(bkAplikasi);
     const hasCustom = bkSetupIdx !== -1;
@@ -3398,13 +3369,12 @@ function buildSPVBlock(spv,rows,bulan,tahun){
 
     // Tag aplikasi cuma ditampilkan kalau SPV ini memang pegang >1 aplikasi —
     // supaya SPV yg cuma pegang 1 aplikasi (mayoritas) tampilannya tidak berubah.
-    const bkAppTag = multiAppSpv ? `<span class="bucket-badge bucket-badge-app" title="Aplikasi bucket ini">${escH(bkAplikasi)}</span>` : '';
+    const bkAppTag = multiAppSpv ? `<span class="bucket-badge bucket-badge-app" title="Aplikasi bucket ini">${escH(bkAplikasiDisplay)}</span>` : '';
 
     return `<div class="bucket-group">
       <div class="bucket-header">
-        <span class="bucket-label">${escH(bk)}</span>
+        <span class="bucket-label">${escH(bkDisplay)}</span>
         ${bkAppTag}
-        ${bkDpd?`<span class="bucket-badge bucket-badge-dpd" title="DPD (keterlambatan) dari sheet Referensi Akun">DPD ${escH(bkDpd)}</span>`:''}
         <span class="bucket-badge">${Object.keys(byBucket[bkKey]).length} TL · ${bkCount} agent</span>
         <button class="btn-bucket-setup ${hasCustom?'has-custom':''}"
           onclick="openBkSetupDropdown(event,'${safeBk}','${safeSpv2}')"
@@ -3435,7 +3405,8 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   // pilihan terpisah di dropdown "Perhatian Khusus", bukan tergabung jadi 1.
   const bucketOptionsHtml=Object.keys(byBucket).sort().map(bkKey=>{
     const {bucket:bk, aplikasi:ap}=bucketMeta[bkKey];
-    const label=multiAppSpv?`${bk} — ${ap}`:bk;
+    const bkLbl=bk||'(Tanpa Bucket)', apLbl=ap||'(Tanpa Aplikasi)';
+    const label=multiAppSpv?`${bkLbl} — ${apLbl}`:bkLbl;
     return `<option value="${escH(bkKey)}">${escH(label)}</option>`;
   }).join('');
 
