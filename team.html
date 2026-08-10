@@ -187,6 +187,7 @@ select:focus{border-color:var(--accent);}
 .bucket-header{padding:8px 18px;background:var(--surface2);border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
 .bucket-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;}
 .bucket-badge{font-size:10px;padding:2px 8px;border-radius:20px;background:var(--border);color:var(--text2);font-weight:500;}
+.bucket-badge-dpd{background:var(--accent-bg);color:var(--accent);font-weight:700;}
 .bucket-badge-app{background:var(--warning-bg);color:var(--warning);font-weight:600;}
 .bsm-bucket-tab-app{font-size:9px;font-weight:600;opacity:.75;margin-left:3px;}
 .btn-bucket-setup{padding:2px 8px;font-size:10px;font-weight:600;background:transparent;color:var(--text3);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:4px;}
@@ -1235,7 +1236,12 @@ async function loadData(){
   const btn=document.getElementById('btnLoad');btn.disabled=true;btn.textContent='⏳ Memuat...';
   document.getElementById('content').innerHTML='<div class="state-box"><div class="spinner"></div><p>Memuat data...</p></div>';
   try{
-    const data=await fetchJSON(API_URL+'?action=agentdata&bulan='+bulan+'&tahun='+tahun);
+    // Referensi Akun (DPD per bucket) di-fetch bareng agentdata — no-op kalau sudah
+    // pernah di-fetch sesi ini (fetchReferensiData pakai cache _referensiCache).
+    const [data]=await Promise.all([
+      fetchJSON(API_URL+'?action=agentdata&bulan='+bulan+'&tahun='+tahun),
+      fetchReferensiData(),
+    ]);
     if(!data.success)throw new Error(data.message);
     allRows=data.rows||[];
     buildBucketMap(allRows);populateAplikasi(allRows);populateBucket('');
@@ -1707,6 +1713,38 @@ async function fetchRankData() {
     _rankDataCache = { daily: [], monthly: [] };
   }
   return _rankDataCache;
+}
+
+// ── Referensi Akun (sheet "Referensi Akun") — dipakai utk ambil DPD (rentang
+// keterlambatan) per kombinasi Supervisor+Aplikasi+Bucket, ditampilkan di badge
+// header bucket pada halaman Tim. Sheet-nya juga punya kolom Jan-Des (jumlah akun
+// per bulan, dipakai index.html) tapi di sini kita cuma butuh field `dpd`.
+let _referensiCache = null; // {rows:[{supervisor,aplikasi,bucket,dpd,...bulan}]}
+async function fetchReferensiData() {
+  if (_referensiCache) return _referensiCache;
+  try {
+    const data = await fetchJSON(API_URL + '?action=referensi');
+    _referensiCache = (data && data.success) ? { rows: data.rows||[] } : { rows: [] };
+  } catch(e) {
+    console.warn('fetchReferensiData gagal:', e);
+    _referensiCache = { rows: [] };
+  }
+  return _referensiCache;
+}
+// Cari nilai DPD utk kombinasi Supervisor+Aplikasi+Bucket tertentu. Match case-
+// insensitive & trim, karena penulisan nama di sheet Referensi Akun vs data harian
+// kadang beda kapitalisasi/spasi.
+function getDpdForBucket(spv, aplikasi, bucket) {
+  if (!_referensiCache || !_referensiCache.rows || !_referensiCache.rows.length) return '';
+  const spvLow = (spv||'').trim().toLowerCase();
+  const apLow = (aplikasi||'').trim().toLowerCase();
+  const bkLow = (bucket||'').trim().toLowerCase();
+  const row = _referensiCache.rows.find(r =>
+    (r.supervisor||'').trim().toLowerCase()===spvLow &&
+    (r.aplikasi||'').trim().toLowerCase()===apLow &&
+    (r.bucket||'').trim().toLowerCase()===bkLow
+  );
+  return row ? (row.dpd||'') : '';
 }
 
 // ── Identitas Bucket (aplikasi + bucket) ───────────────────────
@@ -3350,6 +3388,10 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     // supaya konsisten dgn agentCount per-TL yang sudah exclude agent "lama".
     const bkCount=new Set(tlsInBucket.flatMap(t=>[...(t._activeAgents||[])])).size;
     const bkTotalRaw = Object.values(byBucket[bkKey]).flat().reduce((s,r)=>s+(r.dailyPayment||0),0);
+    // DPD (rentang keterlambatan) dari sheet Referensi Akun — dicocokkan lewat
+    // Supervisor+Aplikasi+Bucket. bkAplikasi dipakai apa adanya (raw) krn byBucket
+    // sudah dipisah per-aplikasi di atas — bukan lagi ditebak via _mainAplikasiOf.
+    const bkDpd=getDpdForBucket(spv, bkAplikasi, bk);
     const bkTotalPayment = fmtRpFull(bkTotalRaw);
     const safeBk=escA(bk); const safeSpv2=escA(spv); const safeBkAp=escA(bkAplikasi);
     const hasCustom = bkSetupIdx !== -1;
@@ -3375,6 +3417,7 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       <div class="bucket-header">
         <span class="bucket-label">${escH(bkDisplay)}</span>
         ${bkAppTag}
+        ${bkDpd?`<span class="bucket-badge bucket-badge-dpd" title="DPD (keterlambatan) dari sheet Referensi Akun">DPD ${escH(bkDpd)}</span>`:''}
         <span class="bucket-badge">${Object.keys(byBucket[bkKey]).length} TL · ${bkCount} agent</span>
         <button class="btn-bucket-setup ${hasCustom?'has-custom':''}"
           onclick="openBkSetupDropdown(event,'${safeBk}','${safeSpv2}')"
