@@ -57,7 +57,8 @@ const REF_COL = {
   SUPERVISOR: 0,
   APLIKASI: 1,
   BUCKET: 2,
-  JAN: 3
+  DPD: 3,
+  JAN: 4
 };
 
 /*** ============ MASTER LIST BULAN ============ ***/
@@ -129,6 +130,25 @@ function normTanggal_(val) {
 
 function normText_(val) {
   if (val === null || val === undefined) return '';
+  return String(val).trim();
+}
+
+// Khusus utk kolom DPD (Referensi Akun): kalau isinya ditulis sbg rentang "hari-bulan"
+// dan KEDUA angkanya kebetulan valid sbg tanggal & bulan kalender (mis. "1-3" atau
+// "4-10"), Google Sheets otomatis mengonversi sel itu jadi tanggal beneran (1-3 → 1
+// Maret, 4-10 → 4 Oktober) — cell-nya sendiri sudah berubah jadi Date, bukan lagi
+// teks, dan ini terjadi di level spreadsheet, bukan di kode ini. Kalau dibiarkan lewat
+// normText_ biasa, Date itu ke-print jadi string panjang "Sun Mar 01 2026 00:00:00
+// GMT+0700 (Western Indonesia Time)" yang membingungkan. Di sini kita rekonstruksi
+// balik jadi "hari-bulan" (format yg sama seperti yg aslinya diketik SPV), bukan
+// tampilkan Date.toString() mentah. Rentang yg salah satu/kedua angkanya BUKAN
+// tanggal/bulan valid (mis. "15-30", "91-800", "120+") tidak pernah dikonversi
+// Sheets, jadi tetap lewat sbg teks biasa dan tidak terpengaruh fungsi ini.
+function normDpdText_(val) {
+  if (val === null || val === undefined || val === '') return '';
+  if (val instanceof Date) {
+    return val.getDate() + '-' + (val.getMonth() + 1);
+  }
   return String(val).trim();
 }
 
@@ -481,6 +501,7 @@ function endpointReferensi_(e) {
     supervisor: normText_(r[REF_COL.SUPERVISOR]),
     aplikasi:   normText_(r[REF_COL.APLIKASI]),
     bucket:     normText_(r[REF_COL.BUCKET]),
+    dpd:        normDpdText_(r[REF_COL.DPD]), // range DPD/keterlambatan, mis. "1-30" — normDpdText_ (bukan normText_) krn Sheets kadang auto-convert nilai spt "1-3"/"4-10" jadi Date
     januari:   normNumber_(r[REF_COL.JAN + 0]),
     februari:  normNumber_(r[REF_COL.JAN + 1]),
     maret:     normNumber_(r[REF_COL.JAN + 2]),
