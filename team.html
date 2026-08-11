@@ -4221,6 +4221,11 @@ function computeRankMonthlySummary(bucketRows){
       rank: ednRowM.rank, totalVendor: totalVendorM,
       leaderName: leaderRowM?leaderRowM.vendor:'',
       gap: (ednRowM.gap!==null&&ednRowM.gap!==undefined&&!isNaN(ednRowM.gap))?ednRowM.gap:null,
+      // ednRate/leaderRate (fraction, mis. 0.093 = 9.3%) — dipakai utk bandingin RATE (bukan
+      // cuma payment/rank) vs vendor pemenang. Rate lebih adil krn tidak dipengaruhi besar-
+      // kecilnya jumlah akun yg dipegang tiap vendor (beda vendor bisa pegang OS beda).
+      ednRate: (ednRowM.rate!==null&&ednRowM.rate!==undefined&&!isNaN(ednRowM.rate))?ednRowM.rate:null,
+      leaderRate: (leaderRowM&&leaderRowM.rate!==null&&leaderRowM.rate!==undefined&&!isNaN(leaderRowM.rate))?leaderRowM.rate:null,
     };
   }catch(e){ console.warn('computeRankMonthlySummary gagal:', e); return null; }
 }
@@ -4516,6 +4521,87 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
   if(rankInsightObj)insights.push(rankInsightObj);
   const rankMonthlySummary=computeRankMonthlySummary(bucketRows);
   const rankDailyTrend=computeRankDailyTrend(bucketRows);
+
+  // 16. Root-cause & konteks tambahan kalau EDN KALAH Rank Vendor BULANAN (rank>1) — supaya
+  // Temuan tidak berhenti di "kita kalah dari vendor X", tapi juga jelasin KENAPA & seberapa
+  // besar usaha yang dibutuhkan. Semua dihitung dari data yang sudah ada (agentScores dari
+  // calcRiskScore = sumber yang sama dgn panel "Perhatian Khusus", rate per vendor dari
+  // DATA RANK MONTHLY, dan tren payment mingguan bucket) — tidak perlu sumber data baru.
+  if(rankMonthlySummary && rankMonthlySummary.rank>1){
+    const leaderTxt=rankMonthlySummary.leaderName?escH(rankMonthlySummary.leaderName):'vendor lain';
+
+    // 16a. Root-cause: breakdown agent bermasalah per KATEGORI (Kehadiran/Aktivitas/Hasil),
+    // bukan per tipe issue detail spt di poin 14 — supaya kesimpulannya ringkas & langsung
+    // menjawab "kenapa kalah", mis. "mayoritas di kategori Aktivitas (4 agent)".
+    if(agentScores.length){
+      const groupAgentSet={};
+      agentScores.forEach(x=>{
+        const seenGroup=new Set();
+        (x.risk.issues||[]).forEach(iss=>{
+          const g=iss.group||'Lainnya';
+          if(seenGroup.has(g))return; seenGroup.add(g);
+          if(!groupAgentSet[g])groupAgentSet[g]=new Set();
+          groupAgentSet[g].add(x.ag);
+        });
+      });
+      const groupCounts=Object.entries(groupAgentSet).map(([g,set])=>({group:g,count:set.size})).sort((a,b)=>b.count-a.count);
+      if(groupCounts.length){
+        const topGroupsTxt=groupCounts.slice(0,2).map(g=>`${g.group} (${g.count} agent)`).join(' dan ');
+        insights.push({dot:'dot-red',
+          text:`📌 <b>Kemungkinan penyebab kalah dari ${leaderTxt}</b> (Rank Vendor bulanan #${rankMonthlySummary.rank} dari ${rankMonthlySummary.totalVendor}): dari ${n} agent, <b>${agentScores.length} bermasalah</b> — mayoritas di kategori ${topGroupsTxt}. Detail lengkap ada di panel "Perhatian Khusus Agent per Bucket".`});
+      }
+    }
+
+    // 16b. Bandingkan RATE (bukan cuma payment/rank) vs vendor pemenang — rate lebih adil
+    // krn tidak dipengaruhi besar-kecilnya jumlah akun yg dipegang tiap vendor.
+    if(rankMonthlySummary.ednRate!=null && rankMonthlySummary.leaderRate!=null && rankMonthlySummary.leaderRate>0){
+      const rateGapPp=(rankMonthlySummary.leaderRate-rankMonthlySummary.ednRate)*100;
+      if(Math.abs(rateGapPp)>=0.5){
+        insights.push({dot:rateGapPp>0?'dot-warn':'dot-green',
+          text:`📊 <b>Rate EDN</b> bulan ini ${fmtRate(rankMonthlySummary.ednRate)} vs rate ${leaderTxt} ${fmtRate(rankMonthlySummary.leaderRate)} — ${rateGapPp>0?`gap ${rateGapPp.toFixed(1)}pp, indikasi kualitas closing masih tertinggal meski volume kerja bisa saja sama besar`:`EDN justru unggul rate ${Math.abs(rateGapPp).toFixed(1)}pp meski kalah rank`}.`});
+      }
+    }
+
+    // 16c. Gap rupiah ke posisi 1 dikonversi ke "setara X agent top performer" — supaya
+    // kebayang skala usaha yang dibutuhkan, bukan cuma angka rupiah yang abstrak.
+    if(rankMonthlySummary.gap!=null && rankMonthlySummary.gap<0 && ranked.length){
+      const topNForGap=ranked.slice(0,Math.min(3,ranked.length));
+      const topAvgForGap=topNForGap.reduce((a,x)=>a+x.payment,0)/topNForGap.length;
+      if(topAvgForGap>0){
+        const equivAgents=Math.abs(rankMonthlySummary.gap)/topAvgForGap;
+        if(equivAgents>=0.3){
+          insights.push({dot:'dot-blue',
+            text:`🎯 Gap ke posisi 1 (${fmtRp(Math.abs(rankMonthlySummary.gap))}) setara dengan kontribusi <b>±${equivAgents.toFixed(1)} agent top performer</b> di bucket ini (rata-rata ${fmtRp(Math.round(topAvgForGap))}/agent) — gambaran skala usaha yang dibutuhkan untuk menyusul.`});
+        }
+      }
+    }
+
+    // 16d. Tren rank vs tren payment bucket — kalau payment bucket ini sebenarnya NAIK tapi
+    // posisi rank tetap turun/stagnan, itu sinyal vendor lawan tumbuh LEBIH CEPAT (bukan EDN
+    // yang memburuk) — actionable-nya beda: perlu akselerasi, bukan cuma "perbaiki performa".
+    if(rankDailyTrend){
+      const wPaysForTrendChk=weeklyPayments(bucketRows);
+      const bktTrendForChk=trendLabel(wPaysForTrendChk);
+      const rankMemburuk=rankDailyTrend.lastRank>rankDailyTrend.firstRank;
+      const rankStagnan=rankDailyTrend.lastRank===rankDailyTrend.firstRank && rankDailyTrend.lastRank>1;
+      if(bktTrendForChk.icon==='📈' && (rankMemburuk||rankStagnan)){
+        insights.push({dot:'dot-warn',
+          text:`⚡ Payment bucket ini <b>${bktTrendForChk.text}</b>, tapi posisi Rank Vendor ${rankMemburuk?'justru memburuk':'tetap stagnan'} (#${rankDailyTrend.firstRank}→#${rankDailyTrend.lastRank}) — indikasi vendor lawan bertumbuh LEBIH CEPAT, bukan performa EDN yang menurun. Perlu akselerasi, bukan sekadar perbaikan.`});
+      }
+    }
+
+    // 16e. Counter-point positif — sebut agent yang tetap konsisten baik, supaya framing-nya
+    // tidak melulu negatif dan bisa jadi contoh pembinaan buat agent yang tertinggal.
+    if(agentScores.length){
+      const problemAgentNames=new Set(agentScores.map(x=>x.ag));
+      const goodAgents=ranked.filter(a=>!problemAgentNames.has(a.ag)&&a.payment>avgPayment)
+        .sort((a,b)=>b.payment-a.payment).slice(0,2);
+      if(goodAgents.length){
+        insights.push({dot:'dot-green',
+          text:`✅ Di tengah posisi rank yang tertinggal, <b>${goodAgents.map(a=>escH(a.ag)).join(', ')}</b> tetap konsisten di atas rata-rata bucket — bisa jadi contoh pembinaan untuk agent lain.`});
+      }
+    }
+  }
 
   if(!insights.length)insights.push({dot:'dot-green',text:'Tidak ada temuan kritis di level bucket — performa relatif merata.'});
 
