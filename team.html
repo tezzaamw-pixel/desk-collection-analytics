@@ -4317,6 +4317,25 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
     if(list.length<=showN)return{shownText:shown, fullText:null};
     return{shownText:shown+', ...', fullText:list.join(', ')};
   }
+  // Label per tipe masalah (dari calcRiskScore issues[].type) — dipindah ke sini (scope
+  // fungsi, bukan lokal di dalam 1 blok) supaya bisa dipakai bareng oleh poin 14 (rekap
+  // Kritis/Waspada per tipe) DAN poin 16 (rincian akar masalah kalah Rank Vendor), tanpa
+  // duplikasi definisi.
+  const ISSUE_TYPE_LABEL={
+    payment:{text:'payment-nya di bawah rata-rata tim — jadi pemberat performa bucket',dot:'dot-red'},
+    rate:{text:'rate bayarnya rendah',dot:'dot-red'},
+    alpha:{text:'ada alpha (tidak hadir tanpa keterangan)',dot:'dot-red'},
+    absensi:{text:'tingkat kehadirannya rendah',dot:'dot-warn'},
+    sentuhWA:{text:'sentuh WA-nya jauh di bawah rata-rata tim',dot:'dot-warn'},
+    callManual:{text:'call manual-nya di bawah rata-rata tim',dot:'dot-warn'},
+    zonkStreak:{text:'hadir berturut-turut tanpa payment',dot:'dot-warn'},
+    catatan:{text:'banyak catatan SPV — perlu pembinaan',dot:'dot-warn'},
+    ptp:{text:'realisasi PTP-nya rendah (janji tidak ditepati)',dot:'dot-warn'},
+    nolPayment:{text:'sering hadir tapi payment Rp 0',dot:'dot-warn'},
+    waBlokir:{text:'rasio WA diblokirnya tinggi',dot:'dot-warn'},
+    callConn:{text:'rasio call terhubungnya rendah',dot:'dot-warn'},
+    pindahProject:{text:'baru pindah dari project/aplikasi lain',dot:'dot-blue'},
+  };
   const topAgent=ranked[0];
   const bottomAgent=ranked[ranked.length-1];
 
@@ -4488,21 +4507,6 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
         issueTypeAgents[iss.type].push(x.ag);
       });
     });
-    const ISSUE_TYPE_LABEL={
-      payment:{text:'payment-nya di bawah rata-rata tim — jadi pemberat performa bucket',dot:'dot-red'},
-      rate:{text:'rate bayarnya rendah',dot:'dot-red'},
-      alpha:{text:'ada alpha (tidak hadir tanpa keterangan)',dot:'dot-red'},
-      absensi:{text:'tingkat kehadirannya rendah',dot:'dot-warn'},
-      sentuhWA:{text:'sentuh WA-nya jauh di bawah rata-rata tim',dot:'dot-warn'},
-      callManual:{text:'call manual-nya di bawah rata-rata tim',dot:'dot-warn'},
-      zonkStreak:{text:'hadir berturut-turut tanpa payment',dot:'dot-warn'},
-      catatan:{text:'banyak catatan SPV — perlu pembinaan',dot:'dot-warn'},
-      ptp:{text:'realisasi PTP-nya rendah (janji tidak ditepati)',dot:'dot-warn'},
-      nolPayment:{text:'sering hadir tapi payment Rp 0',dot:'dot-warn'},
-      waBlokir:{text:'rasio WA diblokirnya tinggi',dot:'dot-warn'},
-      callConn:{text:'rasio call terhubungnya rendah',dot:'dot-warn'},
-      pindahProject:{text:'baru pindah dari project/aplikasi lain',dot:'dot-blue'},
-    };
     Object.entries(issueTypeAgents)
       .filter(([type,names])=>names.length>=2&&ISSUE_TYPE_LABEL[type]) // minimal 2 agent biar tidak berisik
       .sort((a,b)=>b[1].length-a[1].length)
@@ -4514,11 +4518,17 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       });
   }
 
+  // 15-16. Status Rank Vendor + root-cause & konteks tambahan — dikumpulkan di array
+  // TERPISAH (rankInsights, bukan langsung ke insights) supaya di akhir bisa di-unshift
+  // ke PALING ATAS daftar Temuan. Ini "headline" bucket (posisi vs vendor lain), jadi
+  // ditaruh paling atas sebelum temuan operasional lain (payment turun, absensi, dst).
+  const rankInsights=[];
+
   // 15. Status Rank Vendor terbaru + standing bulanan + tren harian — dihitung lewat
   // helper bareng (computeRankInsightObj/computeRankMonthlySummary/computeRankDailyTrend)
   // yang jg dipakai Mode Presentasi, biar 1 sumber logika aja.
   const rankInsightObj=computeRankInsightObj(bucketRows);
-  if(rankInsightObj)insights.push(rankInsightObj);
+  if(rankInsightObj)rankInsights.push(rankInsightObj);
   const rankMonthlySummary=computeRankMonthlySummary(bucketRows);
   const rankDailyTrend=computeRankDailyTrend(bucketRows);
 
@@ -4532,7 +4542,10 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
 
     // 16a. Root-cause: breakdown agent bermasalah per KATEGORI (Kehadiran/Aktivitas/Hasil),
     // bukan per tipe issue detail spt di poin 14 — supaya kesimpulannya ringkas & langsung
-    // menjawab "kenapa kalah", mis. "mayoritas di kategori Aktivitas (4 agent)".
+    // menjawab "kenapa kalah", mis. "mayoritas di kategori Aktivitas (4 agent)". Langsung
+    // disusul 1 bullet RINCIAN per kategori teratas (16a-detail) — supaya "22 bermasalah di
+    // Aktivitas" gak berhenti di angka doang, tapi lanjut jelasin aktivitas APANYA yang
+    // bermasalah dan (utk kategori Hasil) berapa rata-rata vs payment/rate mereka sebenarnya.
     if(agentScores.length){
       const groupAgentSet={};
       agentScores.forEach(x=>{
@@ -4546,9 +4559,46 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       });
       const groupCounts=Object.entries(groupAgentSet).map(([g,set])=>({group:g,count:set.size})).sort((a,b)=>b.count-a.count);
       if(groupCounts.length){
-        const topGroupsTxt=groupCounts.slice(0,2).map(g=>`${g.group} (${g.count} agent)`).join(' dan ');
-        insights.push({dot:'dot-red',
-          text:`📌 <b>Kemungkinan penyebab kalah dari ${leaderTxt}</b> (Rank Vendor bulanan #${rankMonthlySummary.rank} dari ${rankMonthlySummary.totalVendor}): dari ${n} agent, <b>${agentScores.length} bermasalah</b> — mayoritas di kategori ${topGroupsTxt}. Detail lengkap ada di panel "Perhatian Khusus Agent per Bucket".`});
+        const topGroups=groupCounts.slice(0,2);
+        const topGroupsTxt=topGroups.map(g=>`${g.group} (${g.count} agent)`).join(' dan ');
+        rankInsights.push({dot:'dot-red',
+          text:`📌 <b>Kemungkinan penyebab kalah dari ${leaderTxt}</b> (Rank Vendor bulanan #${rankMonthlySummary.rank} dari ${rankMonthlySummary.totalVendor}): dari ${n} agent, <b>${agentScores.length} bermasalah</b> — mayoritas di kategori ${topGroupsTxt}. Rinciannya di bawah ini 👇`});
+
+        // 16a-detail: utk tiap kategori teratas, pecah lagi jadi tipe masalah spesifik
+        // (mis. Aktivitas → sentuh WA rendah / call manual rendah / dst), reuse persis
+        // detail per-agent yang sudah dihitung calcRiskScore (jadi rata-rata & angka
+        // aktualnya PASTI konsisten dgn yang tampil di panel "Perhatian Khusus" kiri —
+        // tidak dihitung ulang dgn cara berbeda).
+        topGroups.forEach(gEntry=>{
+          const typeMap={}; // type -> [{ag, detail, pct}]
+          agentScores.forEach(x=>{
+            const seenTypes=new Set();
+            (x.risk.issues||[]).forEach(iss=>{
+              if((iss.group||'Lainnya')!==gEntry.group)return;
+              if(seenTypes.has(iss.type))return; seenTypes.add(iss.type);
+              typeMap[iss.type]=typeMap[iss.type]||[];
+              typeMap[iss.type].push({ag:x.ag, detail:iss.detail, pct:iss.pct});
+            });
+          });
+          const typeEntries=Object.entries(typeMap)
+            .filter(([type])=>ISSUE_TYPE_LABEL[type])
+            .sort((a,b)=>b[1].length-a[1].length);
+          if(!typeEntries.length)return;
+          const clauses=typeEntries.map(([type,list])=>{
+            const label=ISSUE_TYPE_LABEL[type].text;
+            const worstFirst=[...list].sort((a,b)=>(a.pct??100)-(b.pct??100));
+            const examples=worstFirst.slice(0,2).map(x=>`${escH(x.ag)} (${escH(x.detail)})`).join(', ');
+            const more=list.length>2?` +${list.length-2} lainnya`:'';
+            return `<b>${list.length} agent</b> ${label} — contoh: ${examples}${more}`;
+          });
+          const fullAll=typeEntries.map(([type,list])=>{
+            const label=ISSUE_TYPE_LABEL[type].text;
+            return `${list.length} agent ${label}: `+list.map(x=>`${x.ag} (${x.detail})`).join(', ');
+          }).join(' | ');
+          rankInsights.push({dot:'dot-warn',
+            text:`↳ Rincian kategori <b>${gEntry.group}</b> (${gEntry.count} agent): ${clauses.join('; ')}.`,
+            full: fullAll});
+        });
       }
     }
 
@@ -4557,7 +4607,7 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
     if(rankMonthlySummary.ednRate!=null && rankMonthlySummary.leaderRate!=null && rankMonthlySummary.leaderRate>0){
       const rateGapPp=(rankMonthlySummary.leaderRate-rankMonthlySummary.ednRate)*100;
       if(Math.abs(rateGapPp)>=0.5){
-        insights.push({dot:rateGapPp>0?'dot-warn':'dot-green',
+        rankInsights.push({dot:rateGapPp>0?'dot-warn':'dot-green',
           text:`📊 <b>Rate EDN</b> bulan ini ${fmtRate(rankMonthlySummary.ednRate)} vs rate ${leaderTxt} ${fmtRate(rankMonthlySummary.leaderRate)} — ${rateGapPp>0?`gap ${rateGapPp.toFixed(1)}pp, indikasi kualitas closing masih tertinggal meski volume kerja bisa saja sama besar`:`EDN justru unggul rate ${Math.abs(rateGapPp).toFixed(1)}pp meski kalah rank`}.`});
       }
     }
@@ -4570,7 +4620,7 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       if(topAvgForGap>0){
         const equivAgents=Math.abs(rankMonthlySummary.gap)/topAvgForGap;
         if(equivAgents>=0.3){
-          insights.push({dot:'dot-blue',
+          rankInsights.push({dot:'dot-blue',
             text:`🎯 Gap ke posisi 1 (${fmtRp(Math.abs(rankMonthlySummary.gap))}) setara dengan kontribusi <b>±${equivAgents.toFixed(1)} agent top performer</b> di bucket ini (rata-rata ${fmtRp(Math.round(topAvgForGap))}/agent) — gambaran skala usaha yang dibutuhkan untuk menyusul.`});
         }
       }
@@ -4585,7 +4635,7 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       const rankMemburuk=rankDailyTrend.lastRank>rankDailyTrend.firstRank;
       const rankStagnan=rankDailyTrend.lastRank===rankDailyTrend.firstRank && rankDailyTrend.lastRank>1;
       if(bktTrendForChk.icon==='📈' && (rankMemburuk||rankStagnan)){
-        insights.push({dot:'dot-warn',
+        rankInsights.push({dot:'dot-warn',
           text:`⚡ Payment bucket ini <b>${bktTrendForChk.text}</b>, tapi posisi Rank Vendor ${rankMemburuk?'justru memburuk':'tetap stagnan'} (#${rankDailyTrend.firstRank}→#${rankDailyTrend.lastRank}) — indikasi vendor lawan bertumbuh LEBIH CEPAT, bukan performa EDN yang menurun. Perlu akselerasi, bukan sekadar perbaikan.`});
       }
     }
@@ -4597,11 +4647,16 @@ function buildBucketSummaryHtml(spv, safeSpvId, bucketRows, allSpvRows, agentSco
       const goodAgents=ranked.filter(a=>!problemAgentNames.has(a.ag)&&a.payment>avgPayment)
         .sort((a,b)=>b.payment-a.payment).slice(0,2);
       if(goodAgents.length){
-        insights.push({dot:'dot-green',
+        rankInsights.push({dot:'dot-green',
           text:`✅ Di tengah posisi rank yang tertinggal, <b>${goodAgents.map(a=>escH(a.ag)).join(', ')}</b> tetap konsisten di atas rata-rata bucket — bisa jadi contoh pembinaan untuk agent lain.`});
       }
     }
   }
+
+  // Taruh semua temuan seputar Rank Vendor (poin 15-16) di PALING ATAS daftar Temuan —
+  // ini "headline" performa bucket vs vendor lain, jadi harus terlihat duluan sebelum
+  // temuan operasional lain (payment turun, absensi, dst di poin 1-14 atas).
+  insights.unshift(...rankInsights);
 
   if(!insights.length)insights.push({dot:'dot-green',text:'Tidak ada temuan kritis di level bucket — performa relatif merata.'});
 
