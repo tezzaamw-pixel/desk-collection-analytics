@@ -923,6 +923,7 @@ select:focus{border-color:var(--accent);}
           <option value="">Semua Tanggal</option>
         </select>
         <button class="bsm-view-btn" id="bsmGroupBtn" onclick="toggleBsmGroup()" style="margin-left:8px;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s">👥 Group</button>
+        <button class="bsm-view-btn" id="bsmNameToggleBtn" onclick="toggleBsmNameMode()" title="Beralih antara nama Agent dan nama Akun" style="margin-left:6px;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s">🪪 Nama Akun</button>
         <div class="bsm-view-toggle" id="bsmViewToggle">
           <button class="bsm-view-btn active" data-view="total" onclick="setBsmView('total')">Jumlah</button>
           <button class="bsm-view-btn" data-view="avg" onclick="setBsmView('avg')">Rata-rata/hari</button>
@@ -2167,14 +2168,14 @@ document.addEventListener('click', e => {
   const dd = document.getElementById('bkSetupDropdown');
   if (dd && !dd.contains(e.target)) dd.classList.remove('open');
 });
-let _bsmState = { bucket:'', spv:'', aplikasi:'', mode:'payment', date:'', view:'total', grouped:false };
+let _bsmState = { bucket:'', spv:'', aplikasi:'', mode:'payment', date:'', view:'total', grouped:false, nameMode:'agent' };
 
 // BUG FIX: `aplikasi` sekarang wajib disertakan agar bucket dgn nama sama di
 // aplikasi berbeda (dalam 1 SPV yg sama) tidak kecampur jadi 1 summary.
 function openBucketSummary(bucket, spv, aplikasi) {
   const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
   if (!rows.length) { alert('Tidak ada data untuk bucket ini.'); return; }
-  _bsmState = { bucket, spv, aplikasi, mode:'payment', date:'', view:'total', grouped:false, tab:'table' };
+  _bsmState = { bucket, spv, aplikasi, mode:'payment', date:'', view:'total', grouped:false, nameMode:'agent', tab:'table' };
   document.querySelectorAll('.bsm-mode-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.mode==='payment'));
   document.querySelectorAll('.bsm-view-btn').forEach(b =>
@@ -2193,6 +2194,9 @@ function openBucketSummary(bucket, spv, aplikasi) {
   if (_bsmPayChart) { _bsmPayChart.destroy(); _bsmPayChart = null; }
   const gb = document.getElementById('bsmGroupBtn');
   if (gb) { gb.style.background='var(--surface2)'; gb.style.color='var(--text2)'; gb.style.borderColor='var(--border)'; gb.textContent='👥 Group'; }
+  // Reset toggle nama Akun/Agent tiap buka modal baru — biar konsisten mulai dari "Agent"
+  const nb = document.getElementById('bsmNameToggleBtn');
+  if (nb) { nb.style.background='var(--surface2)'; nb.style.color='var(--text2)'; nb.style.borderColor='var(--border)'; nb.textContent='🪪 Nama Akun'; }
 
   // Build bucket navbar
   _buildBsmBucketNav(spv, bucket, aplikasi);
@@ -2310,7 +2314,15 @@ function _getBsmExportData() {
     byAgent[ag]._rows.push(r);
     if (r.tanggal) byAgent[ag].days[parseInt(r.tanggal.split('-')[2])] = {payment:r.dailyPayment||0, absensi:r.absensi||''};
   });
-  const agents = Object.values(byAgent).sort((a,b)=>b.total-a.total);
+  // Sama seperti _renderBucketSummary: agent 'lama' (nonaktif/digantikan) didorong ke
+  // paling bawah, supaya urutan Excel/PDF export konsisten dgn yang tampil di layar.
+  const exportRotasiInfo = detectRotasiInfo(allRows, bucket);
+  const agents = Object.values(byAgent).sort((a,b)=>{
+    const aLama = exportRotasiInfo[a.ag]&&exportRotasiInfo[a.ag].status==='lama' ? 1 : 0;
+    const bLama = exportRotasiInfo[b.ag]&&exportRotasiInfo[b.ag].status==='lama' ? 1 : 0;
+    if (aLama !== bLama) return aLama - bLama;
+    return b.total-a.total;
+  });
 
   if (mode === 'payment') {
     const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
@@ -2413,6 +2425,23 @@ function toggleBsmGroup() {
     btn.style.color = _bsmState.grouped ? '#fff' : 'var(--text2)';
     btn.style.borderColor = _bsmState.grouped ? 'var(--accent)' : 'var(--border)';
     btn.textContent = _bsmState.grouped ? '👥 Ungroup' : '👥 Group';
+  }
+  _renderBucketSummary();
+}
+
+// Toggle kolom "Agent" di tabel Summary Bucket antara nama Agent (default) dan nama Akun
+// yang dipegangnya. Cuma ganti teks yang ditampilkan (lewat _bsmDisplayName) — identitas
+// asli (data-agent-name, badge rotasi/pindah, klik utk buka preview) tetap pakai nama
+// agent asli apapun mode-nya, jadi fitur lain yang bergantung pada nama agent tidak perlu diubah.
+function toggleBsmNameMode() {
+  _bsmState.nameMode = _bsmState.nameMode === 'akun' ? 'agent' : 'akun';
+  const btn = document.getElementById('bsmNameToggleBtn');
+  if (btn) {
+    const isAkun = _bsmState.nameMode === 'akun';
+    btn.style.background = isAkun ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = isAkun ? '#fff' : 'var(--text2)';
+    btn.style.borderColor = isAkun ? 'var(--accent)' : 'var(--border)';
+    btn.textContent = isAkun ? '👤 Nama Agent' : '🪪 Nama Akun';
   }
   _renderBucketSummary();
 }
@@ -2624,6 +2653,19 @@ function setBsmView(view) {
   _renderBucketSummary();
 }
 
+// Toggle nama Agent <-> nama Akun di kolom "Agent" modal Summary Bucket — data-agent-name
+// (dipakai buat identitas: preview klik, tooltip pindah, badge rotasi) TETAP pakai nama
+// agent asli apapun mode-nya; cuma teks yg keliatan di layar yg berubah, supaya semua
+// logika identitas lain (toggleAgentPreview, _bsmRotasiBadge, getAgentMoveBadge) gak perlu
+// diubah sama sekali.
+function _bsmDisplayName(a) {
+  if (_bsmState.nameMode === 'akun') {
+    const akun = (a._rows && a._rows[0] && a._rows[0].namaAkun) || '';
+    return akun || '(Tanpa Akun)';
+  }
+  return a.ag;
+}
+
 // Badge rotasi ("Pengganti (X) tgl" / "Nonaktif tgl" / "Pindah ke... tgl") utk baris
 // agent di modal Summary Bucket — dipakai bareng oleh baris utama (payment/individual,
 // grouped/ungrouped) DAN preview row, supaya SATU sumber logika/format persis sama dgn
@@ -2778,7 +2820,16 @@ function _renderBucketSummary() {
     }
   });
 
-  const agents = Object.values(byAgent).sort((a,b)=>b.total-a.total);
+  // Agent berstatus 'lama' (sudah digantikan/nonaktif — lihat bsmRotasiInfo di atas)
+  // SENGAJA didorong ke paling bawah, sama seperti urutan di Tim page (buildTLRow) —
+  // supaya rank/urutan di modal ini konsisten dgn Tim page, bukan cuma ranking payment
+  // murni yang bisa naruh agent nonaktif di tengah/atas kalau payment historisnya besar.
+  const agents = Object.values(byAgent).sort((a,b)=>{
+    const aLama = bsmRotasiInfo[a.ag]&&bsmRotasiInfo[a.ag].status==='lama' ? 1 : 0;
+    const bLama = bsmRotasiInfo[b.ag]&&bsmRotasiInfo[b.ag].status==='lama' ? 1 : 0;
+    if (aLama !== bLama) return aLama - bLama;
+    return b.total-a.total;
+  });
   function rankCls(i){ return i===0?'bsm-r1':i===1?'bsm-r2':i===2?'bsm-r3':'bsm-rn'; }
   const tlRankCls = i => i===0?'bsm-r1':i===1?'bsm-r2':i===2?'bsm-r3':'bsm-rn';
 
@@ -2844,7 +2895,7 @@ function _renderBucketSummary() {
       return `<tr>
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
         <td style="font-weight:600;color:var(--accent)">${escH(a.tl)}</td>
-        <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}${rotasiBadge}</td>
+        <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}</td>
         <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
         <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
         ${dayCells}
@@ -2902,7 +2953,7 @@ function _renderBucketSummary() {
           return `<tr>
             <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
             <td style="font-weight:600;color:var(--accent);padding-left:16px">${escH(g.tl)}</td>
-            <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}${rotasiBadge}</td>
+            <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}</td>
             <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
             <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
             ${dayCells}
@@ -2915,7 +2966,7 @@ function _renderBucketSummary() {
 
     tableHtml = `<table class="bsm-table">
       <thead><tr>
-        <th style="text-align:center">Rank</th><th>Team Leader</th><th>Agent</th>
+        <th style="text-align:center">Rank</th><th>Team Leader</th><th>${_bsmState.nameMode==='akun'?'Akun':'Agent'}</th>
         <th style="text-align:center">Hadir</th>
         <th style="text-align:center;border-right:2px solid rgba(255,255,255,.2)">Total Payment${escH(viewLabel)}</th>
         ${dayHeaders}
@@ -2965,7 +3016,7 @@ function _renderBucketSummary() {
           <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(a.tl)}
         </div>
         <div style="font-weight:600;color:var(--text)">
-          <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}${rotasiBadge}
+          <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}
         </div>
       </td>`;
 
@@ -3020,7 +3071,7 @@ function _renderBucketSummary() {
               <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(g.tl)}
             </div>
             <div style="font-weight:600;color:var(--text)">
-              <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(a.ag)}</span>${moveBadge}${rotasiBadge}
+              <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}
             </div>
           </td>`;
           return `<tr>
@@ -3041,7 +3092,7 @@ function _renderBucketSummary() {
       <table class="bsm-table bsm-individual">
         <thead><tr>
           <th style="text-align:center">Rank</th>
-          <th>TL / Agent</th>
+          <th>TL / ${_bsmState.nameMode==='akun'?'Akun':'Agent'}</th>
           <th style="text-align:center;width:52px;min-width:52px">Hadir</th>
           <th style="text-align:center;width:64px;min-width:64px">Rate</th>
           <th style="text-align:center;border-right:2px solid rgba(255,255,255,.2)">Payment${escH(viewLabel)}</th>
