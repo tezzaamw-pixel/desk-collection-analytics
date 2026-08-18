@@ -105,6 +105,10 @@ select:focus{border-color:var(--accent);}
 .btn-cmp-bulan:hover{background:rgba(99,102,241,.25);border-color:#818cf8;}
 .btn-rank-chart{padding:5px 12px;font-size:11px;font-weight:600;background:rgba(16,185,129,.12);color:#059669;border:1px solid rgba(16,185,129,.3);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;white-space:nowrap;}
 .btn-rank-chart:hover{background:rgba(16,185,129,.25);border-color:#059669;}
+.btn-app-summary{padding:5px 12px;font-size:11px;font-weight:600;background:rgba(217,119,6,.12);color:#b45309;border:1px solid rgba(217,119,6,.3);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.btn-app-summary:hover{background:rgba(217,119,6,.25);border-color:#b45309;}
+.app-group-header{display:flex;align-items:center;gap:10px;padding:12px 4px 8px;margin-top:16px;border-top:2px solid var(--border);flex-wrap:wrap;}
+.app-group-header:first-of-type{margin-top:6px;}
 #rankModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:600;align-items:center;justify-content:center;padding:20px;}
 #rankModal.open{display:flex;}
 .rankm-box{background:var(--surface);border-radius:var(--radius);width:95vw;max-width:960px;max-height:88vh;display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.3);overflow:hidden;}
@@ -655,6 +659,11 @@ select:focus{border-color:var(--accent);}
 .bsm-fs-btn:hover{border-color:var(--accent);color:var(--accent);}
 .bsm-modal.fullscreen{width:100vw!important;max-width:100vw!important;max-height:100vh!important;height:100vh;border-radius:0;margin:0;}
 #modalBucketSummary.fullscreen-mode{padding-top:0;align-items:stretch;}
+#modalAppSummary.fullscreen-mode{padding-top:0;align-items:stretch;}
+
+/* ── APP SUMMARY MODAL (reuses .bsm-modal/.bsm-head/.bsm-body/.bsm-footer etc) ── */
+#modalAppSummary{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto;}
+#modalAppSummary.open{display:flex;}
 
 .bsm-mode-btn.active{background:var(--accent)!important;color:#fff!important;}
 /* Bucket navbar */
@@ -663,6 +672,9 @@ select:focus{border-color:var(--accent);}
 .bsm-bucket-tab:hover{border-color:var(--accent);color:var(--accent);}
 .bsm-bucket-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .bsm-bucket-tab-count{font-size:10px;opacity:.8;margin-left:3px;}
+.bsm-weekly-tl-tab{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);white-space:nowrap;transition:all .15s;flex-shrink:0;}
+.bsm-weekly-tl-tab:hover{border-color:var(--accent);color:var(--accent);}
+.bsm-weekly-tl-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
 .bsm-toolbar{padding:8px 16px;border-bottom:1px solid var(--border);background:var(--surface2);display:flex;align-items:center;gap:10px;flex-wrap:wrap;flex-shrink:0;}
 .bsm-toolbar-label{font-size:11px;font-weight:600;color:var(--text3);white-space:nowrap;}
 .bsm-date-select{padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);cursor:pointer;outline:none;}
@@ -895,7 +907,7 @@ select:focus{border-color:var(--accent);}
       </div>
     </div>
     <div class="rankm-body" id="rankmBody">
-      <div style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div>
+      <div id="rankmChartWrap" data-default-h="400" style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div><div id="rankmLatestSummary"></div>
     </div>
   </div>
 </div>
@@ -919,9 +931,19 @@ select:focus{border-color:var(--accent);}
     <div class="bsm-body">
       <div class="bsm-toolbar">
         <span class="bsm-toolbar-label">📅 Tanggal:</span>
-        <select class="bsm-date-select" id="bsmDateSelect" onchange="setBsmDate(this.value)">
-          <option value="">Semua Tanggal</option>
+        <select class="bsm-date-select" id="bsmDateMode" onchange="setBsmDateMode(this.value)">
+          <option value="all">Semua Tanggal</option>
+          <option value="single">Tanggal Tertentu</option>
+          <option value="range">Rentang Tanggal</option>
         </select>
+        <select class="bsm-date-select" id="bsmDateSelect" onchange="setBsmDate(this.value)" style="display:none">
+          <option value="">Pilih tanggal</option>
+        </select>
+        <span id="bsmDateRangeWrap" style="display:none;align-items:center;gap:5px">
+          <select class="bsm-date-select" id="bsmDateFrom" onchange="setBsmDateRange()"></select>
+          <span style="font-size:11px;color:var(--text3)">s/d</span>
+          <select class="bsm-date-select" id="bsmDateTo" onchange="setBsmDateRange()"></select>
+        </span>
         <button class="bsm-view-btn" id="bsmGroupBtn" onclick="toggleBsmGroup()" style="margin-left:8px;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s">👥 Group</button>
         <button class="bsm-view-btn" id="bsmNameToggleBtn" onclick="toggleBsmNameMode()" title="Beralih antara nama Agent dan nama Akun" style="margin-left:6px;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer;transition:all .15s">🪪 Nama Akun</button>
         <div class="bsm-view-toggle" id="bsmViewToggle">
@@ -931,6 +953,7 @@ select:focus{border-color:var(--accent);}
         <div style="margin-left:auto;display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
           <button class="bsm-tab-btn active" data-tab="table" onclick="setBsmTab('table')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">📋 Tabel</button>
           <button class="bsm-tab-btn" data-tab="chart" onclick="setBsmTab('chart')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📈 Chart</button>
+          <button class="bsm-tab-btn" data-tab="weekly" onclick="setBsmTab('weekly')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📅 Weekly</button>
         </div>
       </div>
       <div id="bsmTableWrap" class="bsm-table-wrap"></div>
@@ -945,15 +968,102 @@ select:focus{border-color:var(--accent);}
             <button class="bsm-chart-type-btn" data-ctype="bar" onclick="setBsmChartType('bar')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">Bar</button>
           </div>
         </div>
-        <div style="position:relative;height:340px"><canvas id="bsmPayChart"></canvas></div>
+        <div id="bsmChartCanvasWrap" data-default-h="340" style="position:relative;height:340px"><canvas id="bsmPayChart"></canvas></div>
+      </div>
+      <div id="bsmWeeklyWrap" style="display:none;padding:16px;flex:1;overflow:auto">
+        <div id="bsmWeeklyTLWrap" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          <span style="font-size:11px;font-weight:600;color:var(--text3);margin-right:2px">Team Leader:</span>
+          <div id="bsmWeeklyTLTabs" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:600;color:var(--text3)">Ranking berdasarkan:</span>
+          <select id="bsmWeeklyMetric" onchange="renderBsmWeekly()" style="padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none">
+            <option value="dailyPayment">💰 Payment</option>
+            <option value="avgRate">📈 Rate</option>
+            <option value="ptp">📝 PTP</option>
+            <option value="ptpBayar">✅ PTP Bayar (realisasi)</option>
+            <option value="callManual">📞 Call Manual</option>
+            <option value="callTerhubung">☎️ Call Terhubung</option>
+            <option value="sentuhWA">💬 Sentuh WA</option>
+            <option value="osDataBaru">🗂️ OS Data Baru</option>
+          </select>
+          <button id="bsmWeeklyVersusBtn" onclick="toggleBsmWeeklyVersus()" title="Bandingkan tiap minggu dgn minggu sebelumnya (mis. Minggu 2 vs Minggu 1) — versi mingguan dari &quot;vs Bln Lalu&quot;" style="margin-left:auto;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">🔀 Weekly Versus</button>
+        </div>
+        <div id="bsmWeeklyHint" style="font-size:10.5px;color:var(--text3);margin-bottom:14px">Menampilkan seluruh agent tim (bukan cuma top 10) — pilih Team Leader di atas utk cuma lihat agent di bawahnya. Pembagian minggu berdasar tanggal (1-7 / 8-14 / 15-21 / 22-28), sama dgn "Tren Payment Mingguan".</div>
+        <div id="bsmWeeklyGrid" style="display:grid;grid-template-columns:repeat(4,minmax(200px,1fr));gap:12px;align-items:start"></div>
       </div>
     </div>
     <div class="bsm-footer">
-      <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#fee2e2"></div> 0 Payment</div>
-      <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#fef3c7"></div> Payment rendah</div>
-      <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#f0fdf4"></div> Payment ada</div>
-      <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#dcfce7"></div> Payment tinggi</div>
-      <span style="margin-left:auto">OFF = hari libur terjadwal</span>
+      <div id="bsmFooterLegend" style="display:flex;gap:16px;align-items:center;flex:1">
+        <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#fee2e2"></div> 0 Payment</div>
+        <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#fef3c7"></div> Payment rendah</div>
+        <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#f0fdf4"></div> Payment ada</div>
+        <div class="bsm-legend"><div class="bsm-legend-dot" style="background:#dcfce7"></div> Payment tinggi</div>
+        <span style="margin-left:auto">OFF = hari libur terjadwal</span>
+      </div>
+      <div id="bsmFooterWeeklyTotals" style="display:none;flex:1;flex-wrap:wrap;align-items:center;gap:14px"></div>
+    </div>
+  </div>
+</div>
+
+<!-- SUMMARY APLIKASI MODAL -->
+<div id="modalAppSummary" onclick="if(event.target===this)closeAppSummary()">
+  <div class="bsm-modal">
+    <div class="bsm-head">
+      <div class="bsm-title" id="appsTitle">📊 Summary Aplikasi</div>
+      <button class="btn-cmp-bulan-bsm" onclick="openAppCmpBulan()" title="Bandingkan aplikasi ini (gabungan semua bucket) dengan bulan lalu">📅 vs Bln Lalu</button>
+      <button class="bsm-fs-btn" id="appsFsBtn" onclick="toggleAppsFullscreen()" title="Fullscreen">⛶</button>
+      <button class="bsm-close" onclick="closeAppSummary()">✕</button>
+    </div>
+    <div class="bsm-body">
+      <div class="bsm-toolbar">
+        <span id="appsSubtitle" style="font-size:11px;color:var(--text3)"></span>
+        <div style="margin-left:auto;display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+          <button class="apps-tab-btn active" data-tab="ringkasan" onclick="setAppsTab('ringkasan')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">📋 Ringkasan</button>
+          <button class="apps-tab-btn" data-tab="tren" onclick="setAppsTab('tren')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📈 Tren</button>
+          <button class="apps-tab-btn" data-tab="weekly" onclick="setAppsTab('weekly')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📅 Weekly</button>
+        </div>
+      </div>
+      <div id="appsRingkasanWrap" style="padding:16px;flex:1;overflow:auto"></div>
+      <div id="appsTrenWrap" style="display:none;padding:16px;flex:1">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:600;color:var(--text3)">Tampilkan:</span>
+          <select id="appsChartFilter" onchange="renderAppsTren()" style="padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none">
+            <option value="total">📊 Total Aplikasi</option>
+          </select>
+          <div style="margin-left:auto;display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+            <button class="apps-chart-type-btn active" data-ctype="line" onclick="setAppsChartType('line')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">Line</button>
+            <button class="apps-chart-type-btn" data-ctype="bar" onclick="setAppsChartType('bar')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">Bar</button>
+          </div>
+        </div>
+        <div id="appsChartCanvasWrap" data-default-h="340" style="position:relative;height:340px"><canvas id="appsPayChart"></canvas></div>
+      </div>
+      <div id="appsWeeklyWrap" style="display:none;padding:16px;flex:1;overflow:auto">
+        <div id="appsWeeklyBucketWrap" style="display:none;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px">
+          <span style="font-size:11px;font-weight:600;color:var(--text3);margin-right:2px">Bucket:</span>
+          <div id="appsWeeklyBucketTabs" style="display:flex;gap:6px;flex-wrap:wrap"></div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:600;color:var(--text3)">Ranking berdasarkan:</span>
+          <select id="appsWeeklyMetric" onchange="renderAppsWeekly()" style="padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none">
+            <option value="dailyPayment">💰 Payment</option>
+            <option value="avgRate">📈 Rate</option>
+            <option value="ptp">📝 PTP</option>
+            <option value="ptpBayar">✅ PTP Bayar (realisasi)</option>
+            <option value="callManual">📞 Call Manual</option>
+            <option value="callTerhubung">☎️ Call Terhubung</option>
+            <option value="sentuhWA">💬 Sentuh WA</option>
+            <option value="osDataBaru">🗂️ OS Data Baru</option>
+          </select>
+          <button id="appsWeeklyVersusBtn" onclick="toggleAppsWeeklyVersus()" title="Bandingkan tiap minggu dgn minggu sebelumnya, gabungan seluruh bucket dalam aplikasi ini" style="margin-left:auto;padding:5px 12px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:1px solid var(--border);border-radius:var(--radius-sm);cursor:pointer">🔀 Weekly Versus</button>
+        </div>
+        <div id="appsWeeklyHint" style="font-size:10.5px;color:var(--text3);margin-bottom:14px"></div>
+        <div id="appsWeeklyGrid" style="display:grid;grid-template-columns:repeat(4,minmax(200px,1fr));gap:12px;align-items:start"></div>
+      </div>
+    </div>
+    <div class="bsm-footer">
+      <div id="appsFooterDefault" style="flex:1">Gabungan seluruh bucket dalam aplikasi ini.</div>
+      <div id="appsFooterWeeklyTotals" style="display:none;flex:1;flex-wrap:wrap;align-items:center;gap:14px"></div>
     </div>
   </div>
 </div>
@@ -1801,6 +1911,50 @@ function closeRankModal() {
   if (_rankChartInstance) { try{_rankChartInstance.destroy();}catch(e){} _rankChartInstance = null; }
 }
 
+// ── FIT CANVAS WRAP KE MODAL (dipakai bareng oleh chart Rank Vendor & chart di
+// Summary Bucket) ───────────────────────────────────────────────────────────
+// BUG FIX: wrapper canvas chart selama ini pakai height FIXED (400px/340px) —
+// jadi pas modal di-fullscreen-kan, tinggi wrapper tetap segitu aja walaupun
+// layar jauh lebih tinggi, bikin banyak ruang kosong terbuang di bawah chart
+// (keliatan "gak profesional"). Fix: kalau lagi fullscreen, ukur ruang yang
+// betul-betul tersedia (dari posisi wrapper skrg sampai ke tepi bawah box
+// modal) lalu set tinggi wrapper ke situ + resize chart-nya biar ikut penuh.
+// Kalau BUKAN fullscreen, balikin ke default height semula (400/340px).
+function _fitChartWrap(wrapEl, chartInstance) {
+  if (!wrapEl) return;
+  const box = wrapEl.closest('.rankm-box, .bsm-modal, .cmpb-box');
+  const defH = parseInt(wrapEl.dataset.defaultH || '400', 10);
+  if (!box || !box.classList.contains('fullscreen')) {
+    wrapEl.style.height = defH + 'px';
+    if (chartInstance) { try { chartInstance.resize(); } catch(e){} }
+    return;
+  }
+  const boxRect  = box.getBoundingClientRect();
+  const wrapRect = wrapEl.getBoundingClientRect();
+  const h = Math.max(280, Math.floor(boxRect.bottom - wrapRect.top - 16));
+  wrapEl.style.height = h + 'px';
+  if (chartInstance) { try { chartInstance.resize(); } catch(e){} }
+}
+
+// Kalau layar/window di-resize SELAGI salah satu modal chart lagi fullscreen,
+// ikut sesuaikan lagi tinggi wrapper-nya (bukan cuma pas toggle awal) —
+// di-debounce dikit biar gak keberatan kalau resize event-nya beruntun.
+let _fitChartWrapResizeT = null;
+window.addEventListener('resize', () => {
+  clearTimeout(_fitChartWrapResizeT);
+  _fitChartWrapResizeT = setTimeout(() => {
+    if (document.querySelector('#rankModal .rankm-box.fullscreen')) {
+      _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
+    }
+    if (document.querySelector('#modalBucketSummary .bsm-modal.fullscreen')) {
+      _fitChartWrap(document.getElementById('bsmChartCanvasWrap'), _bsmPayChart);
+    }
+    if (document.querySelector('#modalAppSummary .bsm-modal.fullscreen')) {
+      _fitChartWrap(document.getElementById('appsChartCanvasWrap'), _appsPayChart);
+    }
+  }, 150);
+});
+
 function toggleRankmFullscreen() {
   const overlay = document.getElementById('rankModal');
   const box     = overlay.querySelector('.rankm-box');
@@ -1809,6 +1963,9 @@ function toggleRankmFullscreen() {
   overlay.classList.toggle('fullscreen-mode', isFs);
   btn.textContent = isFs ? '⊠' : '⛶';
   btn.title = isFs ? 'Keluar Fullscreen' : 'Fullscreen';
+  // Kasih waktu 1 frame biar layout fullscreen (width/height box) kelar re-flow
+  // dulu sebelum kita ukur ruang yang tersedia utk chart.
+  requestAnimationFrame(() => _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance));
 }
 
 function _rankDataset() {
@@ -1916,7 +2073,7 @@ function renderRankChart() {
     return;
   }
 
-  body.innerHTML = `<div style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div>`;
+  body.innerHTML = `<div id="rankmChartWrap" data-default-h="400" style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div><div id="rankmLatestSummary"></div>`;
 
   const metric = _rankState.metric;
   const meta = RANK_METRIC_META[metric];
@@ -2002,11 +2159,72 @@ function renderRankChart() {
           // paling kecil setelah dibalik) punya tinggi bar 0 karena base bar = axis-min
           // = nilainya sendiri, jadi keliatan "hilang" padahal datanya ada.
           beginAtZero: true,
+          // BUG FIX: titik/bar rank #1 (nilai chart = maxRankVal, paling tinggi)
+          // duduk PERSIS di batas atas axis (krn axis-max auto-scale = nilai
+          // tertinggi itu sendiri) — akibatnya angka "#1" yg dilabel di ATAS titik
+          // (align:'top', offset:4) kepotong/hilang krn keluar dari area chart.
+          // Sama juga bisa kejadian di batas BAWAH utk metrik Gap yg nilainya bisa
+          // minus. `grace` nambahin ruang kosong ekstra di atas & bawah axis (di
+          // luar dari min/max data asli) supaya titik & labelnya selalu ada spasi,
+          // gak pernah nempel/kepotong di tepi chart.
+          grace: '10%',
           ticks: { font:{size:10}, callback: v => _fmtRankVal(fromChartVal(v), meta.fmt, true) }
         }
       }
     }
   });
+
+  // Chart baru dibuat dgn wrapper height DEFAULT (400px) — kalau modal lagi
+  // fullscreen (mis. user ganti metric/mode/bucket selagi fullscreen), langsung
+  // sesuaikan lagi ke ukuran layar penuh, bukan balik ke 400px.
+  _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
+
+  // Ringkasan "Nilai Terbaru" per vendor di bawah chart — garis di chart-nya
+  // sendiri TIDAK diubah (biar tetap kayak sebelumnya), tapi kalau titik/garis
+  // pada tanggal² tertentu saling numpuk & susah dibaca, angka pastinya tetap
+  // bisa dicek dgn jelas di sini (warna dot ngikutin warna garis di chart).
+  _renderRankLatestSummary(bkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric);
+}
+
+function _renderRankLatestSummary(bkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric) {
+  const box = document.getElementById('rankmLatestSummary');
+  if (!box) return;
+  const latestTgl = hasTanggal ? tanggalSet[tanggalSet.length-1] : null;
+
+  const latestVals = vendors.map((vd, i) => {
+    const vRows = bkRows.filter(r=>r.vendor===vd);
+    let raw = null;
+    if (hasTanggal) {
+      const row = vRows.find(r=>r.tanggal===latestTgl);
+      raw = row ? row[metric] : null;
+    } else {
+      raw = vRows[0] ? vRows[0][metric] : null;
+    }
+    return { vendor: vd, raw, color: PALETTE[i % PALETTE.length] };
+  }).filter(x => x.raw!==null && x.raw!==undefined && !isNaN(x.raw));
+
+  if (!latestVals.length) { box.innerHTML = ''; return; }
+
+  // Rank: makin KECIL makin bagus (#1 di atas). Metrik lain: makin BESAR makin
+  // bagus (Payment/OS/Rate tinggi = bagus; Gap positif = unggul).
+  latestVals.sort((a,b) => isRankMetric ? (a.raw-b.raw) : (b.raw-a.raw));
+
+  box.innerHTML = `
+    <div style="margin-top:14px;padding-top:12px;border-top:1px dashed var(--border)">
+      <div style="font-size:11px;font-weight:700;color:var(--text3);margin-bottom:8px">
+        📌 Nilai ${escH(meta.label)} Terbaru${latestTgl?` (per ${escH(_fmtRankDateLabel(latestTgl))})`:''} — buat pastiin angka kalau garis di chart di atas saling numpuk/susah dibaca:
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${latestVals.map(v => `
+          <div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:11.5px">
+            <span style="width:9px;height:9px;border-radius:50%;background:${v.color};flex-shrink:0"></span>
+            <span style="font-weight:600">${escH(v.vendor)}</span>
+            <span style="color:var(--text3)">:</span>
+            <span style="font-weight:700;color:${v.color}">${_fmtRankVal(v.raw, meta.fmt, false)}</span>
+          </div>
+        `).join('')}
+      </div>
+    </div>`;
 }
 
 // ── Bucket Target Payment ─────────────────────────────────────
@@ -2168,14 +2386,14 @@ document.addEventListener('click', e => {
   const dd = document.getElementById('bkSetupDropdown');
   if (dd && !dd.contains(e.target)) dd.classList.remove('open');
 });
-let _bsmState = { bucket:'', spv:'', aplikasi:'', mode:'payment', date:'', view:'total', grouped:false, nameMode:'agent' };
+let _bsmState = { bucket:'', spv:'', aplikasi:'', mode:'payment', dateMode:'all', date:'', dateFrom:'', dateTo:'', view:'total', grouped:false, nameMode:'agent', weeklyTL:'all', weeklyVersus:false };
 
 // BUG FIX: `aplikasi` sekarang wajib disertakan agar bucket dgn nama sama di
 // aplikasi berbeda (dalam 1 SPV yg sama) tidak kecampur jadi 1 summary.
 function openBucketSummary(bucket, spv, aplikasi) {
   const rows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
   if (!rows.length) { alert('Tidak ada data untuk bucket ini.'); return; }
-  _bsmState = { bucket, spv, aplikasi, mode:'payment', date:'', view:'total', grouped:false, nameMode:'agent', tab:'table' };
+  _bsmState = { bucket, spv, aplikasi, mode:'payment', dateMode:'all', date:'', dateFrom:'', dateTo:'', view:'total', grouped:false, nameMode:'agent', tab:'table', weeklyTL:'all', weeklyVersus:false };
   document.querySelectorAll('.bsm-mode-btn').forEach(b =>
     b.classList.toggle('active', b.dataset.mode==='payment'));
   document.querySelectorAll('.bsm-view-btn').forEach(b =>
@@ -2203,18 +2421,10 @@ function openBucketSummary(bucket, spv, aplikasi) {
   // Init chart filter dropdown
   _initBsmChartFilter(rows);
 
-  // Populate date dropdown
-  const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
-  const sel = document.getElementById('bsmDateSelect');
-  if (sel) {
-    sel.innerHTML = '<option value="">Semua Tanggal</option>' +
-      allDates.map(d => {
-        const dt = new Date(d);
-        const dayNames = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
-        return `<option value="${d}">${dt.getDate()} (${dayNames[dt.getDay()]})</option>`;
-      }).join('');
-    sel.value = '';
-  }
+  // Populate & reset kontrol filter tanggal (dropdown "Tanggal Tertentu" + 2 dropdown
+  // "Rentang Tanggal") — helper bareng dgn switchBsmBucket, 1 sumber logika.
+  _bsmPopulateDateControls(rows);
+  _bsmPopulateWeeklyTLSelect(rows);
   document.getElementById('modalBucketSummary').classList.add('open');
   _renderBucketSummary();
 }
@@ -2260,8 +2470,12 @@ function switchBsmBucket(bucket, spv, aplikasi) {
   if (!rows.length) return;
   _bsmState.bucket = bucket;
   _bsmState.aplikasi = aplikasi;
+  _bsmState.dateMode = 'all';
   _bsmState.date = '';
+  _bsmState.dateFrom = '';
+  _bsmState.dateTo = '';
   _bsmState.grouped = false;
+  _bsmState.weeklyTL = 'all';
   if (_bsmPayChart) { _bsmPayChart.destroy(); _bsmPayChart = null; }
 
   // Re-init chart filter for new bucket
@@ -2276,34 +2490,123 @@ function switchBsmBucket(bucket, spv, aplikasi) {
   const gb = document.getElementById('bsmGroupBtn');
   if (gb) { gb.style.background='var(--surface2)'; gb.style.color='var(--text2)'; gb.style.borderColor='var(--border)'; gb.textContent='👥 Group'; }
 
-  // Rebuild date dropdown
-  const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
-  const sel = document.getElementById('bsmDateSelect');
-  if (sel) {
-    sel.innerHTML = '<option value="">Semua Tanggal</option>' +
-      allDates.map(d => {
-        const dt = new Date(d);
-        const dn = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
-        return `<option value="${d}">${dt.getDate()} (${dn[dt.getDay()]})</option>`;
-      }).join('');
-    sel.value = '';
-  }
-  // Hide view toggle (reset)
+  // Rebuild & reset kontrol filter tanggal utk bucket baru ini
+  _bsmPopulateDateControls(rows);
+  _bsmPopulateWeeklyTLSelect(rows);
+
+  // Hide view toggle (reset) — relevan lagi krn dateMode direset ke 'all' di atas
   const vt = document.getElementById('bsmViewToggle');
   if (vt) vt.style.display = 'flex';
 
+  // _renderBucketSummary() tetap selalu dipanggil krn dia juga yg update judul
+  // modal & progress bar target (bagian yg tampil terlepas dari tab mana yg aktif),
+  // BUKAN cuma isi tabelnya. TAPI BUG FIX: sebelum ini kalau lagi di tab Chart/
+  // Weekly terus ganti bucket, konten tab itu TIDAK ikut ke-refresh (masih nampilin
+  // data bucket lama) krn cuma tabel yg di-render ulang — jadi harus dipanggil juga
+  // renderBsmChart()/renderBsmWeekly() sesuai tab yg lagi aktif.
   _renderBucketSummary();
+  if (_bsmState.tab === 'chart') renderBsmChart();
+  else if (_bsmState.tab === 'weekly') renderBsmWeekly();
+}
+
+// Isi ulang dropdown "Tanggal Tertentu" & 2 dropdown "Rentang Tanggal" (Dari/Sampai) dari
+// tanggal yg tersedia di bucket ini, DAN reset mode filter tanggal balik ke "Semua Tanggal"
+// — dipanggil tiap kali modal Summary Bucket dibuka atau pindah tab bucket, supaya listnya
+// selalu sesuai data bucket yg lagi aktif (bukan sisa opsi dari bucket sebelumnya).
+function _bsmPopulateDateControls(rows) {
+  const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
+  const dayNames = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+  const optHtml = d => { const dt=new Date(d); return `<option value="${d}">${dt.getDate()} (${dayNames[dt.getDay()]})</option>`; };
+
+  const modeSel = document.getElementById('bsmDateMode');
+  if (modeSel) modeSel.value = 'all';
+
+  const sel = document.getElementById('bsmDateSelect');
+  if (sel) {
+    sel.innerHTML = '<option value="">Pilih tanggal</option>' + allDates.map(optHtml).join('');
+    sel.value = '';
+    sel.style.display = 'none';
+  }
+
+  const fromSel = document.getElementById('bsmDateFrom');
+  const toSel = document.getElementById('bsmDateTo');
+  if (fromSel) fromSel.innerHTML = allDates.map(optHtml).join('');
+  if (toSel) toSel.innerHTML = allDates.map(optHtml).join('');
+  if (fromSel && allDates.length) fromSel.value = allDates[0];
+  if (toSel && allDates.length) toSel.value = allDates[allDates.length-1];
+
+  const rangeWrap = document.getElementById('bsmDateRangeWrap');
+  if (rangeWrap) rangeWrap.style.display = 'none';
+
+  return allDates;
+}
+
+// Isi ulang barisan tab Team Leader di tab "📅 Weekly" & reset balik ke "Semua TL"
+// — dipanggil bareng _bsmPopulateDateControls tiap kali modal dibuka/pindah tab
+// bucket, supaya listnya selalu sesuai TL yg ada di bucket yg lagi aktif.
+// BUG FIX/UX: sebelumnya pakai <select> dropdown. Diganti jadi barisan tab (kayak
+// tab bucket di atasnya) biar 1x klik langsung pindah — TAPI kalau bucket ini cuma
+// punya 1 TL (atau 0), barisan tab-nya disembunyikan total (gak ada gunanya milih
+// dari 1 pilihan doang, biar tampilan tetap simple).
+function _bsmPopulateWeeklyTLSelect(rows) {
+  const wrap = document.getElementById('bsmWeeklyTLWrap');
+  const tabsEl = document.getElementById('bsmWeeklyTLTabs');
+  if (!wrap || !tabsEl) return;
+  _bsmState.weeklyTL = 'all';
+  const tls = [...new Set(rows.map(r=>r.teamLeader).filter(Boolean))].sort();
+  if (tls.length <= 1) {
+    wrap.style.display = 'none';
+    tabsEl.innerHTML = '';
+    return;
+  }
+  wrap.style.display = 'flex';
+  tabsEl.innerHTML = '<button class="bsm-weekly-tl-tab active" data-tl="all" onclick="setBsmWeeklyTL(\'all\')">👥 Semua TL</button>' +
+    tls.map(tl=>`<button class="bsm-weekly-tl-tab" data-tl="${escA(tl)}" onclick="setBsmWeeklyTL('${escA(tl)}')">👤 ${escH(tl)}</button>`).join('');
+}
+
+function setBsmWeeklyTL(tl) {
+  _bsmState.weeklyTL = tl;
+  document.querySelectorAll('#bsmWeeklyTLTabs .bsm-weekly-tl-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.tl === tl));
+  renderBsmWeekly();
+}
+
+// Toggle "🔀 Weekly Versus" — mode perbandingan antar-minggu (Minggu N vs Minggu
+// N-1) di tab Weekly, versi mingguan dari fitur "📅 vs Bln Lalu" (yg membandingkan
+// bulan ini vs bulan lalu). Sengaja dibikin toggle TERPISAH & khusus di tab Weekly
+// (bukan gabung ke tombol vs Bln Lalu yg sudah ada), krn cakupan datanya beda
+// (per-minggu dalam 1 bulan yg sama, bukan lintas bulan) — biar gak membingungkan
+// & gak perlu ubah fitur vs Bln Lalu yg sudah ada.
+function toggleBsmWeeklyVersus() {
+  _bsmState.weeklyVersus = !_bsmState.weeklyVersus;
+  const btn = document.getElementById('bsmWeeklyVersusBtn');
+  if (btn) {
+    const on = _bsmState.weeklyVersus;
+    btn.style.background = on ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = on ? '#fff' : 'var(--text2)';
+    btn.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+  }
+  renderBsmWeekly();
 }
 
 // ── Export Summary Bucket ─────────────────────────────────────
 function _getBsmExportData() {
-  const {bucket, spv, aplikasi, mode, date, view} = _bsmState;
+  const {bucket, spv, aplikasi, mode, dateMode, date, dateFrom, dateTo, view} = _bsmState;
   const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
-  const rows = date ? allRows.filter(r=>r.tanggal===date) : allRows;
+  // Filter tanggal: sesuai mode aktif (Semua / Tanggal Tertentu / Rentang) — sama persis
+  // dgn logika filter di _renderBucketSummary, supaya isi export SELALU konsisten dgn yg
+  // sedang tampil di layar (bukan cuma "Semua Tanggal" spt sebelum fitur rentang ada).
+  const isSingleDaySel = dateMode==='single' && !!date;
+  const rows = isSingleDaySel ? allRows.filter(r=>r.tanggal===date)
+    : (dateMode==='range' && dateFrom && dateTo) ? allRows.filter(r=>r.tanggal>=dateFrom && r.tanggal<=dateTo)
+    : allRows;
 
   const bulan = document.getElementById('selBulan').value;
   const tahun = document.getElementById('selTahun').value;
-  const title = `Summary Bucket ${bucket} (${aplikasi}) — ${date||'Semua Tanggal'} — ${bulan} ${tahun}`;
+  const dateLabel = isSingleDaySel ? date
+    : (dateMode==='range' && dateFrom && dateTo) ? `${dateFrom} s/d ${dateTo}`
+    : 'Semua Tanggal';
+  const title = `Summary Bucket ${bucket} (${aplikasi}) — ${dateLabel} — ${bulan} ${tahun}`;
 
   // Build per-agent data
   const byAgent = {};
@@ -2355,7 +2658,7 @@ function _getBsmExportData() {
       const pay = view==='avg' ? (a.total/Math.max(_abs.hariKerja,1)) : a.total;
       const metricVals = setupCols.map(m => {
         const val = m.key==='absensiPct'?_abs.pct:m.key==='cmpRate'?(s.avgRate||0):(s[m.key]||0);
-        const v2 = view==='avg'&&!date ? val/Math.max(_abs.hariKerja,1) : val;
+        const v2 = view==='avg'&&!isSingleDaySel ? val/Math.max(_abs.hariKerja,1) : val;
         return (m.fmt==='pct'||m.fmt==='rate') ? (v2*100).toFixed(2)+'%' : Math.round(v2);
       });
       return [i+1, a.tl, a.ag, `${_abs.hadir}/${_abs.hariKerja}`, agentRate, Math.round(pay), ...metricVals];
@@ -2443,7 +2746,8 @@ function toggleBsmNameMode() {
     btn.style.borderColor = isAkun ? 'var(--accent)' : 'var(--border)';
     btn.textContent = isAkun ? '👤 Nama Agent' : '🪪 Nama Akun';
   }
-  _renderBucketSummary();
+  if (_bsmState.tab === 'weekly') renderBsmWeekly();
+  else _renderBucketSummary();
 }
 
 let _bsmChartType = 'line';
@@ -2459,20 +2763,27 @@ function setBsmTab(tab) {
   });
   const tw = document.getElementById('bsmTableWrap');
   const cw = document.getElementById('bsmChartWrap');
+  const ww = document.getElementById('bsmWeeklyWrap');
   const gb = document.getElementById('bsmGroupBtn');
   const vt = document.getElementById('bsmViewToggle');
-  if (tab === 'chart') {
-    if (tw) tw.style.display = 'none';
-    if (cw) cw.style.display = 'block';
-    if (gb) gb.style.display = 'none';
-    if (vt) vt.style.display = 'none';
-    renderBsmChart();
-  } else {
-    if (tw) tw.style.display = '';
-    if (cw) cw.style.display = 'none';
-    if (gb) gb.style.display = '';
-    if (vt) vt.style.display = 'flex';
-  }
+  if (tw) tw.style.display = tab==='table' ? '' : 'none';
+  if (cw) cw.style.display = tab==='chart' ? 'block' : 'none';
+  if (ww) ww.style.display = tab==='weekly' ? 'block' : 'none';
+  // Group & Jumlah/Rata-rata-per-hari cuma relevan di tab Tabel — tab Chart & Weekly
+  // masing-masing punya kontrolnya sendiri (filter Tampilkan / pilih Metrik).
+  if (gb) gb.style.display = tab==='table' ? '' : 'none';
+  if (vt) vt.style.display = tab==='table' ? 'flex' : 'none';
+
+  // Footer: legend warna payment cuma relevan di tabel biasa — di tab Weekly
+  // diganti dgn ringkasan total per-minggu (lihat _renderBsmWeeklyFooterTotals),
+  // krn di situ legend warna itu gak ada gunanya.
+  const fl = document.getElementById('bsmFooterLegend');
+  const fwt = document.getElementById('bsmFooterWeeklyTotals');
+  if (fl) fl.style.display = tab==='weekly' ? 'none' : 'flex';
+  if (fwt) fwt.style.display = tab==='weekly' ? 'flex' : 'none';
+
+  if (tab === 'chart') renderBsmChart();
+  else if (tab === 'weekly') renderBsmWeekly();
 }
 
 function setBsmChartType(ctype) {
@@ -2612,13 +2923,18 @@ function renderBsmChart() {
       },
       scales: {
         x: { ticks:{font:{size:10}}, grid:{display:false} },
-        y: { beginAtZero:true, ticks:{
+        y: { beginAtZero:true, grace:'10%', ticks:{
           font:{size:10},
           callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'jt' : v >= 1e3 ? (v/1e3).toFixed(0)+'rb' : v
         }}
       }
     }
   });
+
+  // Sama kayak chart Rank Vendor: kalau modal Summary Bucket lagi fullscreen dan
+  // chart di-render ulang (ganti filter/tipe chart/bucket), pastikan wrapper-nya
+  // tetap ngikutin ukuran fullscreen, bukan balik ke 340px default.
+  _fitChartWrap(document.getElementById('bsmChartCanvasWrap'), _bsmPayChart);
 }
 
 function setBsmMode(mode) {
@@ -2636,13 +2952,61 @@ function toggleBsmFullscreen() {
   overlay.classList.toggle('fullscreen-mode', isFs);
   btn.textContent = isFs ? '⊠' : '⛶';
   btn.title = isFs ? 'Keluar Fullscreen' : 'Fullscreen';
+  requestAnimationFrame(() => _fitChartWrap(document.getElementById('bsmChartCanvasWrap'), _bsmPayChart));
+}
+
+// Ganti mode filter tanggal: "all" (Semua Tanggal) / "single" (1 tanggal spesifik via
+// dropdown bsmDateSelect) / "range" (rentang tanggal via 2 dropdown bsmDateFrom/bsmDateTo).
+// Toggle show/hide kontrol yg relevan, dan set default rentang (dari tanggal pertama s/d
+// terakhir yg ada) supaya begitu pilih "Rentang Tanggal" langsung ada hasil, bukan kosong.
+function setBsmDateMode(mode) {
+  _bsmState.dateMode = mode;
+  _bsmState.date = '';
+
+  const sel = document.getElementById('bsmDateSelect');
+  if (sel) { sel.style.display = mode==='single' ? '' : 'none'; sel.value = ''; }
+
+  const rangeWrap = document.getElementById('bsmDateRangeWrap');
+  if (rangeWrap) rangeWrap.style.display = mode==='range' ? 'inline-flex' : 'none';
+
+  if (mode==='range') {
+    const fromSel = document.getElementById('bsmDateFrom');
+    const toSel = document.getElementById('bsmDateTo');
+    _bsmState.dateFrom = fromSel ? fromSel.value : '';
+    _bsmState.dateTo = toSel ? toSel.value : '';
+  } else {
+    _bsmState.dateFrom = '';
+    _bsmState.dateTo = '';
+  }
+
+  // Rata-rata/hari cuma gak relevan kalau lagi lihat 1 tanggal spesifik (avg dari 1 hari =
+  // itu-itu juga) — tetap relevan utk "Semua Tanggal" maupun "Rentang Tanggal".
+  const vt = document.getElementById('bsmViewToggle');
+  if (vt) vt.style.display = mode==='single' ? 'none' : 'flex';
+
+  _renderBucketSummary();
 }
 
 function setBsmDate(date) {
   _bsmState.date = date;
-  // Hide view toggle on single-day (avg doesn't make sense for 1 day)
-  const vt = document.getElementById('bsmViewToggle');
-  if (vt) vt.style.display = date ? 'none' : 'flex';
+  _renderBucketSummary();
+}
+
+// Dipanggil saat dropdown "Dari" atau "Sampai" berubah (mode Rentang Tanggal).
+function setBsmDateRange() {
+  const fromSel = document.getElementById('bsmDateFrom');
+  const toSel = document.getElementById('bsmDateTo');
+  let from = fromSel ? fromSel.value : '';
+  let to = toSel ? toSel.value : '';
+  // Guard: kalau user pilih "Dari" > "Sampai", auto-swap biar rentangnya tetap valid —
+  // drpd nampilin 0 baris krn urutan tanggalnya kebalik tanpa penjelasan ke user.
+  if (from && to && from > to) {
+    const tmp = from; from = to; to = tmp;
+    if (fromSel) fromSel.value = from;
+    if (toSel) toSel.value = to;
+  }
+  _bsmState.dateFrom = from;
+  _bsmState.dateTo = to;
   _renderBucketSummary();
 }
 
@@ -2761,10 +3125,14 @@ function _buildBsmAgentPreviewRow(a, agId, colspanTotal, previewSetupCols, bsmRo
 }
 
 function _renderBucketSummary() {
-  const {bucket, spv, aplikasi, mode, date, view} = _bsmState;
+  const {bucket, spv, aplikasi, mode, dateMode, date, dateFrom, dateTo, view} = _bsmState;
   const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
-  // Apply date filter
-  const rows = date ? allRows.filter(r=>r.tanggal===date) : allRows;
+  // Apply date filter — sesuai mode aktif (Semua / Tanggal Tertentu / Rentang Tanggal).
+  const isSingleDaySel = dateMode==='single' && !!date;
+  const isRangeSel = dateMode==='range' && !!dateFrom && !!dateTo;
+  const rows = isSingleDaySel ? allRows.filter(r=>r.tanggal===date)
+    : isRangeSel ? allRows.filter(r=>r.tanggal>=dateFrom && r.tanggal<=dateTo)
+    : allRows;
   const bulan = document.getElementById('selBulan').value;
   const tahun = document.getElementById('selTahun').value;
   // Rotasi dihitung dari SELURUH data bucket bulan ini (bukan yg sudah difilter
@@ -2772,7 +3140,10 @@ function _renderBucketSummary() {
   const bsmRotasiInfo = detectRotasiInfo(allRows, bucket);
   let _bsmAgIdCounter = 0;
 
-  const titleDate = date ? ` — ${(()=>{const dt=new Date(date);const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];return dt.getDate()+' ('+dn[dt.getDay()]+')'})()}` : '';
+  const _fmtTglShort = d => { const dt=new Date(d); const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab']; return dt.getDate()+' ('+dn[dt.getDay()]+')'; };
+  const titleDate = isSingleDaySel ? ` — ${_fmtTglShort(date)}`
+    : isRangeSel ? ` — ${_fmtTglShort(dateFrom)} s/d ${_fmtTglShort(dateTo)}`
+    : '';
   const multiAppSpv = spvHasMultiApp(spvAgentDataCache[spv]||[]);
   document.getElementById('bsmTitle').textContent =
     `📊 Summary Bucket ${bucket}${multiAppSpv?' ('+aplikasi+')':''}${titleDate} — ${bulan} ${tahun}`;
@@ -2838,7 +3209,7 @@ function _renderBucketSummary() {
     return Math.max(calcAbsensi(a._rows).hariKerja, 1);
   }
   function applyView(val, a) {
-    if (view==='avg' && !date) return val / getHariKerja(a);
+    if (view==='avg' && !isSingleDaySel) return val / getHariKerja(a);
     return val;
   }
   function fmtView(val, a, fmt) {
@@ -2846,10 +3217,10 @@ function _renderBucketSummary() {
     if (fmt==='rp') return 'Rp '+Math.round(v).toLocaleString('id-ID');
     if (fmt==='rate'||fmt==='rate2') return (v*100).toFixed(2)+'%';
     // For avg mode, show 1 decimal for small numbers
-    if (view==='avg' && !date) return v%1===0 ? Math.round(v).toLocaleString('id-ID') : v.toFixed(1);
+    if (view==='avg' && !isSingleDaySel) return v%1===0 ? Math.round(v).toLocaleString('id-ID') : v.toFixed(1);
     return Math.round(v).toLocaleString('id-ID');
   }
-  const viewLabel = view==='avg'&&!date ? ' (avg/hari)' : '';
+  const viewLabel = view==='avg'&&!isSingleDaySel ? ' (avg/hari)' : '';
 
   let tableHtml = '';
 
@@ -3088,7 +3459,7 @@ function _renderBucketSummary() {
     }
 
     tableHtml = `<div style="font-size:11px;color:var(--text3);padding:6px 14px;background:var(--surface2);border-bottom:1px solid var(--border)">
-        Setup aktif: <b style="color:var(--accent)">${setupLabel}</b>${date?` &nbsp;·&nbsp; <b style="color:var(--warning)">Tanggal: ${new Date(date).getDate()}</b>`:''}</div>
+        Setup aktif: <b style="color:var(--accent)">${setupLabel}</b>${isSingleDaySel?` &nbsp;·&nbsp; <b style="color:var(--warning)">Tanggal: ${new Date(date).getDate()}</b>`:isRangeSel?` &nbsp;·&nbsp; <b style="color:var(--warning)">Rentang: ${new Date(dateFrom).getDate()}–${new Date(dateTo).getDate()}</b>`:''}</div>
       <table class="bsm-table bsm-individual">
         <thead><tr>
           <th style="text-align:center">Rank</th>
@@ -3386,11 +3757,20 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   const s=summarizeRows(rows);
   const agentCount=computeActiveAgentCount(rows);
   const initials=spv.split(' ').slice(0,2).map(w=>w[0]||'').join('').toUpperCase();
-  const appList=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))].join(', ');
+  const appListArr=[...new Set(rows.map(r=>r.aplikasi).filter(Boolean))];
+  const appList=appListArr.join(', ');
+  // Rows per-aplikasi (dipakai utk header grup aplikasi & tombol "📊 Summary
+  // Aplikasi" — lihat bucketBlocks di bawah) — key MENTAH (bisa '') sama kayak
+  // konvensi byBucket/bucketMeta di atas.
+  const appAggMap={};
+  rows.forEach(r=>{ const ap=r.aplikasi||''; if(!appAggMap[ap])appAggMap[ap]=[]; appAggMap[ap].push(r); });
   const setups=getSetups(spv);
   const activeIdx=Math.max(0,Math.min(getActiveIdx(spv),setups.length-1));
   const activeSetup=setups[activeIdx]||null;
   const safeSpv=escA(spv);
+  // Dipindah ke atas (sebelumnya dihitung ulang di bawah, dekat spvBlockId) krn
+  // sekarang dipakai lebih awal di bucketBlockPieces (tombol "Summary Aplikasi").
+  const safeSpvId=btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
 
   const setupTabs=setups.map((st,i)=>`<div class="setup-tab ${i===activeIdx?'active':''}" onclick="switchSetup('${safeSpv}',${i})">${escH(st.name)}<button class="setup-tab-del" onclick="event.stopPropagation();deleteSetup('${safeSpv}',${i})" title="Hapus">×</button></div>`).join('');
 
@@ -3429,8 +3809,32 @@ function buildSPVBlock(spv,rows,bulan,tahun){
   // bukan btoa yang bisa menghasilkan ID identik atau bentrok.
   // ============================================================
   let tlCounter=0;
-  const bucketBlocks=Object.keys(byBucket).sort().map(bkKey=>{
+  // BUG FIX/FITUR: bkKey = aplikasi+SEP+bucket, jadi Object.keys(byBucket).sort()
+  // otomatis SUDAH terkelompok per-aplikasi dulu (krn aplikasi jadi prefix key).
+  // Kita manfaatkan urutan ini utk nyisipin HEADER GRUP APLIKASI (+ tombol "📊
+  // Summary Aplikasi") tiap kali aplikasinya ganti dari kartu bucket sebelumnya —
+  // cuma kalau SPV ini pegang >1 aplikasi (multiAppSpv), biar SPV yg cuma pegang
+  // 1 aplikasi (mayoritas) tampilannya TIDAK berubah (mereka dapat tombolnya di
+  // spv-header-right sebagai gantinya — lihat bagian bawah fungsi ini).
+  let _prevApForGroup=null;
+  const bucketBlockPieces=[];
+  Object.keys(byBucket).sort().forEach(bkKey=>{
     const {bucket:bk, aplikasi:bkAplikasi}=bucketMeta[bkKey];
+    if(multiAppSpv && bkAplikasi!==_prevApForGroup){
+      _prevApForGroup=bkAplikasi;
+      const apRowsForHeader=appAggMap[bkAplikasi]||[];
+      const apTotalForHeader=apRowsForHeader.reduce((s,r)=>s+(r.dailyPayment||0),0);
+      const apAgentCountForHeader=computeActiveAgentCount(apRowsForHeader);
+      const apBucketCountForHeader=new Set(apRowsForHeader.map(r=>r.bucket||'')).size;
+      const apTLCountForHeader=new Set(apRowsForHeader.map(r=>r.teamLeader||'')).size;
+      const apDisplayForHeader=bkAplikasi||'(Tanpa Aplikasi)';
+      bucketBlockPieces.push(`<div class="app-group-header">
+        <span style="font-size:13px;font-weight:800;color:var(--text)">🗂️ ${escH(apDisplayForHeader)}</span>
+        <span style="font-size:11px;color:var(--text3)">${apBucketCountForHeader} bucket · ${apTLCountForHeader} TL · ${apAgentCountForHeader} agent</span>
+        <span style="font-size:12px;font-weight:700;color:var(--accent);margin-left:auto">${fmtRpFull(apTotalForHeader)}</span>
+        <button class="btn-app-summary" onclick="openAppSummary('${escA(bkAplikasi)}','${safeSpv}','${safeSpvId}')" title="Lihat summary keseluruhan aplikasi ini (gabungan semua bucket)">📊 Summary Aplikasi</button>
+      </div>`);
+    }
     // Placeholder cuma utk TAMPILAN (label di UI) — bk/bkAplikasi asli (bisa '')
     // tetap dipakai apa adanya utk semua pencocokan/lookup di bawah.
     const bkDisplay=bk||'(Tanpa Bucket)';
@@ -3487,7 +3891,7 @@ function buildSPVBlock(spv,rows,bulan,tahun){
     // supaya SPV yg cuma pegang 1 aplikasi (mayoritas) tampilannya tidak berubah.
     const bkAppTag = multiAppSpv ? `<span class="bucket-badge bucket-badge-app" title="Aplikasi bucket ini">${escH(bkAplikasiDisplay)}</span>` : '';
 
-    return `<div class="bucket-group">
+    bucketBlockPieces.push(`<div class="bucket-group">
       <div class="bucket-header">
         <span class="bucket-label">${escH(bkDisplay)}</span>
         ${bkAppTag}
@@ -3502,14 +3906,13 @@ function buildSPVBlock(spv,rows,bulan,tahun){
         <button class="btn-bucket-summary" onclick="openBucketSummary('${safeBk}','${safeSpv2}','${safeBkAp}')" title="Lihat summary ranking bucket">📊 Summary</button>
       </div>
       ${tlRows}
-    </div>`;
-  }).join('');
+    </div>`);
+  });
+  const bucketBlocks=bucketBlockPieces.join('');
 
-  const spvBlockId='spvblock-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
-  const setupBarId='setupbar-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
-  const metricsGridId='metrics-'+btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
-  // safeSpvId: ID-safe version untuk dipakai di element ID HTML
-  const safeSpvId=btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+  const spvBlockId='spvblock-'+safeSpvId;
+  const setupBarId='setupbar-'+safeSpvId;
+  const metricsGridId='metrics-'+safeSpvId;
   const bucketAnalysisId='bkanal-'+safeSpvId;
 
   // Simpan data agent per bucket untuk keperluan analisa
@@ -3535,6 +3938,7 @@ function buildSPVBlock(spv,rows,bulan,tahun){
       </div>
       <div class="spv-header-right">
         <button class="btn-rank-chart" onclick="openRankModal('${safeSpv}','${safeSpvId}')" title="Lihat ranking vendor per bucket (data dari sheet DATA RANK)">📈 Tampilkan Rank</button>
+        ${!multiAppSpv ? `<button class="btn-app-summary" onclick="openAppSummary('${escA(appListArr[0]||'')}','${safeSpv}','${safeSpvId}')" title="Lihat summary keseluruhan aplikasi ini (gabungan semua bucket)">📊 Summary Aplikasi</button>` : ''}
         <span class="pill-blue">${bulan} ${tahun}</span>
         <button class="btn-cmp-bulan" onclick="openCmpBulan('${safeSpv}','${safeSpvId}')" title="Bandingkan dengan bulan lalu (apple-to-apple)">📅 vs Bln Lalu</button>
         <button class="btn-add-setup" onclick="openSetupModal('${safeSpv}',null)">+ Setup baru</button>
@@ -6843,6 +7247,763 @@ function weeklyPayments(rows){
   // Kembalikan [M1,M2,M3,M4] payment
   return[1,2,3,4].map(w=>summarizeRows(getWeekRows(rows,w)).dailyPayment);
 }
+
+// ── WEEKLY RANKING (tab "📅 Weekly" di modal Summary Bucket) ─────────────
+// Ranking SELURUH agent per minggu (Minggu 1-4, pembagian tanggal SAMA dgn
+// getWeekRows/weeklyPayments di atas — 1-7/8-14/15-21/22-28) berdasarkan
+// metric yang dipilih user (Payment, Rate, PTP, Call Manual, dst — generic
+// lewat ALL_METRICS supaya semua metric otomatis kebagian tanpa hardcode).
+// BUG FIX: sebelum ini di-cap top-10 tanpa opsi — utk bucket dgn banyak agent
+// (mis. 70 agent/7 TL) jadi kepotong & gak keliatan gambaran timnya secara
+// utuh. Sekarang defaultnya TANPA cap (opsional lewat param `limit` kalau
+// suatu saat perlu), dan filter per-TL dilakukan oleh caller (renderBsmWeekly)
+// SEBELUM data masuk sini, supaya "jumlah yg tampil" otomatis ngikut jumlah
+// agent TL yg dipilih.
+function computeWeeklyAgentRanking(rows, metricKey, limit) {
+  const byAgent = {};
+  (rows||[]).forEach(r => {
+    const ag = r.agent || '(?)';
+    if (!byAgent[ag]) byAgent[ag] = [];
+    byAgent[ag].push(r);
+  });
+  return [1,2,3,4].map(wk => {
+    const entries = Object.keys(byAgent).map(ag => {
+      const agRows = byAgent[ag];
+      const wkRows = getWeekRows(agRows, wk);
+      if (!wkRows.length) return null;
+      const s = summarizeRows(wkRows);
+      const val = s[metricKey] || 0;
+      if (val <= 0) return null;
+      return { ag, val, _rows: wkRows, namaAkun: wkRows[0].namaAkun || '', tl: wkRows[0].teamLeader || '' };
+    }).filter(Boolean);
+    entries.sort((a,b) => b.val - a.val);
+    return limit ? entries.slice(0, limit) : entries;
+  });
+}
+
+// Sama persis kriterianya dgn sort di _renderBucketSummary/_getBsmExportData:
+// agent yg statusnya 'lama' (sudah digantikan/nonaktif/pindah keluar bucket ini)
+// didorong ke PALING BAWAH tiap minggu, apapun besaran nilainya minggu itu — biar
+// gak ada agent nonaktif nangkring di posisi atas cuma krn payment historisnya
+// gede. Urutan RELATIF di dalam masing² grup (aktif / lama) tetap ngikutin urutan
+// asal (sudah terurut desc by value) krn Array.sort() stabil di semua browser
+// modern — makanya comparator di sini cuma return 0 kalau lama-statusnya sama.
+function _weeklySortLamaBottom(entries, bsmRotasiInfo) {
+  return entries.slice().sort((a, b) => {
+    const aLama = bsmRotasiInfo[a.ag] && bsmRotasiInfo[a.ag].status === 'lama' ? 1 : 0;
+    const bLama = bsmRotasiInfo[b.ag] && bsmRotasiInfo[b.ag].status === 'lama' ? 1 : 0;
+    return aLama - bLama;
+  });
+}
+
+// Nilai per-agent per-minggu TANPA filter val<=0 (beda dgn computeWeeklyAgentRanking
+// yg sengaja buang agent nol biar ranking gak penuh baris kosong) — dipakai khusus
+// utk mode "Weekly Versus" krn di situ agent yg DROP ke 0 (mis. nonaktif pertengahan
+// bulan) atau BARU MULAI minggu itu justru harus tetap kelihatan (bagian dari cerita
+// perbandingannya), bukan malah hilang dari daftar.
+function computeWeeklyValueMap(rows, metricKey) {
+  const byAgent = {};
+  (rows||[]).forEach(r => {
+    const ag = r.agent || '(?)';
+    if (!byAgent[ag]) byAgent[ag] = [];
+    byAgent[ag].push(r);
+  });
+  return [1,2,3,4].map(wk => {
+    const map = {};
+    Object.keys(byAgent).forEach(ag => {
+      const agRows = byAgent[ag];
+      const wkRows = getWeekRows(agRows, wk);
+      const val = wkRows.length ? (summarizeRows(wkRows)[metricKey] || 0) : 0;
+      const metaRow = wkRows[0] || agRows[0];
+      map[ag] = { val, namaAkun: metaRow.namaAkun || '', tl: metaRow.teamLeader || '' };
+    });
+    return map;
+  });
+}
+
+// Mode "🔀 Weekly Versus" — versi mingguan dari fitur "vs Bln Lalu": 3 tahap
+// perbandingan (Minggu2 vs Minggu1, Minggu3 vs Minggu2, Minggu4 vs Minggu3).
+function computeWeeklyVersusPairs(rows, metricKey) {
+  const weekMaps = computeWeeklyValueMap(rows, metricKey);
+  const pairs = [[1,0],[2,1],[3,2]]; // [idx minggu sekarang, idx minggu pembanding] (0-based)
+  return pairs.map(([ci, pi]) => {
+    const currMap = weekMaps[ci], prevMap = weekMaps[pi];
+    const agents = new Set([...Object.keys(currMap), ...Object.keys(prevMap)]);
+    const entries = [...agents].map(ag => {
+      const curr = currMap[ag] ? currMap[ag].val : 0;
+      const prev = prevMap[ag] ? prevMap[ag].val : 0;
+      if (curr <= 0 && prev <= 0) return null; // gak aktif di dua minggu ini sama sekali
+      const meta = currMap[ag] || prevMap[ag];
+      const delta = curr - prev;
+      const pct = prev > 0 ? (delta/prev)*100 : null; // null = gak ada pembanding ("Baru")
+      return { ag, namaAkun: meta.namaAkun, tl: meta.tl, curr, prev, delta, pct };
+    }).filter(Boolean);
+    entries.sort((a,b) => b.curr - a.curr);
+    return entries;
+  });
+}
+
+// Sama kayak fmtMetric() tapi TANPA singkatan jt/rb (dipakai khusus di footer
+// total minggu — user mau angka lengkap biar perbandingannya jelas, bukan versi
+// ringkas yg dipakai di baris per-agent).
+function _fmtMetricFull(m, val) {
+  if (!m) return String(val);
+  if (m.fmt === 'rp') return fmtRpFull(val);
+  if (m.fmt === 'rate') return fmtRate(val);
+  return fmtNum(val);
+}
+
+// Ringkasan TOTAL (bukan per-agent) per minggu utk metric yg lagi dipilih —
+// ditaruh di footer modal Summary (gantiin legend warna payment yg gak relevan
+// di tab Weekly). Angka lengkap/gak disingkat, biar perbandingan keseluruhan
+// timnya kelihatan jelas (mis. "Total OS Minggu 1: Rp 1.234.567.890").
+function _renderBsmWeeklyFooterTotals(rows, metricKey, metricDef, weeklyTL) {
+  const box = document.getElementById('bsmFooterWeeklyTotals');
+  if (!box) return;
+  const totals = [1,2,3,4].map(wk => summarizeRows(getWeekRows(rows, wk))[metricKey] || 0);
+  const weekShort = ['Minggu 1','Minggu 2','Minggu 3','Minggu 4'];
+  const tlNote = (weeklyTL && weeklyTL !== 'all') ? ` (TL: ${escH(weeklyTL)})` : '';
+  box.innerHTML = `
+    <span style="font-weight:700;color:var(--text2)">📊 Total ${escH(metricDef.label)} per Minggu${tlNote}:</span>
+    ${totals.map((v,i) => `<span><span style="color:var(--text3)">${weekShort[i]}:</span> <b style="color:var(--text)">${_fmtMetricFull(metricDef, v)}</b></span>`).join('<span style="color:var(--border)">·</span>')}
+  `;
+}
+
+function renderBsmWeekly() {
+  const { bucket, spv, aplikasi, nameMode, weeklyTL, weeklyVersus } = _bsmState;
+  const grid = document.getElementById('bsmWeeklyGrid');
+  const hint = document.getElementById('bsmWeeklyHint');
+  if (!grid) return;
+  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>r.bucket===bucket&&r.aplikasi===aplikasi);
+
+  // Filter per Team Leader (opsional, lewat tab yg cuma muncul kalau bucket ini
+  // punya >1 TL — lihat _bsmPopulateWeeklyTLSelect) — "Semua TL" = seluruh tim
+  const rows = (weeklyTL && weeklyTL !== 'all') ? allRows.filter(r => r.teamLeader === weeklyTL) : allRows;
+
+  // Rotasi (Pengganti/Nonaktif/Pindah) dihitung dari SELURUH data bucket (bukan
+  // yg sudah difilter per-TL) — sama persis dgn pola di _renderBucketSummary,
+  // supaya badge & sort-nya konsisten dgn yg tampil di tab Tabel.
+  const bsmRotasiInfo = detectRotasiInfo(allRows, bucket);
+  const isLama = ag => !!(bsmRotasiInfo[ag] && bsmRotasiInfo[ag].status === 'lama');
+
+  const selEl = document.getElementById('bsmWeeklyMetric');
+  const metricKey = selEl ? selEl.value : 'dailyPayment';
+  const metricDef = ALL_METRICS.find(m => m.key === metricKey) || {key:metricKey, label:metricKey, fmt:'num'};
+  const medal = idx => idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':(idx+1)+'.';
+
+  // Total keseluruhan tim per-minggu (angka LENGKAP, gak disingkat jt/rb) di
+  // footer modal — biar kelihatan gambaran total, bukan cuma angka per-agent.
+  _renderBsmWeeklyFooterTotals(rows, metricKey, metricDef, weeklyTL);
+
+  const nameCellHtml = (ag, namaAkun) => {
+    const name = nameMode === 'akun' ? (namaAkun || '(Tanpa Akun)') : ag;
+    const badge = _bsmRotasiBadge(ag, bsmRotasiInfo);
+    return `<span style="flex:1;display:flex;align-items:center;overflow:hidden;min-width:0">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escH(name)}">${escH(name)}</span>${badge}
+    </span>`;
+  };
+
+  if (weeklyVersus) {
+    grid.style.gridTemplateColumns = 'repeat(3,minmax(220px,1fr))';
+    if (hint) hint.textContent = 'Mode "Weekly Versus" aktif: tiap minggu dibandingkan dgn minggu sebelumnya (nilai sekarang + delta & % perubahan) — versi mingguan dari "vs Bln Lalu". Agent Nonaktif/sudah digantikan otomatis ditaruh di bawah & dibikin redup.';
+    const pairLabels = ['Minggu 2 vs Minggu 1', 'Minggu 3 vs Minggu 2', 'Minggu 4 vs Minggu 3'];
+    const pairs = computeWeeklyVersusPairs(rows, metricKey).map(entries => _weeklySortLamaBottom(entries, bsmRotasiInfo));
+    grid.innerHTML = pairs.map((entries, i) => {
+      const rowsHtml = entries.length
+        ? entries.map((e, idx) => {
+            const lama = isLama(e.ag);
+            const deltaHtml = e.pct === null
+              ? `<span style="font-size:10px;font-weight:700;color:var(--text3)">Baru</span>`
+              : e.delta === 0
+                ? `<span style="font-size:10px;font-weight:700;color:var(--text3)">tetap</span>`
+                : `<span style="font-size:10px;font-weight:700;color:${e.delta>0?'#16a34a':'#dc2626'}">${e.delta>0?'▲':'▼'} ${fmtMetric(metricDef, Math.abs(e.delta))} (${e.pct>0?'+':''}${e.pct.toFixed(0)}%)</span>`;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:11.5px;${lama?'opacity:.5':''}">
+              <span style="width:22px;flex-shrink:0;text-align:center">${medal(idx)}</span>
+              ${nameCellHtml(e.ag, e.namaAkun)}
+              <span style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;gap:1px">
+                <span style="font-weight:700;color:var(--accent)">${fmtMetric(metricDef, e.curr)}</span>
+                ${deltaHtml}
+              </span>
+            </div>`;
+          }).join('')
+        : `<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Tidak ada data</div>`;
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:8px 10px;background:var(--surface2);font-weight:700;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
+          <span>🔀 ${pairLabels[i]}</span>
+          <span style="color:var(--text3);font-weight:600">${entries.length} agent</span>
+        </div>
+        <div>${rowsHtml}</div>
+      </div>`;
+    }).join('');
+    return;
+  }
+
+  grid.style.gridTemplateColumns = 'repeat(4,minmax(200px,1fr))';
+  if (hint) hint.textContent = 'Menampilkan seluruh agent tim (bukan cuma top 10) — pilih Team Leader di atas utk cuma lihat agent di bawahnya. Pembagian minggu berdasar tanggal (1-7 / 8-14 / 15-21 / 22-28), sama dgn "Tren Payment Mingguan".';
+  const weekLabels = ['Minggu 1 (1-7)','Minggu 2 (8-14)','Minggu 3 (15-21)','Minggu 4 (22-28)'];
+  const weeks = computeWeeklyAgentRanking(rows, metricKey).map(entries => _weeklySortLamaBottom(entries, bsmRotasiInfo));
+  grid.innerHTML = weeks.map((entries, i) => {
+    const rowsHtml = entries.length
+      ? entries.map((e, idx) => {
+          const lama = isLama(e.ag);
+          return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:11.5px;${lama?'opacity:.5':''}">
+            <span style="width:22px;flex-shrink:0;text-align:center">${medal(idx)}</span>
+            ${nameCellHtml(e.ag, e.namaAkun)}
+            <span style="font-weight:700;color:var(--accent);flex-shrink:0">${fmtMetric(metricDef, e.val)}</span>
+          </div>`;
+        }).join('')
+      : `<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Tidak ada data</div>`;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:8px 10px;background:var(--surface2);font-weight:700;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
+        <span>📅 ${weekLabels[i]}</span>
+        <span style="color:var(--text3);font-weight:600">${entries.length} agent</span>
+      </div>
+      <div>${rowsHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── SUMMARY APLIKASI (gabungan semua bucket dalam 1 aplikasi) ──
+// Dipicu dari tombol "📊 Summary Aplikasi" — muncul di header grup
+// aplikasi (kalau SPV pegang >1 aplikasi) ATAU di spv-header-right
+// (kalau SPV cuma pegang 1 aplikasi). Berisi 3 tab: Ringkasan (KPI
+// headline + breakdown per bucket + top/bottom performer + rotasi +
+// rank vendor rollup + vs Bulan Lalu), Tren (grafik payment harian
+// gabungan), dan Weekly (reuse fungsi generic computeWeeklyAgentRanking
+// dkk yg sudah dipakai di modal Summary Bucket, tapi rows-nya gabungan
+// seluruh bucket dalam aplikasi ini — termasuk toggle "Weekly Versus").
+// ══════════════════════════════════════════════════════════════
+let _appsState = { aplikasi:'', spv:'', tab:'ringkasan', weeklyBucket:'all', weeklyVersus:false };
+let _appsPayChart = null;
+let _appsChartType = 'line';
+
+// Gabungkan detectRotasiInfo per (bucket,TL) — sama persis pola yg dipakai
+// computeActiveAgentCount — supaya badge/sort/hitungan rotasi di level Aplikasi
+// tetap benar walau rows-nya lintas banyak bucket (detectRotasiInfo WAJIB
+// dipanggil per-bucket krn dia baca global `allRows` utk cek bucket lain).
+function _appsComputeRotasiInfo(rows) {
+  const merged = {};
+  const buckets = [...new Set(rows.map(r=>r.bucket).filter(Boolean))];
+  buckets.forEach(bk => {
+    const bkRows = rows.filter(r=>r.bucket===bk);
+    const tls = [...new Set(bkRows.map(r=>r.teamLeader).filter(Boolean))];
+    (tls.length ? tls : [undefined]).forEach(tl => {
+      const scoped = tl!==undefined ? bkRows.filter(r=>r.teamLeader===tl) : bkRows;
+      const info = detectRotasiInfo(scoped, bk);
+      Object.assign(merged, info);
+    });
+  });
+  return merged;
+}
+
+function openAppSummary(aplikasi, spv, safeSpvId) {
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>(r.aplikasi||'')===(aplikasi||''));
+  if (!rows.length) { alert('Tidak ada data untuk aplikasi ini.'); return; }
+  _appsState = { aplikasi, spv, tab:'ringkasan', weeklyBucket:'all', weeklyVersus:false };
+  document.querySelectorAll('.apps-tab-btn').forEach(b => {
+    const isActive = b.dataset.tab === 'ringkasan';
+    b.classList.toggle('active', isActive);
+    b.style.background = isActive ? 'var(--accent)' : 'var(--surface2)';
+    b.style.color = isActive ? '#fff' : 'var(--text2)';
+  });
+  const rw = document.getElementById('appsRingkasanWrap');
+  const tw = document.getElementById('appsTrenWrap');
+  const ww = document.getElementById('appsWeeklyWrap');
+  if (rw) rw.style.display = '';
+  if (tw) tw.style.display = 'none';
+  if (ww) ww.style.display = 'none';
+  const ffl = document.getElementById('appsFooterDefault'), fwt = document.getElementById('appsFooterWeeklyTotals');
+  if (ffl) ffl.style.display = 'block';
+  if (fwt) fwt.style.display = 'none';
+  if (_appsPayChart) { _appsPayChart.destroy(); _appsPayChart = null; }
+  const title = document.getElementById('appsTitle');
+  if (title) title.textContent = `📊 Summary Aplikasi — ${aplikasi || '(Tanpa Aplikasi)'}`;
+  const buckets = [...new Set(rows.map(r=>r.bucket).filter(Boolean))].sort();
+  const sub = document.getElementById('appsSubtitle');
+  if (sub) sub.textContent = `${escH(spv)} · ${buckets.length} bucket: ${buckets.join(', ')}`;
+  _appsInitChartFilter(rows);
+  _appsPopulateWeeklyBucketTabs(rows);
+  document.getElementById('modalAppSummary').classList.add('open');
+  renderAppsRingkasan();
+}
+
+function closeAppSummary() {
+  const overlay = document.getElementById('modalAppSummary');
+  if (!overlay) return;
+  const modal = overlay.querySelector('.bsm-modal');
+  if (modal) modal.classList.remove('fullscreen');
+  overlay.classList.remove('fullscreen-mode');
+  const btn = document.getElementById('appsFsBtn');
+  if (btn) { btn.textContent = '⛶'; btn.title = 'Fullscreen'; }
+  overlay.classList.remove('open');
+  if (_appsPayChart) { _appsPayChart.destroy(); _appsPayChart = null; }
+}
+
+function toggleAppsFullscreen() {
+  const overlay = document.getElementById('modalAppSummary');
+  const modal   = overlay.querySelector('.bsm-modal');
+  const btn     = document.getElementById('appsFsBtn');
+  const isFs    = modal.classList.toggle('fullscreen');
+  overlay.classList.toggle('fullscreen-mode', isFs);
+  btn.textContent = isFs ? '⊠' : '⛶';
+  btn.title = isFs ? 'Keluar Fullscreen' : 'Fullscreen';
+  requestAnimationFrame(() => _fitChartWrap(document.getElementById('appsChartCanvasWrap'), _appsPayChart));
+}
+
+function setAppsTab(tab) {
+  _appsState.tab = tab;
+  document.querySelectorAll('.apps-tab-btn').forEach(b => {
+    const isActive = b.dataset.tab === tab;
+    b.classList.toggle('active', isActive);
+    b.style.background = isActive ? 'var(--accent)' : 'var(--surface2)';
+    b.style.color = isActive ? '#fff' : 'var(--text2)';
+  });
+  const rw = document.getElementById('appsRingkasanWrap');
+  const tw = document.getElementById('appsTrenWrap');
+  const ww = document.getElementById('appsWeeklyWrap');
+  if (rw) rw.style.display = tab==='ringkasan' ? '' : 'none';
+  if (tw) tw.style.display = tab==='tren' ? 'block' : 'none';
+  if (ww) ww.style.display = tab==='weekly' ? 'block' : 'none';
+  const ffl = document.getElementById('appsFooterDefault'), fwt = document.getElementById('appsFooterWeeklyTotals');
+  if (ffl) ffl.style.display = tab==='weekly' ? 'none' : 'block';
+  if (fwt) fwt.style.display = tab==='weekly' ? 'flex' : 'none';
+  if (tab === 'tren') renderAppsTren();
+  else if (tab === 'weekly') renderAppsWeekly();
+}
+
+// ── Ringkasan tab: semua 8 poin yg didiskusikan (KPI headline, target,
+// rotasi, breakdown per bucket, top/bottom performer, tren mingguan
+// ringkas, rank vendor rollup per bucket, vs Bulan Lalu) ──
+function renderAppsRingkasan() {
+  const { aplikasi, spv } = _appsState;
+  const box = document.getElementById('appsRingkasanWrap');
+  if (!box) return;
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>(r.aplikasi||'')===(aplikasi||''));
+  if (!rows.length) { box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3)">Tidak ada data</div>'; return; }
+
+  const s = summarizeRows(rows);
+  const buckets = [...new Set(rows.map(r=>r.bucket).filter(Boolean))].sort();
+  const tlCount = new Set(rows.map(r=>r.teamLeader).filter(Boolean)).size;
+  const agentCount = computeActiveAgentCount(rows);
+  const hadirRows = rows.filter(r=>r.absensi==='Hadir').length;
+  const kehadiranRate = rows.length ? hadirRows/rows.length : 0;
+
+  // 1. KPI headline
+  const kpiHtml = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:18px">
+      ${_appsKpiCard('💰 Total Payment', fmtRpFull(s.dailyPayment))}
+      ${_appsKpiCard('👤 Agent Aktif', fmtNum(agentCount))}
+      ${_appsKpiCard('🧑‍💼 Team Leader', fmtNum(tlCount))}
+      ${_appsKpiCard('🗂️ Bucket', fmtNum(buckets.length))}
+      ${_appsKpiCard('📈 Avg Rate', fmtRate(s.avgRate))}
+      ${_appsKpiCard('✅ Kehadiran', fmtRate(kehadiranRate))}
+    </div>`;
+
+  // 2. Target progress (gabungan target tiap bucket — target sendiri disimpan
+  // per (spv,bucket), bukan per aplikasi, jadi tinggal dijumlah per bucket unik)
+  let targetTotal = 0;
+  buckets.forEach(bk => { targetTotal += (getBucketTarget(spv, bk) || 0); });
+  const targetPct = targetTotal > 0 ? (s.dailyPayment/targetTotal*100) : null;
+  const targetHtml = targetTotal > 0 ? `
+    <div style="margin-bottom:18px">
+      <div style="display:flex;justify-content:space-between;font-size:12px;font-weight:600;margin-bottom:5px">
+        <span>🎯 Target Aplikasi (gabungan seluruh bucket)</span>
+        <span>${fmtRpFull(s.dailyPayment)} / ${fmtRpFull(targetTotal)} (${targetPct.toFixed(1)}%)</span>
+      </div>
+      <div style="height:10px;border-radius:6px;background:var(--surface2);overflow:hidden">
+        <div style="height:100%;width:${Math.min(100,targetPct)}%;background:${targetPct>=100?'#16a34a':targetPct>=70?'#d97706':'#dc2626'}"></div>
+      </div>
+    </div>` : '';
+
+  // 3. Rotasi/pergantian agent (dihitung per bucket+TL, digabung)
+  const appsRotasiInfo = _appsComputeRotasiInfo(rows);
+  const rotasiEntries = Object.keys(appsRotasiInfo).map(ag=>({ag, ...appsRotasiInfo[ag]}));
+  const rotasiBaru = rotasiEntries.filter(r=>r.status==='baru');
+  const rotasiHtml = `
+    <div style="margin-bottom:18px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">🔄 Rotasi/Pergantian Agent (${rotasiBaru.length} pergantian bulan ini)</div>
+      ${rotasiBaru.length ? `<div style="display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto">
+        ${rotasiBaru.map(r=>{
+          const bkOf = (rows.find(x=>x.agent===r.ag)||{}).bucket || '';
+          return `<div style="font-size:11.5px;color:var(--text2);padding:4px 8px;background:var(--surface2);border-radius:6px">
+            <b>${escH(bkOf)}</b>: ${escH(r.lawanFirstName||'')} → ${escH((r.ag||'').split(' ')[0])} <span style="color:var(--text3)">(akun ${escH(r.akun||'-')}${r.changeDate?', '+escH(r.changeDate):''})</span>
+          </div>`;
+        }).join('')}
+      </div>` : `<div style="font-size:11.5px;color:var(--text3)">Tidak ada pergantian agent bulan ini.</div>`}
+    </div>`;
+
+  // 4. Breakdown per bucket
+  const bucketRowsHtml = buckets.map(bk=>{
+    const bkRows = rows.filter(r=>r.bucket===bk);
+    const bs = summarizeRows(bkRows);
+    const bkAgentCount = computeActiveAgentCount(bkRows);
+    const bkTlCount = new Set(bkRows.map(r=>r.teamLeader).filter(Boolean)).size;
+    const bkTarget = getBucketTarget(spv, bk) || 0;
+    const bkPct = bkTarget > 0 ? (bs.dailyPayment/bkTarget*100) : null;
+    return `<tr>
+      <td style="padding:6px 10px;font-weight:600;text-align:left">${escH(bk)}</td>
+      <td style="padding:6px 10px;text-align:right">${fmtRpFull(bs.dailyPayment)}</td>
+      <td style="padding:6px 10px;text-align:center">${bkTlCount}</td>
+      <td style="padding:6px 10px;text-align:center">${bkAgentCount}</td>
+      <td style="padding:6px 10px;text-align:right">${fmtRate(bs.avgRate)}</td>
+      <td style="padding:6px 10px;text-align:right">${bkPct!==null?bkPct.toFixed(1)+'%':'—'}</td>
+    </tr>`;
+  }).join('');
+  const bucketTableHtml = `
+    <div style="margin-bottom:18px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">🗂️ Breakdown per Bucket</div>
+      <div style="overflow:auto">
+      <table style="width:100%;border-collapse:collapse;font-size:11.5px">
+        <thead><tr style="background:var(--surface2)">
+          <th style="padding:6px 10px;text-align:left">Bucket</th>
+          <th style="padding:6px 10px;text-align:right">Payment</th>
+          <th style="padding:6px 10px;text-align:center">TL</th>
+          <th style="padding:6px 10px;text-align:center">Agent</th>
+          <th style="padding:6px 10px;text-align:right">Avg Rate</th>
+          <th style="padding:6px 10px;text-align:right">Target%</th>
+        </tr></thead>
+        <tbody>${bucketRowsHtml}</tbody>
+      </table>
+      </div>
+    </div>`;
+
+  // 5. Top 10 / Bottom 10 performer lintas seluruh bucket aplikasi ini
+  // (exclude agent berstatus 'lama'/sudah digantikan dari ranking)
+  const lamaSet = new Set(rotasiEntries.filter(r=>r.status==='lama').map(r=>r.ag));
+  const byAgent = {};
+  rows.forEach(r=>{ const ag=r.agent||'(?)'; if(!byAgent[ag]) byAgent[ag]=[]; byAgent[ag].push(r); });
+  const agentRanked = Object.keys(byAgent).filter(ag=>!lamaSet.has(ag)).map(ag=>{
+    const rs = summarizeRows(byAgent[ag]);
+    return { ag, bucket: byAgent[ag][0]?.bucket||'', payment: rs.dailyPayment };
+  }).sort((a,b)=>b.payment-a.payment);
+  const top10 = agentRanked.slice(0,10);
+  const bottom10 = agentRanked.slice(-10).reverse();
+  const perfListHtml = (list) => list.length ? list.map((e,i)=>`
+    <div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:11.5px">
+      <span style="width:20px;flex-shrink:0;text-align:center">${i+1}.</span>
+      <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escH(e.ag)}">${escH(e.ag)} <span style="color:var(--text3);font-size:10px">(${escH(e.bucket)})</span></span>
+      <span style="font-weight:700;color:var(--accent);flex-shrink:0">${fmtRp(e.payment)}</span>
+    </div>`).join('') : `<div style="padding:10px;color:var(--text3);font-size:11px">Data tidak cukup</div>`;
+  const perfHtml = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="padding:8px 10px;background:var(--surface2);font-weight:700;font-size:12px">🏆 Top 10 Performer (lintas bucket)</div>
+        ${perfListHtml(top10)}
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden">
+        <div style="padding:8px 10px;background:var(--surface2);font-weight:700;font-size:12px">⚠️ Bottom 10 Performer (lintas bucket)</div>
+        ${perfListHtml(bottom10)}
+      </div>
+    </div>`;
+
+  // 6. Tren payment mingguan app-wide (ringkasan teks — grafik lengkap ada di tab Tren)
+  const wPays = weeklyPayments(rows);
+  const trend = trendLabel(wPays);
+  const trendHtml = `
+    <div style="margin-bottom:18px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:12px">
+      <b>${trend.icon} Tren Payment Mingguan (app-wide)</b>: ${trend.text} — lihat grafik lengkap di tab "📈 Tren".
+    </div>`;
+
+  // 7. Rank Vendor rollup — per bucket dalam aplikasi ini (reuse computeRankInsightObj
+  // yg memang scoped per-bucket, tinggal di-loop & dikumpulkan)
+  const rankRollupItems = buckets.map(bk=>{
+    const bkRows = rows.filter(r=>r.bucket===bk);
+    const insight = computeRankInsightObj(bkRows);
+    if (!insight) return null;
+    return `<div style="font-size:11.5px;padding:5px 8px;border-bottom:1px solid var(--border)"><b>${escH(bk)}</b>: ${insight.text}</div>`;
+  }).filter(Boolean);
+  const rankRollupHtml = `
+    <div style="margin-bottom:18px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">🏆 Rank Vendor per Bucket</div>
+      ${rankRollupItems.length ? rankRollupItems.join('') : `<div style="font-size:11.5px;color:var(--text3)">Data Rank Vendor belum tersedia utk bucket-bucket di aplikasi ini.</div>`}
+    </div>`;
+
+  // 8. vs Bulan Lalu (app-wide) — reuse cache _cmpPrevData yg sama dgn modal
+  // Summary Bucket/Presentasi/AI Kesimpulan, klik "📅 vs Bln Lalu" di atas utk memuat.
+  let cmpHtml = `<div style="font-size:11.5px;color:var(--text3)">Klik "📅 vs Bln Lalu" di atas utk memuat perbandingan dgn bulan sebelumnya.</div>`;
+  if (_cmpPrevData && _cmpPrevData.rows) {
+    const prevRows = _cmpPrevData.rows.filter(r=>{
+      const rSpv = r.supervisor||r.spv||'';
+      return rSpv===spv && (r.aplikasi||'')===(aplikasi||'');
+    });
+    if (prevRows.length) {
+      const prevS = summarizeRows(prevRows);
+      const delta = s.dailyPayment - prevS.dailyPayment;
+      const pct = prevS.dailyPayment>0 ? (delta/prevS.dailyPayment*100) : null;
+      cmpHtml = `<div style="font-size:12px">
+        <b>${escH(_cmpPrevData._bulan)} ${escH(_cmpPrevData._tahun)}</b>: ${fmtRpFull(prevS.dailyPayment)} →
+        <b>Bulan ini</b>: ${fmtRpFull(s.dailyPayment)}
+        <span style="font-weight:700;color:${delta>=0?'#16a34a':'#dc2626'}">(${delta>=0?'+':''}${fmtRpFull(delta)}${pct!==null?`, ${pct>=0?'+':''}${pct.toFixed(1)}%`:''})</span>
+      </div>`;
+    } else {
+      cmpHtml = `<div style="font-size:11.5px;color:var(--text3)">Tidak ada data bulan lalu utk aplikasi ini pada SPV yg sama.</div>`;
+    }
+  }
+  const cmpBlockHtml = `
+    <div style="margin-bottom:4px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:8px">📅 vs Bulan Lalu (app-wide)</div>
+      ${cmpHtml}
+    </div>`;
+
+  box.innerHTML = kpiHtml + targetHtml + rotasiHtml + bucketTableHtml + perfHtml + trendHtml + rankRollupHtml + cmpBlockHtml;
+}
+
+function _appsKpiCard(label, val) {
+  return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+    <div style="font-size:10.5px;color:var(--text3);font-weight:600;margin-bottom:4px">${label}</div>
+    <div style="font-size:16px;font-weight:800;color:var(--text)">${val}</div>
+  </div>`;
+}
+
+async function openAppCmpBulan() {
+  const bulan = document.getElementById('selBulan').value;
+  const tahun = document.getElementById('selTahun').value;
+  await ensurePrevMonthDataCached(bulan, tahun);
+  if (_appsState.tab !== 'ringkasan') setAppsTab('ringkasan');
+  else renderAppsRingkasan();
+}
+
+// ── Tren tab: grafik payment harian gabungan seluruh bucket dalam aplikasi
+// ini (default), atau per-bucket lewat dropdown — pola sama dgn renderBsmChart.
+function _appsInitChartFilter(rows) {
+  const sel = document.getElementById('appsChartFilter');
+  if (!sel) return;
+  const buckets = [...new Set(rows.map(r=>r.bucket).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="total">📊 Total Aplikasi</option>' +
+    '<optgroup label="Per Bucket">' +
+    buckets.map(bk=>`<option value="bucket:${escH(bk)}">🗂️ ${escH(bk)}</option>`).join('') +
+    '</optgroup>';
+}
+
+function setAppsChartType(ctype) {
+  _appsChartType = ctype;
+  document.querySelectorAll('.apps-chart-type-btn').forEach(b => {
+    const isActive = b.dataset.ctype === ctype;
+    b.classList.toggle('active', isActive);
+    b.style.background = isActive ? 'var(--accent)' : 'var(--surface2)';
+    b.style.color = isActive ? '#fff' : 'var(--text2)';
+  });
+  renderAppsTren();
+}
+
+function renderAppsTren() {
+  const { aplikasi, spv } = _appsState;
+  const rows = (spvAgentDataCache[spv]||[]).filter(r=>(r.aplikasi||'')===(aplikasi||''));
+  if (!rows.length) return;
+  const sel = document.getElementById('appsChartFilter');
+  if (sel && !sel.options.length) _appsInitChartFilter(rows);
+  const filterVal = sel ? sel.value : 'total';
+  const allDates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
+  const PALETTE = ['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#6366f1'];
+  let datasets = [];
+
+  if (filterVal === 'total') {
+    const buckets = [...new Set(rows.map(r=>r.bucket).filter(Boolean))].sort();
+    const payByDate = {}; allDates.forEach(d=>payByDate[d]=0);
+    rows.forEach(r => { if (r.tanggal && payByDate.hasOwnProperty(r.tanggal)) payByDate[r.tanggal] += (r.dailyPayment||0); });
+    datasets.push({
+      label: 'Total Aplikasi', data: allDates.map(d=>payByDate[d]),
+      borderColor: PALETTE[0], backgroundColor: _appsChartType==='bar'?PALETTE[0]+'cc':PALETTE[0]+'22',
+      borderWidth: 3, fill: _appsChartType==='line', tension: .3, pointRadius: 4, borderRadius: 3,
+    });
+    buckets.forEach((bk,i) => {
+      const bkRows = rows.filter(r=>r.bucket===bk);
+      const bkPayByDate = {}; allDates.forEach(d=>bkPayByDate[d]=0);
+      bkRows.forEach(r => { if (r.tanggal) bkPayByDate[r.tanggal] = (bkPayByDate[r.tanggal]||0) + (r.dailyPayment||0); });
+      datasets.push({
+        label: bk, data: allDates.map(d=>bkPayByDate[d]||0),
+        borderColor: PALETTE[(i+1)%PALETTE.length], backgroundColor: PALETTE[(i+1)%PALETTE.length]+'22',
+        borderWidth: 1.5, fill: false, tension: .3, pointRadius: 3, borderDash: [4,3],
+      });
+    });
+  } else if (filterVal.startsWith('bucket:')) {
+    const bkName = filterVal.slice(7);
+    const bkRows = rows.filter(r=>r.bucket===bkName);
+    const payByDate = {}; allDates.forEach(d=>payByDate[d]=0);
+    bkRows.forEach(r => { if (r.tanggal) payByDate[r.tanggal] = (payByDate[r.tanggal]||0) + (r.dailyPayment||0); });
+    datasets = [{
+      label: bkName, data: allDates.map(d=>payByDate[d]||0),
+      borderColor: PALETTE[2], backgroundColor: PALETTE[2]+'22',
+      borderWidth: 2, fill: _appsChartType==='line', tension: .3, pointRadius: 4, borderRadius: 3,
+    }];
+  }
+
+  if (_appsPayChart) { _appsPayChart.destroy(); _appsPayChart = null; }
+  const DL = window.ChartDataLabels;
+  const ctx = document.getElementById('appsPayChart');
+  if (!ctx) return;
+  _appsPayChart = new Chart(ctx.getContext('2d'), {
+    type: _appsChartType,
+    plugins: DL ? [DL] : [],
+    data: {
+      labels: allDates.map(d => { const dt=new Date(d); const dn=['Min','Sen','Sel','Rab','Kam','Jum','Sab']; return `${dt.getDate()} (${dn[dt.getDay()]})`; }),
+      datasets,
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: {
+        legend: { display: datasets.length > 1, position: 'bottom', labels: { font:{size:10}, boxWidth:12, padding:8 }},
+        tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label}: Rp ${Math.round(ctx.parsed.y).toLocaleString('id-ID')}` }},
+        ...(DL ? { datalabels: {
+          display: (ctx) => ctx.dataset.data[ctx.dataIndex] > 0,
+          color: _appsChartType === 'bar' ? '#fff' : '#1d60c8',
+          backgroundColor: null, borderRadius: 3, padding: 2,
+          font: { size: 9, weight: 'bold' },
+          anchor: _appsChartType === 'bar' ? 'center' : 'end',
+          align: _appsChartType === 'bar' ? 'center' : 'top',
+          offset: _appsChartType === 'line' ? 4 : 0,
+          formatter: v => v >= 1e6 ? (v/1e6).toFixed(1)+'jt' : v >= 1e3 ? (v/1e3).toFixed(0)+'rb' : Math.round(v),
+          clamp: true,
+        }} : {}),
+      },
+      scales: {
+        x: { ticks:{font:{size:10}}, grid:{display:false} },
+        y: { beginAtZero:true, grace:'10%', ticks:{
+          font:{size:10},
+          callback: v => v >= 1e6 ? (v/1e6).toFixed(1)+'jt' : v >= 1e3 ? (v/1e3).toFixed(0)+'rb' : v
+        }}
+      }
+    }
+  });
+  _fitChartWrap(document.getElementById('appsChartCanvasWrap'), _appsPayChart);
+}
+
+// ── Weekly tab: reuse fungsi generic computeWeeklyAgentRanking/computeWeeklyValueMap/
+// computeWeeklyVersusPairs/_weeklySortLamaBottom/_bsmRotasiBadge/_fmtMetricFull (sudah
+// dipakai di modal Summary Bucket) — bedanya di sini rows-nya gabungan seluruh bucket
+// dalam 1 aplikasi, dan filternya per Bucket (bukan per TL, krn TL hanya scoped ke 1
+// bucket sedangkan di sini cakupannya lintas bucket).
+function _appsPopulateWeeklyBucketTabs(rows) {
+  const wrap = document.getElementById('appsWeeklyBucketWrap');
+  const tabsEl = document.getElementById('appsWeeklyBucketTabs');
+  if (!wrap || !tabsEl) return;
+  _appsState.weeklyBucket = 'all';
+  const buckets = [...new Set(rows.map(r=>r.bucket).filter(Boolean))].sort();
+  if (buckets.length <= 1) { wrap.style.display = 'none'; tabsEl.innerHTML = ''; return; }
+  wrap.style.display = 'flex';
+  tabsEl.innerHTML = '<button class="bsm-weekly-tl-tab active" data-bk="all" onclick="setAppsWeeklyBucket(\'all\')">🗂️ Semua Bucket</button>' +
+    buckets.map(bk=>`<button class="bsm-weekly-tl-tab" data-bk="${escA(bk)}" onclick="setAppsWeeklyBucket('${escA(bk)}')">🗂️ ${escH(bk)}</button>`).join('');
+}
+
+function setAppsWeeklyBucket(bk) {
+  _appsState.weeklyBucket = bk;
+  document.querySelectorAll('#appsWeeklyBucketTabs .bsm-weekly-tl-tab').forEach(b =>
+    b.classList.toggle('active', b.dataset.bk === bk));
+  renderAppsWeekly();
+}
+
+function toggleAppsWeeklyVersus() {
+  _appsState.weeklyVersus = !_appsState.weeklyVersus;
+  const btn = document.getElementById('appsWeeklyVersusBtn');
+  if (btn) {
+    const on = _appsState.weeklyVersus;
+    btn.style.background = on ? 'var(--accent)' : 'var(--surface2)';
+    btn.style.color = on ? '#fff' : 'var(--text2)';
+    btn.style.borderColor = on ? 'var(--accent)' : 'var(--border)';
+  }
+  renderAppsWeekly();
+}
+
+function _renderAppsWeeklyFooterTotals(rows, metricKey, metricDef, weeklyBucket) {
+  const box = document.getElementById('appsFooterWeeklyTotals');
+  if (!box) return;
+  const totals = [1,2,3,4].map(wk => summarizeRows(getWeekRows(rows, wk))[metricKey] || 0);
+  const weekShort = ['Minggu 1','Minggu 2','Minggu 3','Minggu 4'];
+  const bkNote = (weeklyBucket && weeklyBucket !== 'all') ? ` (Bucket: ${escH(weeklyBucket)})` : '';
+  box.innerHTML = `
+    <span style="font-weight:700;color:var(--text2)">📊 Total ${escH(metricDef.label)} per Minggu${bkNote}:</span>
+    ${totals.map((v,i) => `<span><span style="color:var(--text3)">${weekShort[i]}:</span> <b style="color:var(--text)">${_fmtMetricFull(metricDef, v)}</b></span>`).join('<span style="color:var(--border)">·</span>')}
+  `;
+}
+
+function renderAppsWeekly() {
+  const { aplikasi, spv, weeklyBucket, weeklyVersus } = _appsState;
+  const grid = document.getElementById('appsWeeklyGrid');
+  const hint = document.getElementById('appsWeeklyHint');
+  if (!grid) return;
+  const allRows = (spvAgentDataCache[spv]||[]).filter(r=>(r.aplikasi||'')===(aplikasi||''));
+  const rows = (weeklyBucket && weeklyBucket !== 'all') ? allRows.filter(r => r.bucket === weeklyBucket) : allRows;
+
+  // Rotasi dihitung dari SELURUH data aplikasi (bukan yg sudah difilter per-bucket),
+  // per (bucket,TL) — sama pola dgn computeActiveAgentCount/_appsComputeRotasiInfo.
+  const appsRotasiInfo = _appsComputeRotasiInfo(allRows);
+  const isLama = ag => !!(appsRotasiInfo[ag] && appsRotasiInfo[ag].status === 'lama');
+
+  const selEl = document.getElementById('appsWeeklyMetric');
+  const metricKey = selEl ? selEl.value : 'dailyPayment';
+  const metricDef = ALL_METRICS.find(m => m.key === metricKey) || {key:metricKey, label:metricKey, fmt:'num'};
+  const medal = idx => idx===0?'🥇':idx===1?'🥈':idx===2?'🥉':(idx+1)+'.';
+
+  _renderAppsWeeklyFooterTotals(rows, metricKey, metricDef, weeklyBucket);
+
+  const nameCellHtml = (ag) => {
+    const badge = _bsmRotasiBadge(ag, appsRotasiInfo);
+    return `<span style="flex:1;display:flex;align-items:center;overflow:hidden;min-width:0">
+      <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escH(ag)}">${escH(ag)}</span>${badge}
+    </span>`;
+  };
+
+  if (weeklyVersus) {
+    grid.style.gridTemplateColumns = 'repeat(3,minmax(220px,1fr))';
+    if (hint) hint.textContent = 'Mode "Weekly Versus" aktif: tiap minggu dibandingkan dgn minggu sebelumnya, gabungan seluruh bucket dalam aplikasi ini (kecuali difilter per Bucket di atas). Agent Nonaktif/sudah digantikan otomatis ditaruh di bawah & dibikin redup.';
+    const pairLabels = ['Minggu 2 vs Minggu 1', 'Minggu 3 vs Minggu 2', 'Minggu 4 vs Minggu 3'];
+    const pairs = computeWeeklyVersusPairs(rows, metricKey).map(entries => _weeklySortLamaBottom(entries, appsRotasiInfo));
+    grid.innerHTML = pairs.map((entries, i) => {
+      const rowsHtml = entries.length
+        ? entries.map((e, idx) => {
+            const lama = isLama(e.ag);
+            const deltaHtml = e.pct === null
+              ? `<span style="font-size:10px;font-weight:700;color:var(--text3)">Baru</span>`
+              : e.delta === 0
+                ? `<span style="font-size:10px;font-weight:700;color:var(--text3)">tetap</span>`
+                : `<span style="font-size:10px;font-weight:700;color:${e.delta>0?'#16a34a':'#dc2626'}">${e.delta>0?'▲':'▼'} ${fmtMetric(metricDef, Math.abs(e.delta))} (${e.pct>0?'+':''}${e.pct.toFixed(0)}%)</span>`;
+            return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:11.5px;${lama?'opacity:.5':''}">
+              <span style="width:22px;flex-shrink:0;text-align:center">${medal(idx)}</span>
+              ${nameCellHtml(e.ag)}
+              <span style="display:flex;flex-direction:column;align-items:flex-end;flex-shrink:0;gap:1px">
+                <span style="font-weight:700;color:var(--accent)">${fmtMetric(metricDef, e.curr)}</span>
+                ${deltaHtml}
+              </span>
+            </div>`;
+          }).join('')
+        : `<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Tidak ada data</div>`;
+      return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+        <div style="padding:8px 10px;background:var(--surface2);font-weight:700;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
+          <span>🔀 ${pairLabels[i]}</span>
+          <span style="color:var(--text3);font-weight:600">${entries.length} agent</span>
+        </div>
+        <div>${rowsHtml}</div>
+      </div>`;
+    }).join('');
+    return;
+  }
+
+  grid.style.gridTemplateColumns = 'repeat(4,minmax(200px,1fr))';
+  if (hint) hint.textContent = 'Menampilkan seluruh agent gabungan seluruh bucket dalam aplikasi ini — pilih Bucket di atas utk cuma lihat 1 bucket. Pembagian minggu berdasar tanggal (1-7 / 8-14 / 15-21 / 22-28), sama dgn modal Summary Bucket.';
+  const weekLabels = ['Minggu 1 (1-7)','Minggu 2 (8-14)','Minggu 3 (15-21)','Minggu 4 (22-28)'];
+  const weeks = computeWeeklyAgentRanking(rows, metricKey).map(entries => _weeklySortLamaBottom(entries, appsRotasiInfo));
+  grid.innerHTML = weeks.map((entries, i) => {
+    const rowsHtml = entries.length
+      ? entries.map((e, idx) => {
+          const lama = isLama(e.ag);
+          return `<div style="display:flex;align-items:center;gap:6px;padding:5px 8px;border-bottom:1px solid var(--border);font-size:11.5px;${lama?'opacity:.5':''}">
+            <span style="width:22px;flex-shrink:0;text-align:center">${medal(idx)}</span>
+            ${nameCellHtml(e.ag)}
+            <span style="font-weight:700;color:var(--accent);flex-shrink:0">${fmtMetric(metricDef, e.val)}</span>
+          </div>`;
+        }).join('')
+      : `<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">Tidak ada data</div>`;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:8px 10px;background:var(--surface2);font-weight:700;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
+        <span>📅 ${weekLabels[i]}</span>
+        <span style="color:var(--text3);font-weight:600">${entries.length} agent</span>
+      </div>
+      <div>${rowsHtml}</div>
+    </div>`;
+  }).join('');
+}
+
 function trendLabel(wPays){
   // Bandingkan 2 minggu terakhir yang ada data
   const filled=wPays.map((v,i)=>({v,i})).filter(x=>x.v>0);
@@ -7844,6 +9005,7 @@ function setPresRankMetric(sid){
 document.addEventListener('keydown',function(e){
   if(e.key==='Escape'&&document.getElementById('presOverlay').classList.contains('open'))closePresentation();
   if(e.key==='Escape'&&document.getElementById('modalBucketSummary').classList.contains('open'))closeBucketSummary();
+  if(e.key==='Escape'&&document.getElementById('modalAppSummary')?.classList.contains('open'))closeAppSummary();
   if(e.key==='Escape'&&document.getElementById('cmpBulanModal')?.classList.contains('open'))closeCmpBulan();
   if(document.getElementById('presOverlay').classList.contains('open')){
     if(e.key==='ArrowRight')presNavigate(1);
