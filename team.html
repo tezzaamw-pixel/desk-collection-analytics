@@ -886,6 +886,8 @@ select:focus{border-color:var(--accent);}
     <div class="rankm-toolbar">
       <select class="rankm-select" id="rankAplikasiSel" onchange="onRankAplikasiChange()"></select>
       <select class="rankm-select" id="rankBucketSel" onchange="onRankBucketChange()"></select>
+      <select class="rankm-select" id="rankBulanSel" onchange="onRankBulanChange()" title="Filter bulan — default bulan aktif saat ini"></select>
+      <select class="rankm-select" id="rankTahunSel" onchange="onRankTahunChange()" title="Filter tahun"></select>
       <div class="rankm-toggle">
         <button class="rankm-toggle-btn active" data-mode="daily" onclick="setRankMode('daily')">📆 Rank Daily</button>
         <button class="rankm-toggle-btn" data-mode="monthly" onclick="setRankMode('monthly')">🗓 Rank Monthly</button>
@@ -1879,7 +1881,14 @@ async function openRankModal(spv, safeSpvId) {
   const rows = spvAgentDataCache[spv] || [];
   // Dropdown Aplikasi cuma berisi aplikasi yang SPV ini pegang (sesuai halaman yg dibuka)
   const appList = [...new Set(rows.map(r=>r.aplikasi).filter(Boolean))];
-  _rankState = { spv, aplikasi: appList[0]||'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false };
+
+  // Default bulan & tahun = bulan aktif saat ini
+  const now = new Date();
+  const BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const defaultBulan = BULAN_NAMES[now.getMonth()];
+  const defaultTahun = String(now.getFullYear());
+
+  _rankState = { spv, aplikasi: appList[0]||'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false, bulan: defaultBulan, tahun: defaultTahun };
 
   document.getElementById('rankModal').classList.add('open');
   document.getElementById('rankmTitle').textContent = `📈 Rank Vendor — ${spv}`;
@@ -1897,6 +1906,7 @@ async function openRankModal(spv, safeSpvId) {
   document.getElementById('rankmBody').innerHTML = '<div class="rankm-empty"><div class="icon">⏳</div>Memuat data rank...</div>';
 
   await fetchRankData();
+  _rebuildRankBulanTahunOptions();
   onRankAplikasiChange();
 }
 
@@ -1998,10 +2008,103 @@ function onRankBucketChange() {
   renderRankChart();
 }
 
+// ── Rebuild dropdown Bulan & Tahun dari data yang tersedia ────
+const BULAN_NAMES_RANK = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+
+function _rankTanggalToBulanTahun(tanggal) {
+  // tanggal format YYYY-MM-DD
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tanggal||'');
+  if (!m) return null;
+  return { tahun: m[1], bulanIdx: parseInt(m[2],10)-1, bulan: BULAN_NAMES_RANK[parseInt(m[2],10)-1] };
+}
+
+function _rebuildRankBulanTahunOptions() {
+  const dataset = _rankDataset();
+  // Kumpulkan semua bulan+tahun unik dari seluruh data
+  const seen = new Set();
+  const pairs = []; // [{tahun, bulanIdx, bulan}]
+  dataset.forEach(r => {
+    const bt = _rankTanggalToBulanTahun(r.tanggal);
+    if (!bt) return;
+    const key = bt.tahun + '-' + String(bt.bulanIdx+1).padStart(2,'0');
+    if (!seen.has(key)) { seen.add(key); pairs.push(bt); }
+  });
+  // Urutkan: tahun asc, bulan asc
+  pairs.sort((a,b) => a.tahun!==b.tahun ? a.tahun.localeCompare(b.tahun) : a.bulanIdx-b.bulanIdx);
+
+  // Kumpulkan tahun unik
+  const tahuns = [...new Set(pairs.map(p=>p.tahun))].sort();
+
+  const bulanSel = document.getElementById('rankBulanSel');
+  const tahunSel = document.getElementById('rankTahunSel');
+  if (!bulanSel || !tahunSel) return;
+
+  // Populate tahun
+  tahunSel.innerHTML = '<option value="">Semua Tahun</option>' +
+    tahuns.map(t => `<option value="${t}">${t}</option>`).join('');
+
+  // Set tahun ke state (default = tahun aktif jika ada, else semua)
+  const tAvail = tahuns.includes(_rankState.tahun) ? _rankState.tahun : (tahuns[tahuns.length-1]||'');
+  _rankState.tahun = tAvail;
+  tahunSel.value = tAvail;
+
+  // Rebuild bulan berdasarkan tahun terpilih
+  _rebuildRankBulanOptions(pairs);
+}
+
+function _rebuildRankBulanOptions(pairs) {
+  // Ambil ulang pairs dari data jika tidak dikirim
+  if (!pairs) {
+    const dataset = _rankDataset();
+    const seen = new Set();
+    pairs = [];
+    dataset.forEach(r => {
+      const bt = _rankTanggalToBulanTahun(r.tanggal);
+      if (!bt) return;
+      const key = bt.tahun + '-' + String(bt.bulanIdx+1).padStart(2,'0');
+      if (!seen.has(key)) { seen.add(key); pairs.push(bt); }
+    });
+    pairs.sort((a,b) => a.tahun!==b.tahun ? a.tahun.localeCompare(b.tahun) : a.bulanIdx-b.bulanIdx);
+  }
+
+  const bulanSel = document.getElementById('rankBulanSel');
+  if (!bulanSel) return;
+
+  // Filter bulan sesuai tahun yang dipilih (kalau "Semua Tahun" tampilkan semua)
+  const filtPairs = _rankState.tahun
+    ? pairs.filter(p=>p.tahun===_rankState.tahun)
+    : pairs;
+  const bulanList = [...new Map(filtPairs.map(p=>[p.bulanIdx, p.bulan])).entries()]
+    .sort((a,b)=>a[0]-b[0]);
+
+  bulanSel.innerHTML = '<option value="">Semua Bulan</option>' +
+    bulanList.map(([,b]) => `<option value="${b}">${b}</option>`).join('');
+
+  // Set ke bulan state (default = bulan aktif jika ada di list)
+  const bAvail = bulanList.find(([,b])=>b===_rankState.bulan);
+  _rankState.bulan = bAvail ? _rankState.bulan : (bulanList[bulanList.length-1]?.[1]||'');
+  bulanSel.value = _rankState.bulan;
+}
+
+function onRankBulanChange() {
+  _rankState.bulan = document.getElementById('rankBulanSel').value;
+  renderRankChart();
+}
+
+function onRankTahunChange() {
+  _rankState.tahun = document.getElementById('rankTahunSel').value;
+  // Rebuild pilihan bulan sesuai tahun baru, lalu reset bulan ke aktif
+  const now = new Date();
+  _rankState.bulan = BULAN_NAMES_RANK[now.getMonth()];
+  _rebuildRankBulanOptions();
+  renderRankChart();
+}
+
 function setRankMode(mode) {
   _rankState.mode = mode;
   document.querySelectorAll('.rankm-toggle-btn[data-mode]').forEach(b=>b.classList.toggle('active', b.dataset.mode===mode));
   _rebuildRankBucketOptions(true);
+  _rebuildRankBulanTahunOptions();
   renderRankChart();
 }
 
@@ -2073,6 +2176,30 @@ function renderRankChart() {
     return;
   }
 
+  // ── Filter berdasarkan Bulan & Tahun yang dipilih ──────────────────────────
+  // Default: bulan aktif saat ini. Kalau user pilih "Semua" → tampilkan semua.
+  function _rowMatchBulanTahun(r) {
+    if (!r.tanggal) return true; // baris tanpa tanggal (mis. monthly placeholder) selalu lolos
+    const bt = _rankTanggalToBulanTahun(r.tanggal);
+    if (!bt) return true;
+    if (_rankState.tahun && bt.tahun !== _rankState.tahun) return false;
+    if (_rankState.bulan && bt.bulan !== _rankState.bulan) return false;
+    return true;
+  }
+  const filteredBkRows = bkRows.filter(_rowMatchBulanTahun);
+
+  // Kalau filter menghasilkan kosong (mis. bulan ini belum ada data),
+  // tampilkan pesan yang informatif — bukan chart kosong membingungkan.
+  if (!filteredBkRows.length) {
+    const bulanLabel = _rankState.bulan || 'bulan ini';
+    const tahunLabel = _rankState.tahun || '';
+    body.innerHTML = `<div class="rankm-empty"><div class="icon">📅</div><div>Belum ada data Rank untuk <b>${escH(bulanLabel)}${tahunLabel?' '+escH(tahunLabel):''}</b> di bucket ini.<br><span style="font-size:11px;color:var(--text3)">Pilih bulan lain atau pilih "Semua Bulan" untuk lihat seluruh riwayat.</span></div></div>`;
+    return;
+  }
+
+  // Gunakan filteredBkRows untuk build chart
+  const chartBkRows = filteredBkRows;
+
   body.innerHTML = `<div id="rankmChartWrap" data-default-h="400" style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div><div id="rankmLatestSummary"></div>`;
 
   const metric = _rankState.metric;
@@ -2081,13 +2208,13 @@ function renderRankChart() {
   // X-axis: tanggal unik terurut. Kalau tanggal kosong semua (mis. blok Rank Monthly
   // belum diisi tanggalnya krn baru 1 bulan berjalan), fallback 1 kategori "Bulan ini"
   // supaya tetap bisa dibandingkan antar vendor (bar/point tunggal per vendor).
-  const tanggalSet = [...new Set(bkRows.map(r=>r.tanggal).filter(Boolean))].sort();
+  const tanggalSet = [...new Set(chartBkRows.map(r=>r.tanggal).filter(Boolean))].sort();
   const hasTanggal = tanggalSet.length > 0;
   const labels = hasTanggal
     ? tanggalSet.map(_fmtRankDateLabel)
     : ['Bulan ini'];
 
-  const vendors = [...new Set(bkRows.map(r=>r.vendor).filter(Boolean))].sort();
+  const vendors = [...new Set(chartBkRows.map(r=>r.vendor).filter(Boolean))].sort();
   const PALETTE = ['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#6366f1'];
 
   // Metrik "Rank": #1 = TERBAIK, jadi nilainya semakin besar semakin buruk — kebalikan
@@ -2100,14 +2227,14 @@ function renderRankChart() {
   const isRankMetric = metric === 'rank';
   let maxRankVal = 1;
   if (isRankMetric) {
-    const allRanks = bkRows.map(r=>r.rank).filter(v=>v!==null&&v!==undefined&&!isNaN(v));
+    const allRanks = chartBkRows.map(r=>r.rank).filter(v=>v!==null&&v!==undefined&&!isNaN(v));
     maxRankVal = allRanks.length ? Math.max(...allRanks) : 1;
   }
   const toChartVal = raw => (raw===null||raw===undefined||isNaN(raw)) ? null : (isRankMetric ? (maxRankVal+1-raw) : raw);
   const fromChartVal = v => (v===null||v===undefined||isNaN(v)) ? null : (isRankMetric ? (maxRankVal+1-v) : v);
 
   const datasets = vendors.map((vd, i) => {
-    const vRows = bkRows.filter(r=>r.vendor===vd);
+    const vRows = chartBkRows.filter(r=>r.vendor===vd);
     const byTgl = {};
     vRows.forEach(r => { byTgl[r.tanggal||''] = r[metric]; });
     const data = hasTanggal
@@ -2183,7 +2310,7 @@ function renderRankChart() {
   // sendiri TIDAK diubah (biar tetap kayak sebelumnya), tapi kalau titik/garis
   // pada tanggal² tertentu saling numpuk & susah dibaca, angka pastinya tetap
   // bisa dicek dgn jelas di sini (warna dot ngikutin warna garis di chart).
-  _renderRankLatestSummary(bkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric);
+  _renderRankLatestSummary(chartBkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric);
 }
 
 function _renderRankLatestSummary(bkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric) {
