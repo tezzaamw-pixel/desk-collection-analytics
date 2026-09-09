@@ -125,6 +125,23 @@ select:focus{border-color:var(--accent);}
 .rankm-toggle-btn{padding:5px 12px;font-size:11px;font-weight:600;background:var(--surface);color:var(--text2);border:none;cursor:pointer;transition:all .15s;white-space:nowrap;}
 .rankm-toggle-btn.active{background:var(--accent);color:#fff;}
 .rankm-toggle-btn:not(.active):hover{background:var(--surface);opacity:.8;}
+/* Compare button style — warna berbeda supaya beda dari toggle biasa */
+.rankm-cmp-btn{padding:5px 12px;font-size:11px;font-weight:600;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap;}
+.rankm-cmp-btn.active{background:#7c3aed;color:#fff;border-color:#7c3aed;}
+.rankm-cmp-btn:not(.active):hover{border-color:#7c3aed;color:#7c3aed;}
+/* Compare summary table di bawah chart */
+.rankm-cmp-table{width:100%;border-collapse:collapse;font-size:12px;margin-top:14px;}
+.rankm-cmp-table th{padding:7px 10px;background:var(--surface2);color:var(--text3);font-weight:600;border-bottom:1px solid var(--border);text-align:left;font-size:11px;}
+.rankm-cmp-table td{padding:7px 10px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:middle;}
+.rankm-cmp-table tr:last-child td{border-bottom:none;}
+.rankm-cmp-table tr:hover td{background:var(--surface2);}
+.cmp-delta-up{color:#16a34a;font-weight:700;}
+.cmp-delta-down{color:#dc2626;font-weight:700;}
+.cmp-delta-flat{color:var(--text3);font-weight:600;}
+.rankm-cmp-badge{display:inline-block;padding:1px 6px;border-radius:8px;font-size:10px;font-weight:700;margin-left:4px;}
+.rankm-cmp-badge.up{background:#dcfce7;color:#15803d;}
+.rankm-cmp-badge.down{background:#fee2e2;color:#dc2626;}
+.rankm-cmp-note{font-size:11px;color:var(--text3);margin-top:8px;padding:8px 10px;background:var(--surface2);border-radius:var(--radius-sm);line-height:1.6;}
 .rankm-metric-tabs{display:flex;gap:6px;flex-wrap:wrap;}
 .rankm-metric-tab{padding:5px 14px;font-size:11px;font-weight:600;border-radius:20px;cursor:pointer;border:1px solid var(--border);background:var(--surface);color:var(--text2);white-space:nowrap;transition:all .15s;}
 .rankm-metric-tab.active{background:var(--accent);color:#fff;border-color:var(--accent);}
@@ -886,12 +903,13 @@ select:focus{border-color:var(--accent);}
     <div class="rankm-toolbar">
       <select class="rankm-select" id="rankAplikasiSel" onchange="onRankAplikasiChange()"></select>
       <select class="rankm-select" id="rankBucketSel" onchange="onRankBucketChange()"></select>
-      <select class="rankm-select" id="rankBulanSel" onchange="onRankBulanChange()" title="Filter bulan — default bulan aktif saat ini"></select>
-      <select class="rankm-select" id="rankTahunSel" onchange="onRankTahunChange()" title="Filter tahun"></select>
+      <select class="rankm-select" id="rankBulanSel" onchange="onRankBulanChange()" title="Filter bulan — default bulan aktif saat ini" style="min-width:110px"></select>
+      <select class="rankm-select" id="rankTahunSel" onchange="onRankTahunChange()" title="Filter tahun" style="min-width:76px"></select>
       <div class="rankm-toggle">
         <button class="rankm-toggle-btn active" data-mode="daily" onclick="setRankMode('daily')">📆 Rank Daily</button>
         <button class="rankm-toggle-btn" data-mode="monthly" onclick="setRankMode('monthly')">🗓 Rank Monthly</button>
       </div>
+      <button class="rankm-cmp-btn" id="rankCmpBtn" onclick="toggleRankCompare()" title="Bandingkan bulan ini vs bulan lalu untuk semua metrik (OS, Payment, Rate, Rank, Gap)">⚖ Compare Bulan</button>
       <button class="rankm-toggle-btn" id="rankLabelsBtn" onclick="toggleRankLabels()" style="border:1px solid var(--border);border-radius:var(--radius-sm);margin-left:auto" title="Tampilkan/sembunyikan angka nilai di tiap titik/bar">🔢 Tampilkan Angka</button>
       <div class="rankm-toggle">
         <button class="rankm-toggle-btn active" data-ctype="line" onclick="setRankChartType('line')">📈 Line</button>
@@ -1807,7 +1825,7 @@ function toggleCmpbFullscreen() {
 // Aplikasi+Bucket+Vendor, bukan per-SPV.
 let _rankDataCache = null;      // {daily:[...], monthly:[...]} — hasil action=rankdata
 let _rankChartInstance = null;
-let _rankState = { spv:'', aplikasi:'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false };
+let _rankState = { spv:'', aplikasi:'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false, bulan:'', tahun:'', compare:false };
 
 const RANK_METRIC_META = {
   os:      {label:'OS',      fmt:'rp'},
@@ -1883,12 +1901,12 @@ async function openRankModal(spv, safeSpvId) {
   const appList = [...new Set(rows.map(r=>r.aplikasi).filter(Boolean))];
 
   // Default bulan & tahun = bulan aktif saat ini
-  const now = new Date();
-  const BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
-  const defaultBulan = BULAN_NAMES[now.getMonth()];
-  const defaultTahun = String(now.getFullYear());
+  const _now = new Date();
+  const _BULAN = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const defaultBulan = _BULAN[_now.getMonth()];
+  const defaultTahun = String(_now.getFullYear());
 
-  _rankState = { spv, aplikasi: appList[0]||'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false, bulan: defaultBulan, tahun: defaultTahun };
+  _rankState = { spv, aplikasi: appList[0]||'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false, bulan: defaultBulan, tahun: defaultTahun, compare: false };
 
   document.getElementById('rankModal').classList.add('open');
   document.getElementById('rankmTitle').textContent = `📈 Rank Vendor — ${spv}`;
@@ -1897,6 +1915,8 @@ async function openRankModal(spv, safeSpvId) {
   document.querySelectorAll('.rankm-metric-tab').forEach(b=>b.classList.toggle('active', b.dataset.metric==='payment'));
   const labelsBtn = document.getElementById('rankLabelsBtn');
   if (labelsBtn) labelsBtn.classList.remove('active');
+  const cmpBtn = document.getElementById('rankCmpBtn');
+  if (cmpBtn) cmpBtn.classList.remove('active');
 
   const aplikasiSel = document.getElementById('rankAplikasiSel');
   aplikasiSel.innerHTML = appList.length
@@ -2008,79 +2028,61 @@ function onRankBucketChange() {
   renderRankChart();
 }
 
-// ── Rebuild dropdown Bulan & Tahun dari data yang tersedia ────
-const BULAN_NAMES_RANK = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+// ─────────────────────────────────────────────────────────────
+// FILTER BULAN & TAHUN
+// ─────────────────────────────────────────────────────────────
+const _BULAN_NAMES = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 
-function _rankTanggalToBulanTahun(tanggal) {
-  // tanggal format YYYY-MM-DD
-  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(tanggal||'');
+function _rankParseTanggal(t) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t||'');
   if (!m) return null;
-  return { tahun: m[1], bulanIdx: parseInt(m[2],10)-1, bulan: BULAN_NAMES_RANK[parseInt(m[2],10)-1] };
+  return { tahun: m[1], bulanIdx: parseInt(m[2],10)-1, bulan: _BULAN_NAMES[parseInt(m[2],10)-1] };
 }
 
 function _rebuildRankBulanTahunOptions() {
   const dataset = _rankDataset();
-  // Kumpulkan semua bulan+tahun unik dari seluruh data
-  const seen = new Set();
-  const pairs = []; // [{tahun, bulanIdx, bulan}]
+  const seen = new Set(); const pairs = [];
   dataset.forEach(r => {
-    const bt = _rankTanggalToBulanTahun(r.tanggal);
+    const bt = _rankParseTanggal(r.tanggal);
     if (!bt) return;
-    const key = bt.tahun + '-' + String(bt.bulanIdx+1).padStart(2,'0');
+    const key = bt.tahun+'-'+String(bt.bulanIdx+1).padStart(2,'0');
     if (!seen.has(key)) { seen.add(key); pairs.push(bt); }
   });
-  // Urutkan: tahun asc, bulan asc
   pairs.sort((a,b) => a.tahun!==b.tahun ? a.tahun.localeCompare(b.tahun) : a.bulanIdx-b.bulanIdx);
 
-  // Kumpulkan tahun unik
   const tahuns = [...new Set(pairs.map(p=>p.tahun))].sort();
-
-  const bulanSel = document.getElementById('rankBulanSel');
   const tahunSel = document.getElementById('rankTahunSel');
-  if (!bulanSel || !tahunSel) return;
-
-  // Populate tahun
+  if (!tahunSel) return;
   tahunSel.innerHTML = '<option value="">Semua Tahun</option>' +
-    tahuns.map(t => `<option value="${t}">${t}</option>`).join('');
+    tahuns.map(t=>`<option value="${t}">${t}</option>`).join('');
 
-  // Set tahun ke state (default = tahun aktif jika ada, else semua)
   const tAvail = tahuns.includes(_rankState.tahun) ? _rankState.tahun : (tahuns[tahuns.length-1]||'');
   _rankState.tahun = tAvail;
   tahunSel.value = tAvail;
 
-  // Rebuild bulan berdasarkan tahun terpilih
   _rebuildRankBulanOptions(pairs);
 }
 
 function _rebuildRankBulanOptions(pairs) {
-  // Ambil ulang pairs dari data jika tidak dikirim
   if (!pairs) {
     const dataset = _rankDataset();
-    const seen = new Set();
-    pairs = [];
+    const seen = new Set(); pairs = [];
     dataset.forEach(r => {
-      const bt = _rankTanggalToBulanTahun(r.tanggal);
+      const bt = _rankParseTanggal(r.tanggal);
       if (!bt) return;
-      const key = bt.tahun + '-' + String(bt.bulanIdx+1).padStart(2,'0');
+      const key = bt.tahun+'-'+String(bt.bulanIdx+1).padStart(2,'0');
       if (!seen.has(key)) { seen.add(key); pairs.push(bt); }
     });
     pairs.sort((a,b) => a.tahun!==b.tahun ? a.tahun.localeCompare(b.tahun) : a.bulanIdx-b.bulanIdx);
   }
-
   const bulanSel = document.getElementById('rankBulanSel');
   if (!bulanSel) return;
-
-  // Filter bulan sesuai tahun yang dipilih (kalau "Semua Tahun" tampilkan semua)
-  const filtPairs = _rankState.tahun
-    ? pairs.filter(p=>p.tahun===_rankState.tahun)
-    : pairs;
-  const bulanList = [...new Map(filtPairs.map(p=>[p.bulanIdx, p.bulan])).entries()]
-    .sort((a,b)=>a[0]-b[0]);
+  const filtPairs = _rankState.tahun ? pairs.filter(p=>p.tahun===_rankState.tahun) : pairs;
+  const bulanList = [...new Map(filtPairs.map(p=>[p.bulanIdx, p.bulan])).entries()].sort((a,b)=>a[0]-b[0]);
 
   bulanSel.innerHTML = '<option value="">Semua Bulan</option>' +
-    bulanList.map(([,b]) => `<option value="${b}">${b}</option>`).join('');
+    bulanList.map(([,b])=>`<option value="${b}">${b}</option>`).join('');
 
-  // Set ke bulan state (default = bulan aktif jika ada di list)
   const bAvail = bulanList.find(([,b])=>b===_rankState.bulan);
   _rankState.bulan = bAvail ? _rankState.bulan : (bulanList[bulanList.length-1]?.[1]||'');
   bulanSel.value = _rankState.bulan;
@@ -2093,11 +2095,169 @@ function onRankBulanChange() {
 
 function onRankTahunChange() {
   _rankState.tahun = document.getElementById('rankTahunSel').value;
-  // Rebuild pilihan bulan sesuai tahun baru, lalu reset bulan ke aktif
   const now = new Date();
-  _rankState.bulan = BULAN_NAMES_RANK[now.getMonth()];
+  _rankState.bulan = _BULAN_NAMES[now.getMonth()];
   _rebuildRankBulanOptions();
   renderRankChart();
+}
+
+// Ambil bulan sebelumnya dari bulan yang sedang aktif
+function _rankGetPrevBulan() {
+  const curIdx = _BULAN_NAMES.indexOf(_rankState.bulan);
+  if (curIdx < 0) return null; // "Semua Bulan" — tidak ada prev
+  if (curIdx === 0) {
+    // Januari → Desember tahun sebelumnya
+    const prevTahun = _rankState.tahun ? String(parseInt(_rankState.tahun,10)-1) : null;
+    return { bulan: _BULAN_NAMES[11], tahun: prevTahun };
+  }
+  return { bulan: _BULAN_NAMES[curIdx-1], tahun: _rankState.tahun };
+}
+
+// Filter bkRows berdasarkan bulan+tahun
+function _filterRankRows(rows, bulan, tahun) {
+  return rows.filter(r => {
+    if (!r.tanggal) return !bulan; // baris tanpa tanggal lolos hanya kalau semua bulan
+    const bt = _rankParseTanggal(r.tanggal);
+    if (!bt) return true;
+    if (tahun && bt.tahun !== tahun) return false;
+    if (bulan && bt.bulan !== bulan) return false;
+    return true;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────
+// COMPARE MODE
+// ─────────────────────────────────────────────────────────────
+function toggleRankCompare() {
+  _rankState.compare = !_rankState.compare;
+  const btn = document.getElementById('rankCmpBtn');
+  if (btn) btn.classList.toggle('active', _rankState.compare);
+  renderRankChart();
+}
+
+// Render tabel compare bulan ini vs bulan lalu untuk semua metrik
+function _renderRankCompareTable(bkRows, vendors, PALETTE) {
+  const box = document.getElementById('rankmLatestSummary');
+  if (!box) return;
+
+  const prev = _rankGetPrevBulan();
+  if (!prev) {
+    box.innerHTML = `<div class="rankm-cmp-note">⚠️ Pilih bulan tertentu (bukan "Semua Bulan") untuk menggunakan fitur Compare.</div>`;
+    return;
+  }
+
+  const curBulan  = _rankState.bulan;
+  const curTahun  = _rankState.tahun;
+  const prevBulan = prev.bulan;
+  const prevTahun = prev.tahun;
+
+  const curRows  = _filterRankRows(bkRows, curBulan, curTahun);
+  const prevRows = _filterRankRows(bkRows, prevBulan, prevTahun);
+
+  if (!prevRows.length) {
+    box.innerHTML = `<div class="rankm-cmp-note">📅 Tidak ada data untuk <b>${escH(prevBulan)}${prevTahun?' '+escH(prevTahun):''}</b> — tidak bisa membandingkan. Pastikan data bulan lalu sudah diinput di sheet DATA RANK.</div>`;
+    return;
+  }
+
+  // Hitung nilai akhir tiap vendor per bulan (ambil nilai dari tanggal TERAKHIR yang ada)
+  function getLastVal(rows, vendor, metric) {
+    const vRows = rows.filter(r=>r.vendor===vendor && r.tanggal);
+    if (!vRows.length) {
+      // Fallback: kalau tidak ada tanggal (monthly), ambil baris pertama
+      const fb = rows.find(r=>r.vendor===vendor);
+      return fb ? (fb[metric]??null) : null;
+    }
+    vRows.sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+    const last = vRows[vRows.length-1];
+    return last[metric]??null;
+  }
+
+  // Untuk metrik rank: lebih kecil = lebih baik (naik rank = angka turun)
+  // Untuk metrik lain: lebih besar = lebih baik
+  const metrics = [
+    {key:'payment', label:'Payment',  fmt:'rp',   higherBetter:true},
+    {key:'os',      label:'OS',       fmt:'rp',   higherBetter:true},
+    {key:'rate',    label:'Rate',     fmt:'rate', higherBetter:true},
+    {key:'rank',    label:'Rank',     fmt:'rank', higherBetter:false},
+    {key:'gap',     label:'Gap ke #1',fmt:'num',  higherBetter:true},
+  ];
+
+  const curLabel  = `${curBulan}${curTahun?' '+curTahun:''}`;
+  const prevLabel = `${prevBulan}${prevTahun?' '+prevTahun:''}`;
+
+  let html = `
+    <div style="margin-top:16px;padding-top:14px;border-top:2px solid var(--border)">
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px">
+        ⚖ Perbandingan <span style="color:var(--accent)">${escH(curLabel)}</span> vs <span style="color:var(--text3)">${escH(prevLabel)}</span>
+        <span style="font-size:10px;font-weight:400;color:var(--text3)">— nilai akhir (tanggal terbaru) tiap bulan per vendor</span>
+      </div>`;
+
+  metrics.forEach(m => {
+    const rows_cur  = curRows;
+    const rows_prev = prevRows;
+    const vendorRows = vendors.map((vd, i) => {
+      const vCur  = getLastVal(rows_cur,  vd, m.key);
+      const vPrev = getLastVal(rows_prev, vd, m.key);
+      return { vendor: vd, cur: vCur, prev: vPrev, color: PALETTE[i%PALETTE.length] };
+    }).filter(x => x.cur!==null||x.prev!==null);
+
+    if (!vendorRows.length) return;
+
+    // Sort: rank → kecil dulu; lainnya → besar dulu
+    vendorRows.sort((a,b) => {
+      const va = a.cur??a.prev??0, vb = b.cur??b.prev??0;
+      return m.higherBetter ? vb-va : va-vb;
+    });
+
+    html += `
+      <div style="margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;padding:4px 0;border-bottom:1px solid var(--border)">
+          ${escH(m.label)}
+        </div>
+        <table class="rankm-cmp-table">
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>${escH(prevLabel)}</th>
+              <th>${escH(curLabel)}</th>
+              <th>Selisih</th>
+              <th>Δ%</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${vendorRows.map(v => {
+              const hasCur  = v.cur!==null&&v.cur!==undefined&&!isNaN(v.cur);
+              const hasPrev = v.prev!==null&&v.prev!==undefined&&!isNaN(v.prev);
+              const delta   = hasCur && hasPrev ? v.cur - v.prev : null;
+              const deltaPct= hasPrev && v.prev!==0 ? (delta/Math.abs(v.prev)*100) : null;
+              // Apakah ini perbaikan? Tergantung higherBetter
+              const improved = delta===null ? null : (m.higherBetter ? delta>0 : delta<0);
+              const deltaStr = delta===null ? '—'
+                : (delta>0?'+':'')+_fmtRankVal(delta, m.fmt, false);
+              const pctStr = deltaPct===null ? '—'
+                : (deltaPct>0?'+':'')+deltaPct.toFixed(1)+'%';
+              const cls = delta===null||delta===0 ? 'cmp-delta-flat'
+                : improved ? 'cmp-delta-up' : 'cmp-delta-down';
+              const badge = delta===null||delta===0 ? ''
+                : `<span class="rankm-cmp-badge ${improved?'up':'down'}">${improved?'▲':'▼'}</span>`;
+              return `<tr>
+                <td style="font-weight:600;display:flex;align-items:center;gap:5px">
+                  <span style="width:8px;height:8px;border-radius:50%;background:${v.color};flex-shrink:0;display:inline-block"></span>
+                  ${escH(v.vendor)}
+                </td>
+                <td style="color:var(--text3)">${hasPrev?_fmtRankVal(v.prev,m.fmt,false):'—'}</td>
+                <td style="font-weight:600">${hasCur?_fmtRankVal(v.cur,m.fmt,false):'—'}</td>
+                <td class="${cls}">${deltaStr}${badge}</td>
+                <td class="${cls}">${pctStr}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>`;
+  });
+
+  html += `<div class="rankm-cmp-note">ℹ️ Nilai yang dibandingkan adalah data dari <b>tanggal terakhir</b> yang tersedia di masing-masing bulan (bukan akumulasi). Untuk melihat tren harian, matikan tombol Compare dan lihat chart di atas.</div></div>`;
+  box.innerHTML = html;
 }
 
 function setRankMode(mode) {
@@ -2158,7 +2318,9 @@ function renderRankChart() {
   const body = document.getElementById('rankmBody');
   if (_rankChartInstance) { try{_rankChartInstance.destroy();}catch(e){} _rankChartInstance = null; }
 
-  const titleBits = [_rankState.spv, _rankState.aplikasi, _rankState.bucket].filter(Boolean);
+  const bulanLabel = _rankState.bulan || '';
+  const tahunLabel = _rankState.tahun || '';
+  const titleBits = [_rankState.spv, _rankState.aplikasi, _rankState.bucket, bulanLabel, tahunLabel].filter(Boolean);
   document.getElementById('rankmTitle').textContent = `📈 Rank Vendor — ${titleBits.join(' · ')}`;
 
   const apLow = (_rankState.aplikasi||'').toLowerCase();
@@ -2176,54 +2338,33 @@ function renderRankChart() {
     return;
   }
 
-  // ── Filter berdasarkan Bulan & Tahun yang dipilih ──────────────────────────
-  // Default: bulan aktif saat ini. Kalau user pilih "Semua" → tampilkan semua.
-  function _rowMatchBulanTahun(r) {
-    if (!r.tanggal) return true; // baris tanpa tanggal (mis. monthly placeholder) selalu lolos
-    const bt = _rankTanggalToBulanTahun(r.tanggal);
-    if (!bt) return true;
-    if (_rankState.tahun && bt.tahun !== _rankState.tahun) return false;
-    if (_rankState.bulan && bt.bulan !== _rankState.bulan) return false;
-    return true;
-  }
-  const filteredBkRows = bkRows.filter(_rowMatchBulanTahun);
+  // ── Filter berdasarkan Bulan & Tahun yang dipilih ──────────
+  const chartBkRows = _filterRankRows(bkRows, _rankState.bulan, _rankState.tahun);
 
-  // Kalau filter menghasilkan kosong (mis. bulan ini belum ada data),
-  // tampilkan pesan yang informatif — bukan chart kosong membingungkan.
-  if (!filteredBkRows.length) {
-    const bulanLabel = _rankState.bulan || 'bulan ini';
-    const tahunLabel = _rankState.tahun || '';
-    body.innerHTML = `<div class="rankm-empty"><div class="icon">📅</div><div>Belum ada data Rank untuk <b>${escH(bulanLabel)}${tahunLabel?' '+escH(tahunLabel):''}</b> di bucket ini.<br><span style="font-size:11px;color:var(--text3)">Pilih bulan lain atau pilih "Semua Bulan" untuk lihat seluruh riwayat.</span></div></div>`;
+  if (!chartBkRows.length) {
+    const lbl = [bulanLabel, tahunLabel].filter(Boolean).join(' ') || 'periode ini';
+    body.innerHTML = `<div class="rankm-empty"><div class="icon">📅</div><div>Belum ada data Rank untuk <b>${escH(lbl)}</b> di bucket ini.<br><span style="font-size:11px;color:var(--text3)">Pilih bulan lain atau "Semua Bulan" untuk lihat seluruh riwayat.</span></div></div>`;
     return;
   }
 
-  // Gunakan filteredBkRows untuk build chart
-  const chartBkRows = filteredBkRows;
+  const vendors = [...new Set(bkRows.map(r=>r.vendor).filter(Boolean))].sort();
+  const PALETTE = ['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#6366f1'];
 
+  // ── Compare mode: tampilkan tabel perbandingan, chart tetap jalan ──
   body.innerHTML = `<div id="rankmChartWrap" data-default-h="400" style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div><div id="rankmLatestSummary"></div>`;
 
   const metric = _rankState.metric;
   const meta = RANK_METRIC_META[metric];
 
-  // X-axis: tanggal unik terurut. Kalau tanggal kosong semua (mis. blok Rank Monthly
-  // belum diisi tanggalnya krn baru 1 bulan berjalan), fallback 1 kategori "Bulan ini"
-  // supaya tetap bisa dibandingkan antar vendor (bar/point tunggal per vendor).
+
+  // X-axis dari chartBkRows (data yang sudah difilter bulan/tahun)
   const tanggalSet = [...new Set(chartBkRows.map(r=>r.tanggal).filter(Boolean))].sort();
   const hasTanggal = tanggalSet.length > 0;
   const labels = hasTanggal
     ? tanggalSet.map(_fmtRankDateLabel)
     : ['Bulan ini'];
 
-  const vendors = [...new Set(chartBkRows.map(r=>r.vendor).filter(Boolean))].sort();
-  const PALETTE = ['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#6366f1'];
-
-  // Metrik "Rank": #1 = TERBAIK, jadi nilainya semakin besar semakin buruk — kebalikan
-  // dari kebiasaan chart (nilai besar biasanya "bagus"/di atas/bar tinggi). Dulu ini
-  // "diakalin" dengan reverse:true di axis, tapi itu bikin bar chart menggantung dari
-  // ATAS ke bawah (base bar Chart.js tetap di 0/scale-min, cuma tampilan axis yang
-  // dibalik — jadi bar-nya salah arah). Solusinya: balik NILAI DATA-nya sendiri
-  // (bukan axis), supaya bar tetap tumbuh dari bawah seperti biasa, lalu balik lagi
-  // pas ditampilkan (tooltip/tick/label) supaya tetap kebaca sebagai "#1, #2, ...".
+  // Metrik "Rank": #1 = TERBAIK → balik nilai supaya chart tetap tumbuh dari bawah
   const isRankMetric = metric === 'rank';
   let maxRankVal = 1;
   if (isRankMetric) {
@@ -2242,9 +2383,7 @@ function renderRankChart() {
       : [toChartVal(vRows[0]?.[metric] ?? null)];
     const color = PALETTE[i % PALETTE.length];
     return {
-      label: vd,
-      data,
-      borderColor: color,
+      label: vd, data, borderColor: color,
       backgroundColor: _rankState.chartType==='bar' ? color+'cc' : color+'22',
       borderWidth: 2, fill: false, tension: .3, pointRadius: 3, spanGaps: true,
     };
@@ -2267,51 +2406,30 @@ function renderRankChart() {
         ...(DL ? { datalabels: {
           display: (dctx) => _rankState.showLabels && dctx.dataset.data[dctx.dataIndex] !== null && dctx.dataset.data[dctx.dataIndex] !== undefined,
           color: isBar ? '#fff' : (dctx) => dctx.dataset.borderColor,
-          backgroundColor: null,
-          borderRadius: 3, padding: 2,
+          backgroundColor: null, borderRadius: 3, padding: 2,
           font: { size: 9, weight: 'bold' },
-          anchor: isBar ? 'center' : 'end',
-          align: isBar ? 'center' : 'top',
-          offset: isBar ? 0 : 4,
+          anchor: isBar ? 'center' : 'end', align: isBar ? 'center' : 'top', offset: isBar ? 0 : 4,
           formatter: v => _fmtRankVal(fromChartVal(v), meta.fmt, true),
           clamp: true,
         }} : {}),
       },
       scales: {
         x: { ticks:{font:{size:10}}, grid:{display:false} },
-        y: {
-          // SELALU mulai dari 0 (termasuk utk metrik Rank). Sebelumnya Rank pakai
-          // beginAtZero:false, jadi axis-min auto-scale ke nilai chart terkecil yang
-          // tampil (mis. 1) — akibatnya vendor rank TERBURUK (yg nilai chart-nya jadi
-          // paling kecil setelah dibalik) punya tinggi bar 0 karena base bar = axis-min
-          // = nilainya sendiri, jadi keliatan "hilang" padahal datanya ada.
-          beginAtZero: true,
-          // BUG FIX: titik/bar rank #1 (nilai chart = maxRankVal, paling tinggi)
-          // duduk PERSIS di batas atas axis (krn axis-max auto-scale = nilai
-          // tertinggi itu sendiri) — akibatnya angka "#1" yg dilabel di ATAS titik
-          // (align:'top', offset:4) kepotong/hilang krn keluar dari area chart.
-          // Sama juga bisa kejadian di batas BAWAH utk metrik Gap yg nilainya bisa
-          // minus. `grace` nambahin ruang kosong ekstra di atas & bawah axis (di
-          // luar dari min/max data asli) supaya titik & labelnya selalu ada spasi,
-          // gak pernah nempel/kepotong di tepi chart.
-          grace: '10%',
-          ticks: { font:{size:10}, callback: v => _fmtRankVal(fromChartVal(v), meta.fmt, true) }
-        }
+        y: { beginAtZero: true, grace: '10%', ticks: { font:{size:10}, callback: v => _fmtRankVal(fromChartVal(v), meta.fmt, true) } }
       }
     }
   });
 
-  // Chart baru dibuat dgn wrapper height DEFAULT (400px) — kalau modal lagi
-  // fullscreen (mis. user ganti metric/mode/bucket selagi fullscreen), langsung
-  // sesuaikan lagi ke ukuran layar penuh, bukan balik ke 400px.
   _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
 
-  // Ringkasan "Nilai Terbaru" per vendor di bawah chart — garis di chart-nya
-  // sendiri TIDAK diubah (biar tetap kayak sebelumnya), tapi kalau titik/garis
-  // pada tanggal² tertentu saling numpuk & susah dibaca, angka pastinya tetap
-  // bisa dicek dgn jelas di sini (warna dot ngikutin warna garis di chart).
-  _renderRankLatestSummary(chartBkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric);
+  // ── Bawah chart: Compare (semua metrik) atau ringkasan nilai terbaru ──
+  if (_rankState.compare) {
+    _renderRankCompareTable(bkRows, vendors, PALETTE);
+  } else {
+    _renderRankLatestSummary(chartBkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric);
+  }
 }
+
 
 function _renderRankLatestSummary(bkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric) {
   const box = document.getElementById('rankmLatestSummary');
