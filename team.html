@@ -1825,6 +1825,7 @@ function toggleCmpbFullscreen() {
 // Aplikasi+Bucket+Vendor, bukan per-SPV.
 let _rankDataCache = null;      // {daily:[...], monthly:[...]} — hasil action=rankdata
 let _rankChartInstance = null;
+let _rankChartInstancePrev = null; // chart kiri (bulan lalu) saat compare mode aktif
 let _rankState = { spv:'', aplikasi:'', bucket:'', mode:'daily', metric:'payment', chartType:'line', showLabels:false, bulan:'', tahun:'', compare:false };
 
 const RANK_METRIC_META = {
@@ -1939,6 +1940,7 @@ function closeRankModal() {
   if (btn) { btn.textContent = '⛶'; btn.title = 'Fullscreen'; }
   overlay.classList.remove('open');
   if (_rankChartInstance) { try{_rankChartInstance.destroy();}catch(e){} _rankChartInstance = null; }
+  if (_rankChartInstancePrev) { try{_rankChartInstancePrev.destroy();}catch(e){} _rankChartInstancePrev = null; }
 }
 
 // ── FIT CANVAS WRAP KE MODAL (dipakai bareng oleh chart Rank Vendor & chart di
@@ -1975,6 +1977,9 @@ window.addEventListener('resize', () => {
   _fitChartWrapResizeT = setTimeout(() => {
     if (document.querySelector('#rankModal .rankm-box.fullscreen')) {
       _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
+      if (_rankChartInstancePrev) {
+        _fitChartWrap(document.getElementById('rankmChartWrapPrev'), _rankChartInstancePrev);
+      }
     }
     if (document.querySelector('#modalBucketSummary .bsm-modal.fullscreen')) {
       _fitChartWrap(document.getElementById('bsmChartCanvasWrap'), _bsmPayChart);
@@ -1993,9 +1998,12 @@ function toggleRankmFullscreen() {
   overlay.classList.toggle('fullscreen-mode', isFs);
   btn.textContent = isFs ? '⊠' : '⛶';
   btn.title = isFs ? 'Keluar Fullscreen' : 'Fullscreen';
-  // Kasih waktu 1 frame biar layout fullscreen (width/height box) kelar re-flow
-  // dulu sebelum kita ukur ruang yang tersedia utk chart.
-  requestAnimationFrame(() => _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance));
+  requestAnimationFrame(() => {
+    _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
+    if (_rankChartInstancePrev) {
+      _fitChartWrap(document.getElementById('rankmChartWrapPrev'), _rankChartInstancePrev);
+    }
+  });
 }
 
 function _rankDataset() {
@@ -2317,6 +2325,7 @@ function _fmtRankVal(v, fmt, short) {
 function renderRankChart() {
   const body = document.getElementById('rankmBody');
   if (_rankChartInstance) { try{_rankChartInstance.destroy();}catch(e){} _rankChartInstance = null; }
+  if (_rankChartInstancePrev) { try{_rankChartInstancePrev.destroy();}catch(e){} _rankChartInstancePrev = null; }
 
   const bulanLabel = _rankState.bulan || '';
   const tahunLabel = _rankState.tahun || '';
@@ -2338,7 +2347,6 @@ function renderRankChart() {
     return;
   }
 
-  // ── Filter berdasarkan Bulan & Tahun yang dipilih ──────────
   const chartBkRows = _filterRankRows(bkRows, _rankState.bulan, _rankState.tahun);
 
   if (!chartBkRows.length) {
@@ -2349,85 +2357,153 @@ function renderRankChart() {
 
   const vendors = [...new Set(bkRows.map(r=>r.vendor).filter(Boolean))].sort();
   const PALETTE = ['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#6366f1'];
+  const metric  = _rankState.metric;
+  const meta    = RANK_METRIC_META[metric];
+  const isBar   = _rankState.chartType === 'bar';
+  const DL      = window.ChartDataLabels;
 
-  // ── Compare mode: tampilkan tabel perbandingan, chart tetap jalan ──
+  // Helper: hitung maxRank dari kumpulan rows tertentu
+  function _calcMaxRank(rows) {
+    const all = rows.map(r=>r.rank).filter(v=>v!=null&&!isNaN(v));
+    return all.length ? Math.max(...all) : 1;
+  }
+  const isRankMetric = metric === 'rank';
+
+  // Helper: buat satu Chart.js instance dari rows + canvasId
+  function _makeRankChart(canvasId, rows, maxRankOverride) {
+    const maxRankVal = maxRankOverride ?? (isRankMetric ? _calcMaxRank(rows) : 1);
+    const toV  = raw => (raw==null||isNaN(raw)) ? null : (isRankMetric ? maxRankVal+1-raw : raw);
+    const fromV = v  => (v==null||isNaN(v))    ? null : (isRankMetric ? maxRankVal+1-v   : v);
+    const tglSet = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
+    const hasTgl = tglSet.length > 0;
+    const lbls   = hasTgl ? tglSet.map(_fmtRankDateLabel) : ['(tidak ada data)'];
+    const ds = vendors.map((vd,i) => {
+      const vRows = rows.filter(r=>r.vendor===vd);
+      const byTgl = {};
+      vRows.forEach(r => { byTgl[r.tanggal||''] = r[metric]; });
+      const data = hasTgl
+        ? tglSet.map(t => toV(byTgl[t]===undefined ? null : byTgl[t]))
+        : [toV(vRows[0]?.[metric] ?? null)];
+      const color = PALETTE[i % PALETTE.length];
+      return {
+        label: vd, data, borderColor: color,
+        backgroundColor: isBar ? color+'cc' : color+'22',
+        borderWidth: 2, fill: false, tension: .3, pointRadius: 3, spanGaps: true,
+      };
+    });
+    const ctx = document.getElementById(canvasId);
+    if (!ctx) return null;
+    return new Chart(ctx.getContext('2d'), {
+      type: _rankState.chartType,
+      plugins: DL ? [DL] : [],
+      data: { labels: lbls, datasets: ds },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { display: true, position: 'bottom', labels:{font:{size:10},boxWidth:12,padding:6} },
+          tooltip: { callbacks: { label: c => ` ${c.dataset.label}: ${_fmtRankVal(fromV(c.parsed.y), meta.fmt)}` }},
+          ...(DL ? { datalabels: {
+            display: (dctx) => _rankState.showLabels && dctx.dataset.data[dctx.dataIndex] != null,
+            color: isBar ? '#fff' : (dctx) => dctx.dataset.borderColor,
+            backgroundColor: null, borderRadius: 3, padding: 2,
+            font: { size: 9, weight: 'bold' },
+            anchor: isBar ? 'center' : 'end', align: isBar ? 'center' : 'top', offset: isBar ? 0 : 4,
+            formatter: v => _fmtRankVal(fromV(v), meta.fmt, true), clamp: true,
+          }} : {}),
+        },
+        scales: {
+          x: { ticks:{font:{size:9}}, grid:{display:false} },
+          y: {
+            beginAtZero: true, grace: '10%',
+            ticks: { font:{size:10}, callback: v => _fmtRankVal(fromV(v), meta.fmt, true) }
+          }
+        }
+      }
+    });
+  }
+
+  // ── COMPARE MODE: 2 chart side-by-side ────────────────────────────────────
+  if (_rankState.compare) {
+    const prev = _rankGetPrevBulan();
+    if (!prev || !_rankState.bulan) {
+      // Tidak ada bulan terpilih → fallback ke single chart + pesan
+      body.innerHTML = `
+        <div id="rankmChartWrap" data-default-h="400" style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div>
+        <div id="rankmLatestSummary"></div>`;
+      _rankChartInstance = _makeRankChart('rankmChart', chartBkRows);
+      _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
+      const box2 = document.getElementById('rankmLatestSummary');
+      if (box2) box2.innerHTML = `<div class="rankm-cmp-note">⚠️ Pilih bulan tertentu (bukan "Semua Bulan") untuk menggunakan fitur Compare.</div>`;
+      return;
+    }
+
+    const prevRows = _filterRankRows(bkRows, prev.bulan, prev.tahun);
+    const curLabel  = `${_rankState.bulan}${_rankState.tahun?' '+_rankState.tahun:''}`;
+    const prevLabel = `${prev.bulan}${prev.tahun?' '+prev.tahun:''}`;
+
+    // Shared maxRankVal agar skala Y kedua chart sama (apples-to-apples)
+    const sharedMaxRank = isRankMetric
+      ? Math.max(_calcMaxRank(prevRows), _calcMaxRank(chartBkRows))
+      : 1;
+
+    body.innerHTML = `
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;height:100%">
+        <div style="border-right:2px dashed var(--border);padding-right:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-align:center;padding:6px 0 4px;letter-spacing:.04em;text-transform:uppercase">
+            ◀ ${escH(prevLabel)} (Bulan Lalu)
+          </div>
+          <div id="rankmChartWrapPrev" data-default-h="360" style="position:relative;height:360px">
+            <canvas id="rankmChartPrev"></canvas>
+          </div>
+        </div>
+        <div style="padding-left:10px">
+          <div style="font-size:11px;font-weight:700;color:var(--accent);text-align:center;padding:6px 0 4px;letter-spacing:.04em;text-transform:uppercase">
+            ▶ ${escH(curLabel)} (Bulan Ini)
+          </div>
+          <div id="rankmChartWrap" data-default-h="360" style="position:relative;height:360px">
+            <canvas id="rankmChart"></canvas>
+          </div>
+        </div>
+      </div>
+      <div id="rankmLatestSummary"></div>`;
+
+    // Render chart kiri (bulan lalu)
+    if (prevRows.length) {
+      _rankChartInstancePrev = _makeRankChart('rankmChartPrev', prevRows, sharedMaxRank);
+    } else {
+      const prevCanvas = document.getElementById('rankmChartPrev');
+      if (prevCanvas) {
+        const pCtx = prevCanvas.getContext('2d');
+        pCtx.save();
+        pCtx.fillStyle = 'rgba(128,128,128,0.08)';
+        pCtx.fillRect(0,0,prevCanvas.width,prevCanvas.height);
+        pCtx.restore();
+      }
+      // Tampilkan empty state di dalam wrap kiri
+      const prevWrap = document.getElementById('rankmChartWrapPrev');
+      if (prevWrap) prevWrap.innerHTML = `<div class="rankm-empty" style="height:100%"><div class="icon">📭</div><div style="font-size:12px">Belum ada data<br>${escH(prevLabel)}</div></div>`;
+    }
+
+    // Render chart kanan (bulan ini)
+    _rankChartInstance = _makeRankChart('rankmChart', chartBkRows, sharedMaxRank);
+
+    // Fit kedua wrap
+    _fitChartWrap(document.getElementById('rankmChartWrapPrev'), _rankChartInstancePrev);
+    _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
+
+    // Tabel compare di bawah
+    _renderRankCompareTable(bkRows, vendors, PALETTE);
+    return;
+  }
+
+  // ── MODE NORMAL: 1 chart ──────────────────────────────────────────────────
   body.innerHTML = `<div id="rankmChartWrap" data-default-h="400" style="position:relative;height:400px"><canvas id="rankmChart"></canvas></div><div id="rankmLatestSummary"></div>`;
 
-  const metric = _rankState.metric;
-  const meta = RANK_METRIC_META[metric];
-
-
-  // X-axis dari chartBkRows (data yang sudah difilter bulan/tahun)
   const tanggalSet = [...new Set(chartBkRows.map(r=>r.tanggal).filter(Boolean))].sort();
   const hasTanggal = tanggalSet.length > 0;
-  const labels = hasTanggal
-    ? tanggalSet.map(_fmtRankDateLabel)
-    : ['Bulan ini'];
-
-  // Metrik "Rank": #1 = TERBAIK → balik nilai supaya chart tetap tumbuh dari bawah
-  const isRankMetric = metric === 'rank';
-  let maxRankVal = 1;
-  if (isRankMetric) {
-    const allRanks = chartBkRows.map(r=>r.rank).filter(v=>v!==null&&v!==undefined&&!isNaN(v));
-    maxRankVal = allRanks.length ? Math.max(...allRanks) : 1;
-  }
-  const toChartVal = raw => (raw===null||raw===undefined||isNaN(raw)) ? null : (isRankMetric ? (maxRankVal+1-raw) : raw);
-  const fromChartVal = v => (v===null||v===undefined||isNaN(v)) ? null : (isRankMetric ? (maxRankVal+1-v) : v);
-
-  const datasets = vendors.map((vd, i) => {
-    const vRows = chartBkRows.filter(r=>r.vendor===vd);
-    const byTgl = {};
-    vRows.forEach(r => { byTgl[r.tanggal||''] = r[metric]; });
-    const data = hasTanggal
-      ? tanggalSet.map(t => toChartVal(byTgl[t]===undefined?null:byTgl[t]))
-      : [toChartVal(vRows[0]?.[metric] ?? null)];
-    const color = PALETTE[i % PALETTE.length];
-    return {
-      label: vd, data, borderColor: color,
-      backgroundColor: _rankState.chartType==='bar' ? color+'cc' : color+'22',
-      borderWidth: 2, fill: false, tension: .3, pointRadius: 3, spanGaps: true,
-    };
-  });
-
-  const isBar = _rankState.chartType === 'bar';
-  const DL = window.ChartDataLabels;
-  const ctx = document.getElementById('rankmChart');
-  _rankChartInstance = new Chart(ctx.getContext('2d'), {
-    type: _rankState.chartType,
-    plugins: DL ? [DL] : [],
-    data: { labels, datasets },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: {
-        legend: { display: true, position: 'bottom', labels:{font:{size:10},boxWidth:12,padding:8} },
-        tooltip: { callbacks: {
-          label: c => ` ${c.dataset.label}: ${_fmtRankVal(fromChartVal(c.parsed.y), meta.fmt)}`
-        }},
-        ...(DL ? { datalabels: {
-          display: (dctx) => _rankState.showLabels && dctx.dataset.data[dctx.dataIndex] !== null && dctx.dataset.data[dctx.dataIndex] !== undefined,
-          color: isBar ? '#fff' : (dctx) => dctx.dataset.borderColor,
-          backgroundColor: null, borderRadius: 3, padding: 2,
-          font: { size: 9, weight: 'bold' },
-          anchor: isBar ? 'center' : 'end', align: isBar ? 'center' : 'top', offset: isBar ? 0 : 4,
-          formatter: v => _fmtRankVal(fromChartVal(v), meta.fmt, true),
-          clamp: true,
-        }} : {}),
-      },
-      scales: {
-        x: { ticks:{font:{size:10}}, grid:{display:false} },
-        y: { beginAtZero: true, grace: '10%', ticks: { font:{size:10}, callback: v => _fmtRankVal(fromChartVal(v), meta.fmt, true) } }
-      }
-    }
-  });
-
+  _rankChartInstance = _makeRankChart('rankmChart', chartBkRows);
   _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
-
-  // ── Bawah chart: Compare (semua metrik) atau ringkasan nilai terbaru ──
-  if (_rankState.compare) {
-    _renderRankCompareTable(bkRows, vendors, PALETTE);
-  } else {
-    _renderRankLatestSummary(chartBkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric);
-  }
+  _renderRankLatestSummary(chartBkRows, vendors, PALETTE, metric, meta, tanggalSet, hasTanggal, isRankMetric);
 }
 
 
