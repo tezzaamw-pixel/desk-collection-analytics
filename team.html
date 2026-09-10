@@ -2144,7 +2144,7 @@ function toggleRankCompare() {
 }
 
 // Render tabel compare bulan ini vs bulan lalu untuk semua metrik
-function _renderRankCompareTable(bkRows, vendors, PALETTE) {
+function _renderRankCompareTable(bkRows, vendors, PALETTE, cutoffDay) {
   const box = document.getElementById('rankmLatestSummary');
   if (!box) return;
 
@@ -2160,7 +2160,16 @@ function _renderRankCompareTable(bkRows, vendors, PALETTE) {
   const prevTahun = prev.tahun;
 
   const curRows  = _filterRankRows(bkRows, curBulan, curTahun);
-  const prevRows = _filterRankRows(bkRows, prevBulan, prevTahun);
+  // Terapkan cutoff hari yang sama supaya tabel konsisten dengan chart kiri
+  const _cd = cutoffDay && cutoffDay < 31 ? cutoffDay : 31;
+  const prevRowsAll = _filterRankRows(bkRows, prevBulan, prevTahun);
+  const prevRows = _cd < 31
+    ? prevRowsAll.filter(r => {
+        if (!r.tanggal) return true;
+        const day = parseInt(r.tanggal.split('-')[2]||'99', 10);
+        return day <= _cd;
+      })
+    : prevRowsAll;
 
   if (!prevRows.length) {
     box.innerHTML = `<div class="rankm-cmp-note">📅 Tidak ada data untuk <b>${escH(prevBulan)}${prevTahun?' '+escH(prevTahun):''}</b> — tidak bisa membandingkan. Pastikan data bulan lalu sudah diinput di sheet DATA RANK.</div>`;
@@ -2192,12 +2201,13 @@ function _renderRankCompareTable(bkRows, vendors, PALETTE) {
 
   const curLabel  = `${curBulan}${curTahun?' '+curTahun:''}`;
   const prevLabel = `${prevBulan}${prevTahun?' '+prevTahun:''}`;
+  const cutoffNote = _cd < 31 ? ` (s.d. tgl ${_cd})` : '';
 
   let html = `
     <div style="margin-top:16px;padding-top:14px;border-top:2px solid var(--border)">
-      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px">
-        ⚖ Perbandingan <span style="color:var(--accent)">${escH(curLabel)}</span> vs <span style="color:var(--text3)">${escH(prevLabel)}</span>
-        <span style="font-size:10px;font-weight:400;color:var(--text3)">— nilai akhir (tanggal terbaru) tiap bulan per vendor</span>
+      <div style="font-size:12px;font-weight:700;color:var(--text);margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+        ⚖ Perbandingan <span style="color:var(--accent)">${escH(curLabel)}</span> vs <span style="color:var(--text3)">${escH(prevLabel)}${escH(cutoffNote)}</span>
+        <span style="font-size:10px;font-weight:400;color:var(--text3)">— nilai akhir (tanggal terbaru) tiap bulan per vendor${_cd<31?' · bulan lalu dipotong s.d. tgl '+_cd+' agar apple-to-apple':''}</span>
       </div>`;
 
   metrics.forEach(m => {
@@ -2441,16 +2451,34 @@ function renderRankChart() {
     const curLabel  = `${_rankState.bulan}${_rankState.tahun?' '+_rankState.tahun:''}`;
     const prevLabel = `${prev.bulan}${prev.tahun?' '+prev.tahun:''}`;
 
+    // ── Potong prevRows sampai tanggal yang sama dengan bulan ini ──────────
+    // Cari tanggal terbesar yang ada di chartBkRows (bulan ini), ambil hari-nya
+    // (bagian DD dari YYYY-MM-DD), lalu filter prevRows hanya DD ≤ cutoffDay
+    // supaya perbandingan apple-to-apple: "s.d. tanggal X bulan lalu vs bulan ini"
+    const curTanggals  = chartBkRows.map(r=>r.tanggal).filter(Boolean).sort();
+    const lastCurTgl   = curTanggals[curTanggals.length - 1] || '';
+    const cutoffDay    = lastCurTgl ? parseInt(lastCurTgl.split('-')[2] || '31', 10) : 31;
+    const prevRowsCut  = cutoffDay < 31
+      ? prevRows.filter(r => {
+          if (!r.tanggal) return true;
+          const day = parseInt(r.tanggal.split('-')[2] || '99', 10);
+          return day <= cutoffDay;
+        })
+      : prevRows;
+    // Label info tanggal cutoff untuk header chart kiri
+    const cutoffInfo = cutoffDay < 31
+      ? ` s.d. tgl ${cutoffDay}` : '';
+
     // Shared maxRankVal agar skala Y kedua chart sama (apples-to-apples)
     const sharedMaxRank = isRankMetric
-      ? Math.max(_calcMaxRank(prevRows), _calcMaxRank(chartBkRows))
+      ? Math.max(_calcMaxRank(prevRowsCut), _calcMaxRank(chartBkRows))
       : 1;
 
     body.innerHTML = `
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:0;height:100%">
         <div style="border-right:2px dashed var(--border);padding-right:10px">
           <div style="font-size:11px;font-weight:700;color:var(--text3);text-align:center;padding:6px 0 4px;letter-spacing:.04em;text-transform:uppercase">
-            ◀ ${escH(prevLabel)} (Bulan Lalu)
+            ◀ ${escH(prevLabel)}${escH(cutoffInfo)} (Bulan Lalu)
           </div>
           <div id="rankmChartWrapPrev" data-default-h="360" style="position:relative;height:360px">
             <canvas id="rankmChartPrev"></canvas>
@@ -2467,19 +2495,10 @@ function renderRankChart() {
       </div>
       <div id="rankmLatestSummary"></div>`;
 
-    // Render chart kiri (bulan lalu)
-    if (prevRows.length) {
-      _rankChartInstancePrev = _makeRankChart('rankmChartPrev', prevRows, sharedMaxRank);
+    // Render chart kiri (bulan lalu — dipotong s.d. tanggal yang sama)
+    if (prevRowsCut.length) {
+      _rankChartInstancePrev = _makeRankChart('rankmChartPrev', prevRowsCut, sharedMaxRank);
     } else {
-      const prevCanvas = document.getElementById('rankmChartPrev');
-      if (prevCanvas) {
-        const pCtx = prevCanvas.getContext('2d');
-        pCtx.save();
-        pCtx.fillStyle = 'rgba(128,128,128,0.08)';
-        pCtx.fillRect(0,0,prevCanvas.width,prevCanvas.height);
-        pCtx.restore();
-      }
-      // Tampilkan empty state di dalam wrap kiri
       const prevWrap = document.getElementById('rankmChartWrapPrev');
       if (prevWrap) prevWrap.innerHTML = `<div class="rankm-empty" style="height:100%"><div class="icon">📭</div><div style="font-size:12px">Belum ada data<br>${escH(prevLabel)}</div></div>`;
     }
@@ -2491,8 +2510,8 @@ function renderRankChart() {
     _fitChartWrap(document.getElementById('rankmChartWrapPrev'), _rankChartInstancePrev);
     _fitChartWrap(document.getElementById('rankmChartWrap'), _rankChartInstance);
 
-    // Tabel compare di bawah
-    _renderRankCompareTable(bkRows, vendors, PALETTE);
+    // Tabel compare di bawah — kirim cutoffDay agar angka tabel konsisten dengan chart
+    _renderRankCompareTable(bkRows, vendors, PALETTE, cutoffDay);
     return;
   }
 
