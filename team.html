@@ -1871,11 +1871,19 @@ function getDpdForBucket(spv, aplikasi, bucket) {
   const spvLow = (spv||'').trim().toLowerCase();
   const apLow = (aplikasi||'').trim().toLowerCase();
   const bkLow = (bucket||'').trim().toLowerCase();
-  const row = _referensiCache.rows.find(r =>
+  const matches = _referensiCache.rows.filter(r =>
     (r.supervisor||'').trim().toLowerCase()===spvLow &&
     (r.aplikasi||'').trim().toLowerCase()===apLow &&
     (r.bucket||'').trim().toLowerCase()===bkLow
   );
+  if (!matches.length) return '';
+  // Utamakan baris dari tahun yang sedang dipilih (kolom TAHUN Referensi Akun);
+  // kalau tidak ada, pakai baris tahun terbaru. Baris tanpa tahun dianggap 2026.
+  const selT = document.getElementById('selTahun');
+  const tahun = selT ? String(selT.value) : '';
+  const yr = r => String(r.tahun || '2026');
+  const row = matches.find(r => yr(r) === tahun) ||
+              matches.slice().sort((a,b)=>Number(yr(b))-Number(yr(a)))[0];
   return row ? (row.dpd||'') : '';
 }
 

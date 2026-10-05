@@ -264,7 +264,8 @@ async function fetchJSON(url,useCache=true){
   return data;
 }
 
-let refData=[];
+let refData=[];      // semua baris Referensi Akun (semua tahun)
+let refTahun='';     // tahun yang sedang dipilih di filter
 let agentData=[];
 let chartInstance=null;
 let currentChart='akun';
@@ -281,14 +282,27 @@ function summarizeRows(rows){
   return r;
 }
 
-// Hitung total akun dari refData untuk satu aplikasi pada bulan tertentu
-function getAkunFromRef(aplikasi, bulanKey){
-  return refData.filter(r=>r.aplikasi===aplikasi).reduce((a,r)=>a+(r[bulanKey]||0),0);
+// Baris Referensi Akun tanpa kolom TAHUN (atau dari cache lama) dianggap 2026
+const REF_DEFAULT_TAHUN='2026';
+function refRowTahun(r){return String(r.tahun||REF_DEFAULT_TAHUN);}
+function refRowsOfYear(tahun){return refData.filter(r=>refRowTahun(r)===String(tahun));}
+
+// Hitung total akun dari refData untuk satu aplikasi pada bulan & tahun tertentu
+function getAkunFromRef(aplikasi, bulanKey, tahun=refTahun){
+  return refRowsOfYear(tahun).filter(r=>r.aplikasi===aplikasi).reduce((a,r)=>a+(r[bulanKey]||0),0);
 }
 
-// Hitung total akun semua aplikasi untuk bulan tertentu
-function getTotalAkunFromRef(bulanKey){
-  return refData.reduce((a,r)=>a+(r[bulanKey]||0),0);
+// Hitung total akun semua aplikasi untuk bulan & tahun tertentu
+function getTotalAkunFromRef(bulanKey, tahun=refTahun){
+  return refRowsOfYear(tahun).reduce((a,r)=>a+(r[bulanKey]||0),0);
+}
+
+// Bulan pembanding (bulan sebelumnya). Januari → Desember tahun lalu,
+// tapi hanya kalau tahun lalu memang ada barisnya di Referensi Akun.
+function getPrevRef(bulanIdx, tahun){
+  if(bulanIdx>0) return {key:BULAN_KEYS[bulanIdx-1], tahun:String(tahun)};
+  const py=String(Number(tahun)-1);
+  return refRowsOfYear(py).length ? {key:'desember', tahun:py} : null;
 }
 
 async function loadData(){
@@ -312,6 +326,7 @@ async function loadData(){
     if(!agentRes.success) throw new Error(agentRes.message);
     agentData=agentRes.rows||[];
     refData=refRes.rows||[];
+    refTahun=String(tahun);
 
     // Group agent by aplikasi
     const byApp={};
@@ -324,8 +339,8 @@ async function loadData(){
 
     // Total akun dari Referensi Akun bulan ini
     const totalAkunRef=getTotalAkunFromRef(bulanKey);
-    const prevBulanKey=bulanIdx>0?BULAN_KEYS[bulanIdx-1]:null;
-    const totalAkunPrev=prevBulanKey?getTotalAkunFromRef(prevBulanKey):0;
+    const prevRef=getPrevRef(bulanIdx,tahun);
+    const totalAkunPrev=prevRef?getTotalAkunFromRef(prevRef.key,prevRef.tahun):0;
     const selisihAkun=totalAkunRef-totalAkunPrev;
 
     // Total payment dari agentdata
@@ -333,7 +348,7 @@ async function loadData(){
 
     renderStats(totalAkunRef,selisihAkun,totalS,appList.length);
     renderChart();
-    renderProjects(appSummaries,bulan,tahun,bulanKey,prevBulanKey);
+    renderProjects(appSummaries,bulan,tahun,bulanKey,prevRef);
 
     document.getElementById('navTimestamp').textContent='Update: '+new Date().toLocaleDateString('id-ID')+', '+new Date().toLocaleTimeString('id-ID');
   }catch(e){
@@ -421,7 +436,7 @@ function renderChart(){
   });
 }
 
-function renderProjects(summaries,bulan,tahun,bulanKey,prevBulanKey){
+function renderProjects(summaries,bulan,tahun,bulanKey,prevRef){
   const appList=Object.keys(summaries).sort();
   if(!appList.length){document.getElementById('projectGrid').innerHTML='<div class="state-box"><div class="icon">📭</div><p>Tidak ada data.</p></div>';return;}
   document.getElementById('projectGrid').innerHTML=appList.map(ap=>{
@@ -430,7 +445,7 @@ function renderProjects(summaries,bulan,tahun,bulanKey,prevBulanKey){
     const spvSet=new Set(agentData.filter(r=>r.aplikasi===ap).map(r=>r.supervisor).filter(Boolean));
     const spvStr=[...spvSet].join(', ')||'—';
     const akunNow=getAkunFromRef(ap,bulanKey);
-    const akunPrev=prevBulanKey?getAkunFromRef(ap,prevBulanKey):0;
+    const akunPrev=prevRef?getAkunFromRef(ap,prevRef.key,prevRef.tahun):0;
     const selisih=akunNow-akunPrev;
     const selisihHtml=selisih>0?`<span class="change-up">+${fmtNum(selisih)}</span>`:selisih<0?`<span class="change-down">-${fmtNum(Math.abs(selisih))}</span>`:`<span class="change-zero">—</span>`;
     return `<div class="project-card" onclick="window.location.href='app.html?ap=${encodeURIComponent(ap)}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}'">

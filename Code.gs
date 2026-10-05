@@ -58,8 +58,16 @@ const REF_COL = {
   APLIKASI: 1,
   BUCKET: 2,
   DPD: 3,
-  JAN: 4
+  JAN: 4,      // E..P = Januari..Desember
+  TAHUN: 16    // Q = TAHUN (1 baris per Supervisor+Aplikasi+Bucket per tahun)
 };
+const REF_TOTAL_COLS = 17; // A sampai Q
+// Baris Referensi Akun yang kolom TAHUN-nya masih kosong dianggap tahun ini
+// (data lama sebelum kolom TAHUN ditambahkan semuanya data 2026).
+const REF_DEFAULT_TAHUN = '2026';
+function refTahun_(r) {
+  return normTahun_(r[REF_COL.TAHUN]) || REF_DEFAULT_TAHUN;
+}
 
 /*** ============ MASTER LIST BULAN ============ ***/
 const BULAN_LIST = [
@@ -241,28 +249,28 @@ function normalizeRow(row, rowIndex) {
 }
 
 /*** ============ SUPERVISOR LOOKUP ============ ***/
+// Map supervisor per tahun: key "aplikasi||bucket||tahun" (lowercase), plus
+// key "aplikasi||bucket" sbg fallback kalau tahun tsb belum ada barisnya
+// (fallback ambil baris tahun TERBARU, krn diproses urut tahun naik).
 function buildSupervisorMap_(refRows) {
   const map = {};
-  refRows.forEach(r => {
+  const sorted = refRows.slice().sort((a, b) => Number(refTahun_(a)) - Number(refTahun_(b)));
+  sorted.forEach(r => {
     const supervisor = normText_(r[REF_COL.SUPERVISOR]);
-    const aplikasi   = normText_(r[REF_COL.APLIKASI]);
-    const bucket     = normText_(r[REF_COL.BUCKET]);
+    const aplikasi   = normText_(r[REF_COL.APLIKASI]).toLowerCase();
+    const bucket     = normText_(r[REF_COL.BUCKET]).toLowerCase();
     if (!aplikasi || !bucket) return;
+    map[aplikasi + '||' + bucket + '||' + refTahun_(r)] = supervisor;
     map[aplikasi + '||' + bucket] = supervisor;
   });
   return map;
 }
 
-function lookupSupervisor_(supMap, aplikasi, bucket) {
-  const aLow = normText_(aplikasi).toLowerCase();
-  const bLow = normText_(bucket).toLowerCase();
-  for (const key in supMap) {
-    const parts = key.split('||');
-    if (parts[0].toLowerCase() === aLow && parts[1].toLowerCase() === bLow) {
-      return supMap[key];
-    }
-  }
-  return '';
+function lookupSupervisor_(supMap, aplikasi, bucket, tahun) {
+  const base = normText_(aplikasi).toLowerCase() + '||' + normText_(bucket).toLowerCase();
+  const t = normTahun_(tahun);
+  if (t && supMap.hasOwnProperty(base + '||' + t)) return supMap[base + '||' + t];
+  return supMap.hasOwnProperty(base) ? supMap[base] : '';
 }
 
 /*** ============ APLIKASI & BUCKET DINAMIS ============ ***/
@@ -304,7 +312,7 @@ function readInputData() {
   const displayRows = range.getDisplayValues();
 
   const refRows = lastRowRef >= 2
-    ? sheetRef.getRange(2, 1, lastRowRef - 1, REF_COL.JAN + 12).getValues()
+    ? sheetRef.getRange(2, 1, lastRowRef - 1, REF_TOTAL_COLS).getValues()
     : [];
 
   const supMap = buildSupervisorMap_(refRows);
@@ -318,7 +326,7 @@ function readInputData() {
     const rowIndex = CFG.DATA_START_ROW + i;
     const norm = normalizeRow(raw, rowIndex);
     if (norm._errors.length > 0) errors.push({ row: rowIndex, issues: norm._errors });
-    norm.supervisor = lookupSupervisor_(supMap, norm.aplikasi, norm.bucket);
+    norm.supervisor = lookupSupervisor_(supMap, norm.aplikasi, norm.bucket, norm.tahun);
     rows.push(norm);
   });
 
@@ -487,6 +495,15 @@ function endpointWeekly_(e) {
 }
 
 function endpointReferensi_(e) {
+  const p = (e && e.parameter) || {};
+  const all = referensiAll_();
+  if (!p.tahun) return all;
+  const t = normTahun_(p.tahun);
+  return Object.assign({}, all, { filters: p, rows: all.rows.filter(r => r.tahun === t) });
+}
+
+// Semua baris Referensi Akun (semua tahun) — di-cache.
+function referensiAll_() {
   const CACHE_KEY = 'svc_referensi';
   const hit = _cacheGet(CACHE_KEY);
   if (hit) return hit;
@@ -495,12 +512,13 @@ function endpointReferensi_(e) {
   const sheetRef = ss.getSheetByName(CFG.SHEET_REFERENSI);
   if (!sheetRef) throw new Error('Sheet Referensi Akun tidak ditemukan.');
   const lastRow = sheetRef.getLastRow();
-  if (lastRow < 2) return { success: true, action: 'referensi', rows: [], aplikasiList: [], bucketList: [] };
-  const rawRows = sheetRef.getRange(2, 1, lastRow - 1, REF_COL.JAN + 12).getValues();
+  if (lastRow < 2) return { success: true, action: 'referensi', rows: [], aplikasiList: [], bucketList: [], tahunList: [] };
+  const rawRows = sheetRef.getRange(2, 1, lastRow - 1, REF_TOTAL_COLS).getValues();
   const rows = rawRows.map(r => ({
     supervisor: normText_(r[REF_COL.SUPERVISOR]),
     aplikasi:   normText_(r[REF_COL.APLIKASI]),
     bucket:     normText_(r[REF_COL.BUCKET]),
+    tahun:      refTahun_(r),
     dpd:        normDpdText_(r[REF_COL.DPD]), // range DPD/keterlambatan, mis. "1-30" — normDpdText_ (bukan normText_) krn Sheets kadang auto-convert nilai spt "1-3"/"4-10" jadi Date
     januari:   normNumber_(r[REF_COL.JAN + 0]),
     februari:  normNumber_(r[REF_COL.JAN + 1]),
@@ -515,16 +533,18 @@ function endpointReferensi_(e) {
     november:  normNumber_(r[REF_COL.JAN + 10]),
     desember:  normNumber_(r[REF_COL.JAN + 11]),
   })).filter(r => r.aplikasi || r.bucket);
-  const aplikasiSet = {}, bucketSet = {};
+  const aplikasiSet = {}, bucketSet = {}, tahunSet = {};
   rows.forEach(r => {
     if (r.aplikasi) aplikasiSet[r.aplikasi] = true;
     if (r.bucket)   bucketSet[r.bucket]     = true;
+    if (r.tahun)    tahunSet[r.tahun]       = true;
   });
   const result = {
     success: true, action: 'referensi',
     rows,
     aplikasiList: Object.keys(aplikasiSet).sort(),
-    bucketList:   Object.keys(bucketSet).sort()
+    bucketList:   Object.keys(bucketSet).sort(),
+    tahunList:    Object.keys(tahunSet).sort()
   };
   _cachePut(CACHE_KEY, result);
   return result;
@@ -649,6 +669,9 @@ function TEST_weekly() {
 }
 function TEST_referensi() {
   Logger.log(JSON.stringify(endpointReferensi_({parameter:{}}), null, 2));
+}
+function TEST_referensi2027() {
+  Logger.log(JSON.stringify(endpointReferensi_({parameter:{tahun:'2027'}}), null, 2));
 }
 function TEST_violation() {
   Logger.log(JSON.stringify(endpointViolation_({parameter:{}}), null, 2));
