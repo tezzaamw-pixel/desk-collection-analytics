@@ -461,7 +461,7 @@ function renderChart(){
     return m?m.dailyPayment:0;
   };
   const titleEl=document.querySelector('.chart-card-title');
-  if(titleEl)titleEl.textContent=tzT(currentChart==='akun'?'Tren Akun Bulanan':'Tren Payment Bulanan');
+  if(titleEl){const tt=currentChart==='akun'?'Tren Akun Bulanan':'Tren Payment Bulanan';titleEl.textContent=(typeof tzT==='function')?tzT(tt):tt;}
   const noteEl=document.getElementById('chartNote');
   if(noteEl){
     noteEl.textContent=currentChart!=='payment'?'':
