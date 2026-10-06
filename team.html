@@ -1213,7 +1213,35 @@ select:focus{border-color:var(--accent);}
       <option>Oktober</option><option>November</option><option>Desember</option>
     </select>
     <label>Tahun</label>
-    <select id="selTahun"><option>2025</option><option>2026</option><option>2027</option></select>
+    <select id="selTahun"></select>
+<script>
+/* Pilihan Tahun otomatis: 2025 s/d tahun berjalan, ditambah tahun yang ada di
+   data (disimpan di localStorage 'tz_tahun_list' setiap kali API mengirim
+   tahunList) dan tahun dari URL ?tahun=. */
+(function(){
+  var KEY='tz_tahun_list', START=2025;
+  function stored(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')||[];}catch(e){return [];}}
+  function fill(extra){
+    var s=document.getElementById('selTahun'); if(!s) return;
+    var cur=s.value, ys={}, now=new Date().getFullYear(), y;
+    for(y=START;y<=now;y++) ys[y]=1;
+    stored().concat(extra||[]).forEach(function(v){v=String(v);if(/^\d{4}$/.test(v))ys[v]=1;});
+    var u=new URLSearchParams(location.search).get('tahun'); if(u&&/^\d{4}$/.test(u)) ys[u]=1;
+    if(cur) ys[cur]=1;
+    var list=Object.keys(ys).sort();
+    if(Array.prototype.map.call(s.options,function(o){return o.value;}).join()===list.join()) return;
+    s.innerHTML=list.map(function(v){return '<option>'+v+'</option>';}).join('');
+    s.value=cur&&ys[cur]?cur:String(now);
+  }
+  window.tzMergeTahun=function(list){
+    if(!list||!list.length) return;
+    try{var m={};stored().concat(list).forEach(function(v){v=String(v);if(/^\d{4}$/.test(v))m[v]=1;});
+        localStorage.setItem(KEY,JSON.stringify(Object.keys(m).sort()));}catch(e){}
+    fill(list);
+  };
+  fill();
+})();
+</script>
     <label>Aplikasi</label>
     <select id="selAplikasi" onchange="onAplikasiChange()"><option value="">Semua</option></select>
     <label>Bucket</label>
@@ -1857,6 +1885,7 @@ async function fetchReferensiData() {
   try {
     const data = await fetchJSON(API_URL + '?action=referensi');
     _referensiCache = (data && data.success) ? { rows: data.rows||[] } : { rows: [] };
+    if (data && data.tahunList && window.tzMergeTahun) tzMergeTahun(data.tahunList);
   } catch(e) {
     console.warn('fetchReferensiData gagal:', e);
     _referensiCache = { rows: [] };
