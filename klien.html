@@ -307,6 +307,9 @@ function recomputeRed(res){
   const g={};
   res.agents.forEach(a=>{const k=a.jenis+'|'+(a.jenis==='MONTHLY'?'M':a.tanggal);(g[k]=g[k]||[]).push(a);});
   Object.values(g).forEach(list=>{
+    // laporan yang sudah punya tanda merah (upload versi baru pakai aturan rate < AVG asli) tidak diubah;
+    // hanya laporan yang tanda merahnya kosong sama sekali (warna gagal terbaca) yang dihitung ulang
+    if(list.some(a=>a.merah))return;
     const avg=list.reduce((s,a)=>s+(a.rate||0),0)/list.length;
     list.forEach(a=>{a.merahStored=a.merah;if(Math.abs((a.rate||0)-avg)>0.005)a.merah=(a.rate||0)<avg;});
   });
