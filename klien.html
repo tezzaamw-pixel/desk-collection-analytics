@@ -207,7 +207,7 @@ table.t td.flagcell{background:rgba(220,38,38,.18)!important;font-weight:700;}
     <div class="modal-h">
       <div>
         <div class="ttl">⬆ Upload Laporan Klien</div>
-        <div class="card-sub">Bisa 4 gambar sekaligus (NPA/CO3, Daily/Monthly). Jenis, bucket, dan tanggal dikenali dari judul gambar.</div>
+        <div class="card-sub">Bisa 4 gambar/file sekaligus (NPA/CO3, Daily/Monthly). Jenis, bucket, dan tanggal dikenali dari judul gambar.</div>
       </div>
       <button class="btn btn-ghost" onclick="closeUpload()">✕</button>
     </div>
@@ -215,8 +215,10 @@ table.t td.flagcell{background:rgba(220,38,38,.18)!important;font-weight:700;}
       <div class="drop" id="dropZone" onclick="document.getElementById('fileInput').click()">
         <div style="font-size:28px;margin-bottom:6px">🖼️</div>
         <b>Klik untuk pilih gambar</b>, seret ke sini, atau tekan <b>Ctrl+V</b> untuk tempel gambar yang disalin dari WhatsApp
+        <div style="font-size:12px;margin-top:6px;color:var(--text2)">Bisa juga file <b>Excel / CSV</b> (dibaca langsung tanpa AI — lebih cepat &amp; pasti)</div>
       </div>
-      <input type="file" id="fileInput" accept="image/*" multiple style="display:none" onchange="addFiles(this.files);this.value=''">
+      <div style="display:flex;justify-content:flex-end;margin:6px 0 2px"><button class="btn btn-ghost" style="font-size:12px" onclick="downloadTemplate()">⬇ Template Excel</button></div>
+      <input type="file" id="fileInput" accept="image/*,.xlsx,.xlsm,.xls,.csv" multiple style="display:none" onchange="addFiles(this.files);this.value=''">
       <div id="keyBox"></div>
       <div class="files" id="fileList"></div>
       <div id="resultBox"></div>
@@ -560,11 +562,206 @@ function renderKeyBox(){
 })();
 
 function addFiles(list){
-  [...list].filter(f=>f.type.startsWith('image/')).forEach(f=>{
-    const u={id:'u'+Date.now()+Math.random().toString(36).slice(2,6),file:f,url:URL.createObjectURL(f),status:'wait',msg:'menunggu'};
-    UP.push(u); if(!UPSEL)UPSEL=u.id; processFile(u);
+  [...list].filter(f=>f.type.startsWith('image/')||isSheetFile(f)).forEach(f=>{
+    const sheet=isSheetFile(f);
+    const u={id:'u'+Date.now()+Math.random().toString(36).slice(2,6),file:f,url:URL.createObjectURL(f),status:'wait',msg:'menunggu',isFile:sheet};
+    UP.push(u); if(!UPSEL)UPSEL=u.id; sheet?processSheetFile(u):processFile(u);
   });
   renderUp();
+}
+
+// ── Upload Excel / CSV (tanpa AI) ─────────────────────────────
+// Dibaca langsung per kolom → cepat & pasti. Header dikenali dari beberapa nama
+// (mis. "REPAY AMOUNT" / "REPAY" / "BAYAR"). Satu sheet boleh berisi beberapa
+// tabel (tabel TL di atas, tabel agent di bawah) seperti laporan asli klien.
+const XLSX_SRC='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+let XLSX_P=null;
+function loadXLSX(){
+  if(window.XLSX)return Promise.resolve(window.XLSX);
+  if(!XLSX_P)XLSX_P=new Promise((res,rej)=>{const s=document.createElement('script');s.src=XLSX_SRC;s.onload=()=>res(window.XLSX);s.onerror=()=>{XLSX_P=null;rej(new Error('library Excel gagal dimuat — cek koneksi internet'));};document.head.appendChild(s);});
+  return XLSX_P;
+}
+function isSheetFile(f){return /\.(xlsx|xlsm|xls|csv)$/i.test(f.name||'')||/spreadsheet|ms-excel|csv/i.test(f.type||'');}
+
+const HDR={
+  kufiId:['KUFIID','KUFI','IDKUFI','AGENTID','IDAGENT','KODEAGENT'],
+  nama:['NAME','NAMA','AGENT','AGENTNAME','NAMAAGENT','AGENTNAMA'],
+  tl:['TLNAME','TL','NAMATL','TEAMLEADER','TEAMLEADERNAME','LEADER'],
+  company:['COMPANY','VENDOR','PERUSAHAAN','AGENCY'],
+  outstanding:['LEFTUNPAIDPRINCIPAL','TOTALLEFTUNPAIDPRINCIPAL','UNPAIDPRINCIPAL','OUTSTANDING','OS','SISAPOKOK','TOTALOUTSTANDING'],
+  repay:['REPAYAMOUNT','REPAY','TOTALREPAY','REPAYMENT','PAYMENT','BAYAR'],
+  rate:['REPAYRATE','RATE','RATEPERSEN','PERSEN'],
+  handleTime:['HANDLETIME','AVERAGEHANDLETIME','AVGHANDLETIME','AHT','HANDLE'],
+  load:['LOADNUMBER','LOAD','JUMLAHLOAD'],
+  merah:['MERAH','RED','M','STATUSMERAH'],
+  rank:['RANK','RANKING','NO','NOMOR'],
+  tanggal:['DATE','TANGGAL','TGL']
+};
+const HDR_IDX={};Object.entries(HDR).forEach(([f,arr])=>arr.forEach(a=>HDR_IDX[a]=f));
+function hdrKey(v){return String(v??'').toUpperCase().replace(/%/g,'PERSEN').replace(/[^A-Z0-9]/g,'');}
+function cellStr(v){return String(v??'').trim();}
+// Angka gaya Indonesia (1.234.567,89) maupun Inggris (1,234,567.89)
+function sheetNum(v,isRate){
+  if(typeof v==='number')return v;
+  let s=cellStr(v).replace(/rp/ig,'').replace(/%/g,'').replace(/\s/g,'');
+  if(!s||s==='-')return 0;
+  const neg=/^\(.*\)$/.test(s)||/^-/.test(s); s=s.replace(/[()\-]/g,'');
+  const dots=(s.match(/\./g)||[]).length, commas=(s.match(/,/g)||[]).length;
+  if(dots&&commas){ if(s.lastIndexOf(',')>s.lastIndexOf('.'))s=s.replace(/\./g,'').replace(',','.'); else s=s.replace(/,/g,''); }
+  else if(commas){ s=(commas>1||(!isRate&&/^\d{1,3}(,\d{3})+$/.test(s)))?s.replace(/,/g,''):s.replace(',','.'); }
+  else if(dots>1||(!isRate&&dots===1&&/^\d{1,3}(\.\d{3})+$/.test(s)))s=s.replace(/\./g,'');
+  const n=parseFloat(s.replace(/[^\d.]/g,''));
+  return isNaN(n)?0:(neg?-n:n);
+}
+const MON={JAN:1,FEB:2,MAR:3,APR:4,MAY:5,MEI:5,JUN:6,JUL:7,AUG:8,AGU:8,AGS:8,SEP:9,OCT:10,OKT:10,NOV:11,DEC:12,DES:12};
+function sheetDate(v){
+  if(v instanceof Date&&!isNaN(v))return `${v.getFullYear()}-${String(v.getMonth()+1).padStart(2,'0')}-${String(v.getDate()).padStart(2,'0')}`;
+  if(typeof v==='number'&&v>30000&&v<80000){const d=new Date(Math.round((v-25569)*864e5));return `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`;}
+  const s=cellStr(v);let m;
+  const iso=(y,mo,d)=>{y=+y;if(y<100)y+=2000;if(!(mo>=1&&mo<=12&&d>=1&&d<=31))return '';return `${y}-${String(mo).padStart(2,'0')}-${String(d).padStart(2,'0')}`;};
+  if((m=s.match(/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/)))return iso(m[1],+m[2],+m[3]);
+  if((m=s.match(/^(\d{1,2})[-\/. ](\d{1,2})[-\/. ](\d{2,4})$/)))return iso(m[3],+m[2],+m[1]); // dd/mm/yyyy
+  if((m=s.match(/^(\d{1,2})[-\/ ]([A-Za-z]{3})[A-Za-z]*[-\/ ,]*(\d{2,4})$/))&&MON[m[2].toUpperCase()])return iso(m[3],MON[m[2].toUpperCase()],+m[1]);
+  return '';
+}
+function metaFromText(s,meta){
+  const t=String(s||'').toUpperCase();
+  if(!meta.bucket){if(/\bNPA\b/.test(t))meta.bucket='NPA';else if(/\bC[O0]3\b/.test(t))meta.bucket='C03';}
+  if(!meta.jenis){if(/DAILY|HARIAN/.test(t))meta.jenis='DAILY';else if(/MONTHLY|BULANAN|AKUMULASI/.test(t))meta.jenis='MONTHLY';}
+}
+function metaFromFilename(name,meta){
+  metaFromText(String(name).replace(/[_\-.]/g,' '),meta);
+  if(!meta.tanggal){
+    const s=String(name);let m;
+    if((m=s.match(/(20\d{2})[-_.](\d{1,2})[-_.](\d{1,2})/)))meta.tanggal=sheetDate(`${m[1]}-${m[2]}-${m[3]}`);
+    else if((m=s.match(/(\d{1,2})[-_. ](\d{1,2})[-_. ](20\d{2})/)))meta.tanggal=sheetDate(`${m[1]}/${m[2]}/${m[3]}`);
+  }
+}
+
+// Baca semua baris semua sheet → {meta, tl, agents, vendor, tlAvg, agentAvg}
+function parseWorkbookRows(sheets,fileName){
+  const meta={jenis:'',bucket:'',tanggal:''}, out={tl:[],agents:[],vendor:[],tlAvg:null,agentAvg:null};
+  const INFO_KEYS={JENIS:'jenis',TIPE:'jenis',BUCKET:'bucket',TANGGAL:'tanggal',DATE:'tanggal',TGL:'tanggal',
+    AVGOUTSTANDING:'avgOs',AVGREPAY:'avgRepay',AVGRATE:'avgRate',AVGREPAYAMOUNT:'avgRepay',AVGREPAYRATE:'avgRate'};
+  const avgInfo={};
+  sheets.forEach(({name,rows})=>{
+    metaFromText(name,meta);
+    let blk=null; // {kind, map:{field:col}, matrix:[{col,company}]}
+    rows.forEach(row=>{
+      const cells=row.map(cellStr);
+      if(!cells.some(Boolean))return;
+      // judul laporan, mis. "EDN NPA DAILY PERFORMANCE REPORT"
+      cells.forEach(c=>{if(/REPORT|LAPORAN|PERFORMANCE/i.test(c))metaFromText(c,meta);});
+      // baris header?
+      const map={};let hits=0;
+      cells.forEach((c,i)=>{const f=HDR_IDX[hdrKey(c)];if(f&&map[f]===undefined){map[f]=i;hits++;}});
+      if(hits>=3||(hits>=2&&map.tanggal!==undefined&&map.rate!==undefined)){
+        let kind=map.nama!==undefined||map.kufiId!==undefined?'agent':(map.tanggal!==undefined&&map.repay===undefined&&map.outstanding===undefined)?'vendor':map.tl!==undefined?'tl':null;
+        if(kind){blk={kind,map};return;}
+      }
+      // header matriks rate vendor: DATE | EDN | B | C ...
+      if(HDR_IDX[hdrKey(cells[0])]==='tanggal'&&cells.slice(1).filter(Boolean).length>=1&&cells.slice(1).filter(Boolean).every(c=>/^[A-Z]{1,6}$/i.test(c))){
+        blk={kind:'matrix',matrix:cells.map((c,i)=>i&&c?{col:i,company:c.toUpperCase()}:null).filter(Boolean)};return;
+      }
+      // baris kunci–nilai (sheet INFO)
+      const k0=hdrKey(cells[0]);
+      if(INFO_KEYS[k0]&&cells[1]&&!blk){
+        const f=INFO_KEYS[k0], v=row[1];
+        if(f==='jenis'||f==='bucket')metaFromText(cellStr(v),meta);
+        else if(f==='tanggal'){const d=sheetDate(v);if(d)meta.tanggal=d;}
+        else avgInfo[f]=sheetNum(v,f==='avgRate');
+        return;
+      }
+      if(!blk)return;
+      const g=f=>blk.map&&blk.map[f]!==undefined?row[blk.map[f]]:'';
+      const isAvg=cells.slice(0,4).some(c=>/^(AVG|AVERAGE|RATA[\s-]?RATA|TOTAL)$/i.test(c));
+      if(blk.kind==='matrix'){
+        const d=sheetDate(row[0]);if(!d)return;
+        blk.matrix.forEach(({col,company})=>{if(cellStr(row[col])!=='')out.vendor.push({tanggal:d,company,rate:sheetNum(row[col],true),_pct:/%/.test(cellStr(row[col]))});});
+        return;
+      }
+      if(blk.kind==='vendor'){
+        const d=sheetDate(g('tanggal'));if(!d)return;
+        out.vendor.push({tanggal:d,company:cellStr(g('company')).toUpperCase(),rate:sheetNum(g('rate'),true),_pct:/%/.test(cellStr(g('rate')))});
+        return;
+      }
+      const os=sheetNum(g('outstanding')),rp=sheetNum(g('repay')),rt=sheetNum(g('rate'),true);
+      if(isAvg){const a={outstanding:os,repay:rp,rate:rt};if(blk.kind==='agent')out.agentAvg=a;else out.tlAvg=a;return;}
+      if(blk.kind==='tl'){
+        const tl=cellStr(g('tl'));if(!tl)return;
+        out.tl.push({rank:sheetNum(g('rank'))||out.tl.length+1,tl,company:cellStr(g('company')).toUpperCase(),outstanding:os,repay:rp,rate:rt,aht:sheetNum(g('handleTime'))});
+      }else{
+        const nama=cellStr(g('nama')),kufi=cellStr(g('kufiId'));if(!nama&&!kufi)return;
+        out.agents.push({kufiId:kufi,nama,tl:cellStr(g('tl')),company:cellStr(g('company')).toUpperCase(),outstanding:os,repay:rp,rate:rt,
+          handleTime:sheetNum(g('handleTime')),load:sheetNum(g('load')),merah:/^(1|Y|YA|YES|TRUE|M|MERAH|RED|X|V|✓)$/i.test(cellStr(g('merah')))});
+      }
+    });
+  });
+  metaFromFilename(fileName,meta);
+  if(!out.agentAvg&&(avgInfo.avgRepay||avgInfo.avgRate))out.agentAvg={outstanding:avgInfo.avgOs||0,repay:avgInfo.avgRepay||0,rate:avgInfo.avgRate||0};
+  // Rate dalam bentuk desimal (0.0068 = 0.68%) → ubah ke persen, dicek dari repay÷outstanding
+  const fixRate=r=>{if(r.outstanding>0&&r.rate>0){const c=r.repay/r.outstanding*100;if(Math.abs(r.rate*100-c)<Math.abs(r.rate-c))r.rate=r.rate*100;}};
+  out.agents.forEach(fixRate);out.tl.forEach(fixRate);
+  [out.agentAvg,out.tlAvg].forEach(a=>{if(a)fixRate(a);});
+  if(out.vendor.length&&!out.vendor.some(v=>v._pct)&&Math.max(...out.vendor.map(v=>v.rate))<0.05)out.vendor.forEach(v=>v.rate*=100);
+  out.vendor.forEach(v=>delete v._pct);
+  if(!meta.jenis)meta.jenis=out.vendor.length?'MONTHLY':'DAILY';
+  if(!meta.tanggal&&meta.jenis==='MONTHLY'&&out.vendor.length)meta.tanggal=out.vendor.map(v=>v.tanggal).sort().pop();
+  return Object.assign(meta,out);
+}
+
+async function processSheetFile(u){
+  u.isFile=true;u.status='busy';u.msg='membaca file…';renderUp();
+  const t0=Date.now();
+  try{
+    const X=await loadXLSX();
+    let wb;
+    if(/\.csv$/i.test(u.file.name)||/csv/i.test(u.file.type)){
+      let txt=await u.file.text();txt=txt.replace(/^﻿/,'');
+      const first=txt.split(/\r?\n/).find(l=>l.trim())||'';
+      const FS=(first.match(/;/g)||[]).length>(first.match(/,/g)||[]).length?';':(first.match(/\t/g)||[]).length>(first.match(/,/g)||[]).length?'\t':',';
+      wb=X.read(txt,{type:'string',FS,raw:true});
+    }else{
+      wb=X.read(await u.file.arrayBuffer(),{type:'array',cellDates:true});
+    }
+    const sheets=wb.SheetNames.map(n=>({name:n,rows:X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''})}));
+    const r=parseWorkbookRows(sheets,u.file.name);
+    if(!r.agents.length&&!r.tl.length)throw new Error('tidak ada tabel agent/TL yang dikenali. Pastikan baris judul kolom memuat mis. NAME, TL NAME, REPAY AMOUNT, REPAY RATE (lihat ⬇ Template Excel).');
+    u.data=normalizeParsed(r);
+    if(r.bucket)u.data.bucket=r.bucket;
+    applyRedRule(u.data);
+    validate(u);
+    u.secs=Math.max(1,Math.round((Date.now()-t0)/1000));
+    u.status='done';
+    u.msg=(u.issues.length?u.msg:'✓ semua cocok')+' · dari file';
+  }catch(e){u.status='error';u.msg='gagal: '+e.message;}
+  renderUp();
+}
+
+async function downloadTemplate(){
+  let X;try{X=await loadXLSX();}catch(e){alert(e.message);return;}
+  const wb=X.utils.book_new();
+  const info=[['KOLOM','ISI','KETERANGAN'],
+    ['JENIS','DAILY','DAILY atau MONTHLY'],
+    ['BUCKET','NPA','NPA atau CO3'],
+    ['TANGGAL','2026-10-09','DAILY: tanggal laporan. MONTHLY: tanggal terakhir di kotak rate harian. Format YYYY-MM-DD'],
+    ['AVG_OUTSTANDING','','Baris AVG tabel agent (boleh kosong)'],
+    ['AVG_REPAY','','Baris AVG tabel agent (boleh kosong)'],
+    ['AVG_RATE','','Baris AVG tabel agent, dalam persen mis. 0.68 (boleh kosong → dihitung dari rata-rata rate agent)']];
+  const tl=[['RANK','TL NAME','COMPANY','TOTAL LEFT UNPAID PRINCIPAL','REPAY AMOUNT','REPAY RATE','AVERAGE HANDLE TIME']];
+  const ag=[['KUFI-ID','NAME','TL NAME','COMPANY','LEFT UNPAID PRINCIPAL','REPAY AMOUNT','REPAY RATE','HANDLE TIME','LOAD NUMBER','MERAH']];
+  const vd=[['DATE','COMPANY','RATE']];
+  const pt=[['PETUNJUK'],
+    ['1. Isi sheet INFO (jenis, bucket, tanggal). Kalau kosong, dicoba dikenali dari nama file, mis. "NPA Daily 2026-10-09.xlsx".'],
+    ['2. Sheet TL = tabel ranking TL bagian atas laporan (tanpa baris AVG).'],
+    ['3. Sheet AGENT = tabel agent. Kolom MERAH boleh kosong — status merah dihitung otomatis (rate < AVG).'],
+    ['4. Sheet VENDOR hanya untuk laporan MONTHLY (kotak rate harian per vendor). Untuk DAILY biarkan kosong.'],
+    ['5. Angka boleh pakai titik/koma ribuan. Rate ditulis persen (0.68 atau 0.68%).'],
+    ['6. Satu file = satu laporan. Untuk 4 laporan, buat 4 file.'],
+    ['7. CSV juga bisa: cukup isi tabel agent (baris judul kolom seperti sheet AGENT).']];
+  const add=(aoa,name,w)=>{const ws=X.utils.aoa_to_sheet(aoa);ws['!cols']=w.map(x=>({wch:x}));X.utils.book_append_sheet(wb,ws,name);};
+  add(info,'INFO',[18,14,80]);add(tl,'TL',[6,28,10,26,16,12,20]);add(ag,'AGENT',[14,28,28,10,22,16,12,12,12,8]);add(vd,'VENDOR',[12,10,8]);add(pt,'PETUNJUK',[110]);
+  X.writeFile(wb,'Template_Laporan_Klien.xlsx');
 }
 
 // ── Persiapan gambar ──────────────────────────────────────────
@@ -673,42 +870,55 @@ async function pool(tasks,n){
   await Promise.all(Array.from({length:Math.min(n,tasks.length)},async()=>{while(i<tasks.length){const k=i++;out[k]=await tasks[k]();}}));
   return out;
 }
-// Mode "berpikir" AI dimatikan supaya cepat & jatah jawaban tidak termakan.
-// Tiap model beda cara mematikannya → dicoba berurutan, yang berhasil diingat.
-const THINK_OPTS=[{thinkingBudget:0},{thinkingLevel:'minimal'},{thinkingLevel:'low'},null];
-const THINK_OK={};
+// Pengaturan dicoba bertahap dari yang paling cepat ke yang paling aman.
+// Kalau Gemini menolak ("invalid argument" dll), turun ke tingkat berikutnya,
+// lalu ganti model. Kombinasi yang berhasil diingat di browser.
+const GEM_LEVELS=[
+  {think:{thinkingBudget:0},max:65536,label:'tanpa berpikir (budget 0)'},
+  {think:{thinkingLevel:'minimal'},max:65536,label:'berpikir minimal'},
+  {think:{thinkingLevel:'low'},max:65536,label:'berpikir rendah'},
+  {think:null,max:65536,label:'standar'},
+  {think:null,max:32768,label:'standar, jawaban ≤32k'},
+  {think:null,max:16384,label:'standar, jawaban ≤16k'}
+];
+function gemSaved(){try{return JSON.parse(localStorage.getItem('tz_gem_cfg')||'null');}catch(e){return null;}}
+function gemSave(model,level){try{localStorage.setItem('tz_gem_cfg',JSON.stringify({model,level}));}catch(e){}}
 async function gemCall(blob,prompt,schema){
   const key=getGeminiKey();
   const b64=await fileToB64(blob);
-  let lastErr=null;
-  for(const model of GEMINI_MODELS){
-    let ti=THINK_OK[model]!==undefined?THINK_OK[model]:0, maxTok=65536;
-    for(let attempt=0;attempt<8;attempt++){
-      const gc={temperature:0,responseMimeType:'application/json',responseSchema:schema,maxOutputTokens:maxTok};
-      if(THINK_OPTS[ti])gc.thinkingConfig=THINK_OPTS[ti];
+  const saved=gemSaved();
+  const models=saved&&GEMINI_MODELS.includes(saved.model)?[saved.model].concat(GEMINI_MODELS.filter(m=>m!==saved.model)):GEMINI_MODELS.slice();
+  let lastErr=null; const tried=[];
+  for(const model of models){
+    let lv=saved&&saved.model===model?Math.min(saved.level,GEM_LEVELS.length-1):0;
+    for(let attempt=0;attempt<12&&lv<GEM_LEVELS.length;attempt++){
+      const L=GEM_LEVELS[lv];
+      const gc={temperature:0,responseMimeType:'application/json',responseSchema:schema,maxOutputTokens:L.max};
+      if(L.think)gc.thinkingConfig=L.think;
       const body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:blob.type||'image/png',data:b64}}]}],generationConfig:gc};
       let resp,j;
       try{
         resp=await fetch(GEMINI_URL_BASE+model+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
         j=await resp.json().catch(()=>({}));
       }catch(e){lastErr=e;await sleep(3000);continue;}
-      const msg=JSON.stringify(j.error||'');
-      if(resp.status===404){lastErr=new Error('model '+model+' tidak tersedia');break;}
-      if(resp.status===400&&/thinking/i.test(msg)&&ti<THINK_OPTS.length-1){ti++;continue;}
-      if(resp.status===400&&/output.?tokens/i.test(msg)&&maxTok>32768){maxTok=32768;continue;}
+      const msg=(j.error&&j.error.message)||('HTTP '+resp.status);
+      if(resp.status===404){tried.push(`${model}: tidak tersedia`);lastErr=new Error('model '+model+' tidak tersedia');break;}
       if(resp.status===429||resp.status===503||resp.status===500){lastErr=new Error('Gemini sibuk/kuota per menit habis');await sleep([8000,20000,40000,40000,40000][Math.min(attempt,4)]);continue;}
-      if(!resp.ok){
-        if(resp.status===400&&/API key/i.test(msg)){try{localStorage.removeItem('tz_gemini_key');}catch(e){}renderKeyBox();}
-        throw new Error((j.error&&j.error.message)||('HTTP '+resp.status));
+      if(resp.status===400&&/API key/i.test(msg)){try{localStorage.removeItem('tz_gemini_key');}catch(e){}renderKeyBox();throw new Error('API key Gemini tidak valid — masukkan ulang.');}
+      if(!resp.ok){ // 400 lain: pengaturan ditolak → coba tingkat berikutnya
+        tried.push(`${model} [${L.label}]: ${msg}`);lastErr=new Error(msg);lv++;continue;
       }
-      THINK_OK[model]=ti;
+      gemSave(model,lv);
       const cand=(j.candidates||[])[0]||{};
       if(cand.finishReason==='MAX_TOKENS'){const e=new Error('Jawaban AI terpotong');e.code='MAXTOK';throw e;}
+      if(cand.finishReason&&!['STOP','MAX_TOKENS'].includes(cand.finishReason)){tried.push(`${model}: berhenti (${cand.finishReason})`);}
       const txt=((cand.content||{}).parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('');
       try{return JSON.parse(txt);}catch(e){const er=new Error('Jawaban AI tidak lengkap');er.code='MAXTOK';throw er;}
     }
   }
-  throw lastErr||new Error('Gemini tidak merespons');
+  const err=new Error(lastErr?lastErr.message:'Gemini tidak merespons');
+  err.code='BADREQ';err.detail=tried.join('\n');
+  throw err;
 }
 
 function rateOK(a){if(!(a.outstanding>0))return true;const c=a.repay/a.outstanding*100,r=Number(a.rate)||0;return Math.abs(c-r)<=0.0051||Math.abs(c-r*100)<=0.06;}
@@ -746,6 +956,12 @@ async function readSlice(u,sl,depth){
     u.doneParts++;u.msg=`membaca… ${u.doneParts} bagian selesai`;renderUp();
     return [{r,blob}];
   }catch(e){
+    if(e.code==='BADREQ'&&!sl.small){ // semua pengaturan ditolak → coba sekali lagi dgn gambar lebih kecil
+      const c=sl.canvas, k=0.7, sm=document.createElement('canvas');sm.width=Math.round(c.width*k);sm.height=Math.round(c.height*k);
+      sm.getContext('2d').drawImage(c,0,0,sm.width,sm.height);
+      u.msg='mencoba ulang dgn gambar lebih kecil…';renderUp();
+      try{return await readSlice(u,{canvas:sm,top:sl.top,whole:sl.whole,small:true},depth);}catch(e2){e2.detail=(e.detail||'')+'\n[gambar diperkecil] '+(e2.detail||e2.message);throw e2;}
+    }
     if(e.code!=='MAXTOK'||depth>=2||sl.canvas.height<400)throw e;
     const c=sl.canvas, mid=Math.round(c.height/2), ov=Math.max(60,Math.round(c.height*0.04));
     const a={canvas:cropCanvas(c,0,Math.min(c.height,mid+ov)),top:sl.top,whole:false};
@@ -757,6 +973,7 @@ async function readSlice(u,sl,depth){
 }
 
 async function processFile(u){
+  if(u.isFile)return processSheetFile(u);
   if(!getGeminiKey()){u.status='nokey';u.msg='butuh API key';renderUp();return;}
   u.status='busy';u.msg='menyiapkan gambar…';u.reread={};u.leaves=[];u.doneParts=0;renderUp();
   const t0=Date.now();
@@ -789,7 +1006,7 @@ async function processFile(u){
     u.secs=Math.round((Date.now()-t0)/1000);
     u.status='done';
     if(!u.issues.length)u.msg=`✓ semua cocok · ${u.secs} dtk`;else u.msg+=` · ${u.secs} dtk`;
-  }catch(e){u.status='error';u.msg='gagal: '+(e.code==='MAXTOK'?'gambar terlalu padat walau sudah dibelah — coba potong gambarnya manual jadi 2':e.message);}
+  }catch(e){u.status='error';u.errDetail=e.detail||'';u.msg='gagal: '+(e.code==='MAXTOK'?'gambar terlalu padat walau sudah dibelah — coba potong gambarnya manual jadi 2':e.message);}
   renderUp();
 }
 
@@ -885,12 +1102,15 @@ function renderUp(){
   document.getElementById('fileList').innerHTML=UP.map(u=>{
     const d=u.data, lbl=d?`${d.bucket==='C03'?'CO3':d.bucket} ${d.jenis==='DAILY'?'Daily':'Monthly'}${d.tanggal?' '+dShort(d.tanggal):''}`:(u.file.name||'gambar');
     const ic=u.status==='busy'?'⏳':u.status==='error'?'❌':u.status==='saved'?'💾':u.status==='done'?(u.issues&&u.issues.length?'⚠️':'✅'):u.status==='nokey'?'🔑':'…';
-    return `<div class="fchip ${u.id===UPSEL?'sel':''}" onclick="UPSEL='${u.id}';renderUp()"><img src="${u.url}" alt=""><div style="min-width:0"><div class="fn">${ic} ${escH(lbl)}</div><div class="st">${escH(u.msg)}</div></div>
+    return `<div class="fchip ${u.id===UPSEL?'sel':''}" onclick="UPSEL='${u.id}';renderUp()">${u.isFile?'<span style="width:34px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📊</span>':`<img src="${u.url}" alt="">`}<div style="min-width:0"><div class="fn">${ic} ${escH(lbl)}</div><div class="st">${escH(u.msg)}</div></div>
       <span title="Hapus" onclick="event.stopPropagation();UP=UP.filter(x=>x.id!=='${u.id}');if(UPSEL==='${u.id}')UPSEL=UP[0]?UP[0].id:null;renderUp()" style="margin-left:4px;color:var(--text3)">✕</span></div>`;
   }).join('');
   const u=UP.find(x=>x.id===UPSEL);
   const rb=document.getElementById('resultBox');
-  if(!u||!u.data){rb.innerHTML=u&&u.status==='error'?`<div class="issues warn" style="margin-top:14px">${escH(u.msg)} <button class="btn btn-ghost" style="margin-left:8px" onclick="processFile(UP.find(x=>x.id==='${u.id}'))">Coba lagi</button></div>`:'';}
+  if(!u||!u.data){rb.innerHTML=u&&u.status==='error'?`<div class="issues warn" style="margin-top:14px">${escH(u.msg)} ${u.isFile?'':`<button class="btn btn-ghost" style="margin-left:8px" onclick="processFile(UP.find(x=>x.id==='${u.id}'))">Coba lagi</button>`}
+      ${u.errDetail?`<button class="btn btn-ghost" style="margin-left:6px" onclick="navigator.clipboard&&navigator.clipboard.writeText(UP.find(x=>x.id==='${u.id}').errDetail).then(()=>this.textContent='✓ Disalin')">📋 Salin detail</button>
+      <details style="margin-top:8px"><summary style="font-size:12px">Detail teknis</summary><pre style="white-space:pre-wrap;font-size:11px;margin-top:6px">${escH(u.errDetail)}</pre></details>`:''}
+      ${u.isFile?'':`<div style="font-size:12px;margin-top:6px;color:var(--text2)">Alternatif: upload versi Excel/CSV dari laporan ini (lihat tombol ⬇ Template Excel).</div>`}</div>`:'';}
   else{
     const d=u.data, ft=u.filterTl||'';
     const rr=Object.entries(u.reread||{});
@@ -904,7 +1124,7 @@ function renderUp(){
         <select onchange="upSet('${u.id}','bucket',this.value)"><option value="NPA" ${d.bucket==='NPA'?'selected':''}>NPA</option><option value="C03" ${d.bucket==='C03'?'selected':''}>CO3</option></select>
         <input type="date" value="${d.tanggal}" onchange="upSet('${u.id}','tanggal',this.value)">
         <span class="muted" style="font-size:12px">${d.tl.length} TL · ${d.agents.length} agent · ${d.agents.filter(a=>a.merah).length} merah${d.vendor.length?' · '+d.vendor.length+' rate vendor':''}${u.nParts>1?' · dibaca dalam '+u.nParts+' bagian':''}${u.secs?' · '+u.secs+' dtk':''}</span>
-        <span style="margin-left:auto;font-size:12px;display:flex;gap:12px">${u.prepUrl?`<a href="${u.prepUrl}" target="_blank" style="color:var(--accent)">Gambar yang dibaca AI ↗</a>`:''}<a href="${u.url}" target="_blank" style="color:var(--accent)">Gambar asli ↗</a></span>
+        <span style="margin-left:auto;font-size:12px;display:flex;gap:12px">${u.prepUrl?`<a href="${u.prepUrl}" target="_blank" style="color:var(--accent)">Gambar yang dibaca AI ↗</a>`:''}${u.isFile?`<span class="muted">📊 ${escH(u.file.name)}</span>`:`<a href="${u.url}" target="_blank" style="color:var(--accent)">Gambar asli ↗</a>`}</span>
       </div>
       ${(()=>{if(d.redAvg===undefined)return '';const diff=d.agents.filter(a=>!a.merahManual&&a.merahAI!==undefined&&a.merahAI!==a.merah).length;const ai=d.agents.filter(a=>a.merahAI).length;
         return `<div class="issues ${diff?'warn':'ok'}" style="${diff?'':'background:var(--surface2);color:var(--text2)'}">🚩 Status merah dihitung dari aturan klien: <b>rate &lt; ${fmtPct(d.redAvg)}</b> (${escH(d.redSrc)}) → <b>${d.agents.filter(a=>a.merah).length}</b> agent merah. AI membaca warna: ${ai} merah${diff?` — <b>beda di ${diff} baris</b> (ditandai ⚑). Kalau perbedaannya banyak, mungkin klien mengubah aturan warnanya.`:' — sama.'}</div>`;})()}
