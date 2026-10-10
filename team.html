@@ -1042,6 +1042,7 @@ select:focus{border-color:var(--accent);}
           <button class="apps-tab-btn active" data-tab="ringkasan" onclick="setAppsTab('ringkasan')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--accent);color:#fff;border:none;cursor:pointer">📋 Ringkasan</button>
           <button class="apps-tab-btn" data-tab="tren" onclick="setAppsTab('tren')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📈 Tren</button>
           <button class="apps-tab-btn" data-tab="weekly" onclick="setAppsTab('weekly')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📅 Weekly</button>
+          <button class="apps-tab-btn" data-tab="tl" onclick="setAppsTab('tl')" style="padding:4px 12px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">👥 Kompare TL</button>
         </div>
       </div>
       <div id="appsRingkasanWrap" style="padding:16px;flex:1;overflow:auto"></div>
@@ -1079,6 +1080,36 @@ select:focus{border-color:var(--accent);}
         </div>
         <div id="appsWeeklyHint" style="font-size:10.5px;color:var(--text3);margin-bottom:14px"></div>
         <div id="appsWeeklyGrid" style="display:grid;grid-template-columns:repeat(4,minmax(200px,1fr));gap:12px;align-items:start"></div>
+      </div>
+      <div id="appsTlWrap" style="display:none;padding:16px;flex:1;overflow:auto">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
+          <span style="font-size:11px;font-weight:600;color:var(--text3)">Metrik:</span>
+          <select id="appsTlMetric" onchange="setAppsTl('metric',this.value)" style="padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none">
+            <option value="dailyPayment">💰 Payment</option>
+            <option value="avgRate">📈 Rate</option>
+            <option value="jmlDataBayar">✅ Data Bayar</option>
+            <option value="ptp">📝 PTP</option>
+            <option value="ptpBayar">💵 PTP Bayar</option>
+            <option value="callTerhubung">☎️ Call Terhubung</option>
+            <option value="callManual">📞 Call Manual</option>
+          </select>
+          <span id="appsTlBucketWrap" style="display:flex;align-items:center;gap:6px">
+            <span style="font-size:11px;font-weight:600;color:var(--text3)">Bucket:</span>
+            <select id="appsTlBucket" onchange="setAppsTl('bucket',this.value)" style="padding:5px 10px;font-size:12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--text);outline:none"></select>
+          </span>
+          <div style="display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden" title="Per agent: nilai dibagi jumlah agent yang punya data di hari itu — adil utk tim yang ukurannya beda">
+            <button class="apps-tl-seg" data-key="basis" data-val="total" onclick="setAppsTl('basis','total')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">Total Tim</button>
+            <button class="apps-tl-seg" data-key="basis" data-val="agent" onclick="setAppsTl('basis','agent')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">Per Agent</button>
+          </div>
+          <label id="appsTlCumulWrap" style="display:none;font-size:11px;color:var(--text2);align-items:center;gap:4px;cursor:pointer">
+            <input type="checkbox" id="appsTlCumul" onchange="setAppsTl('cumul',this.checked)"> Kumulatif
+          </label>
+          <div style="margin-left:auto;display:flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden">
+            <button class="apps-tl-seg" data-key="view" data-val="table" onclick="setAppsTl('view','table')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">▦ Tabel</button>
+            <button class="apps-tl-seg" data-key="view" data-val="chart" onclick="setAppsTl('view','chart')" style="padding:4px 10px;font-size:11px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">📈 Grafik</button>
+          </div>
+        </div>
+        <div id="appsTlContent"></div>
       </div>
     </div>
     <div class="bsm-footer">
@@ -7862,6 +7893,12 @@ function openAppSummary(aplikasi, spv, safeSpvId) {
   if (rw) rw.style.display = '';
   if (tw) tw.style.display = 'none';
   if (ww) ww.style.display = 'none';
+  const tlw = document.getElementById('appsTlWrap');
+  if (tlw) tlw.style.display = 'none';
+  _appsTlState = { metric:'dailyPayment', basis:'total', view:'table', bucket:'all', cumul:false };
+  const tlCum = document.getElementById('appsTlCumul'); if (tlCum) tlCum.checked = false;
+  _appsTlInitBucket(rows);
+  if (_appsTlChart) { _appsTlChart.destroy(); _appsTlChart = null; }
   const ffl = document.getElementById('appsFooterDefault'), fwt = document.getElementById('appsFooterWeeklyTotals');
   if (ffl) ffl.style.display = 'block';
   if (fwt) fwt.style.display = 'none';
@@ -7887,6 +7924,7 @@ function closeAppSummary() {
   if (btn) { btn.textContent = '⛶'; btn.title = 'Fullscreen'; }
   overlay.classList.remove('open');
   if (_appsPayChart) { _appsPayChart.destroy(); _appsPayChart = null; }
+  if (_appsTlChart) { _appsTlChart.destroy(); _appsTlChart = null; }
 }
 
 function toggleAppsFullscreen() {
@@ -7914,11 +7952,14 @@ function setAppsTab(tab) {
   if (rw) rw.style.display = tab==='ringkasan' ? '' : 'none';
   if (tw) tw.style.display = tab==='tren' ? 'block' : 'none';
   if (ww) ww.style.display = tab==='weekly' ? 'block' : 'none';
+  const tlw = document.getElementById('appsTlWrap');
+  if (tlw) tlw.style.display = tab==='tl' ? 'block' : 'none';
   const ffl = document.getElementById('appsFooterDefault'), fwt = document.getElementById('appsFooterWeeklyTotals');
   if (ffl) ffl.style.display = tab==='weekly' ? 'none' : 'block';
   if (fwt) fwt.style.display = tab==='weekly' ? 'flex' : 'none';
   if (tab === 'tren') renderAppsTren();
   else if (tab === 'weekly') renderAppsWeekly();
+  else if (tab === 'tl') renderAppsTl();
 }
 
 // ── Ringkasan tab: semua 8 poin yg didiskusikan (KPI headline, target,
@@ -8103,6 +8144,248 @@ function _appsKpiCard(label, val) {
     <div style="font-size:10.5px;color:var(--text3);font-weight:600;margin-bottom:4px">${label}</div>
     <div style="font-size:16px;font-weight:800;color:var(--text)">${val}</div>
   </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// ── KOMPARE TL (tab "👥 Kompare TL" di Summary Aplikasi) ──
+// Membandingkan hasil tiap Team Leader per tanggal dalam 1 aplikasi:
+// kartu insight, tabel heatmap TL × tanggal (warna relatif per tanggal:
+// hijau = terbaik hari itu, merah = terendah), dan grafik garis per TL.
+// Basis "Per agent" = nilai dibagi jumlah agent yg punya data hari itu,
+// supaya TL dgn tim besar & kecil bisa dibandingkan adil.
+// ══════════════════════════════════════════════════════════════
+let _appsTlState = { metric:'dailyPayment', basis:'total', view:'table', bucket:'all', cumul:false };
+let _appsTlChart = null;
+const APPS_TL_METRICS = {
+  dailyPayment:  { label:'💰 Payment',        fmt:v=>fmtRp(v),  full:v=>fmtRpFull(v), sum:true },
+  avgRate:       { label:'📈 Rate',           fmt:v=>fmtRate(v), full:v=>fmtRate(v),  sum:false },
+  jmlDataBayar:  { label:'✅ Data Bayar',     fmt:v=>_tlNum(v),  full:v=>_tlNum(v),   sum:true },
+  ptp:           { label:'📝 PTP',            fmt:v=>_tlNum(v),  full:v=>_tlNum(v),   sum:true },
+  ptpBayar:      { label:'💵 PTP Bayar',      fmt:v=>_tlNum(v),  full:v=>_tlNum(v),   sum:true },
+  callTerhubung: { label:'☎️ Call Terhubung', fmt:v=>_tlNum(v),  full:v=>_tlNum(v),   sum:true },
+  callManual:    { label:'📞 Call Manual',    fmt:v=>_tlNum(v),  full:v=>_tlNum(v),   sum:true }
+};
+const _TL_PALETTE = ['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#6366f1','#0f766e','#a16207'];
+const _TL_HARI = ['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+function _tlNum(v){ if(v===null||v===undefined) return '—'; return Math.abs(v)<10&&v%1!==0 ? v.toFixed(1).replace('.',',') : fmtNum(v); }
+
+function _appsTlRows() {
+  const { aplikasi, spv } = _appsState;
+  let rows = (spvAgentDataCache[spv]||[]).filter(r=>(r.aplikasi||'')===(aplikasi||''));
+  if (_appsTlState.bucket !== 'all') rows = rows.filter(r=>r.bucket===_appsTlState.bucket);
+  return rows;
+}
+
+// Hitung matriks TL × tanggal untuk metrik & basis terpilih
+function _appsTlCompute() {
+  const rows = _appsTlRows();
+  const m = APPS_TL_METRICS[_appsTlState.metric] || APPS_TL_METRICS.dailyPayment;
+  const perAgent = _appsTlState.basis === 'agent' && m.sum;
+  const dates = [...new Set(rows.map(r=>r.tanggal).filter(Boolean))].sort();
+  const byTl = {};
+  rows.forEach(r=>{
+    const tl = r.teamLeader || '(Tanpa TL)';
+    (byTl[tl] = byTl[tl] || []).push(r);
+  });
+  const valOf = (rs) => {
+    if (!rs.length) return null;
+    if (!m.sum) return summarizeRows(rs).avgRate;
+    const total = rs.reduce((a,x)=>a+(x[_appsTlState.metric]||0),0);
+    if (!perAgent) return total;
+    // per agent = total ÷ agent-hari (agent unik per tanggal, dijumlah)
+    const agentDays = new Set(rs.map(x=>(x.tanggal||'')+'|'+(x.agent||''))).size;
+    return agentDays ? total/agentDays : 0;
+  };
+  const tls = Object.keys(byTl).map(tl=>{
+    const rs = byTl[tl];
+    const daily = dates.map(d=>valOf(rs.filter(r=>r.tanggal===d)));
+    const active = daily.filter(v=>v!==null);
+    return {
+      tl,
+      buckets: [...new Set(rs.map(r=>r.bucket).filter(Boolean))].sort(),
+      agents: new Set(rs.map(r=>r.agent).filter(Boolean)).size,
+      daily,
+      total: valOf(rs),
+      perDay: m.sum && active.length ? active.reduce((a,v)=>a+v,0)/active.length : null,
+      wins: 0, lasts: 0
+    };
+  });
+  // Ranking per tanggal: siapa terbaik/terendah hari itu (min. 2 TL berdata)
+  const colStat = dates.map((d,i)=>{
+    const vals = tls.map(t=>t.daily[i]).filter(v=>v!==null);
+    if (vals.length < 2) return null;
+    const max = Math.max(...vals), min = Math.min(...vals);
+    if (max !== min) tls.forEach(t=>{
+      if (t.daily[i]===max) t.wins++;
+      if (t.daily[i]===min) t.lasts++;
+    });
+    return { max, min };
+  });
+  tls.sort((a,b)=>(b.total||0)-(a.total||0));
+  return { rows, m, perAgent, dates, tls, colStat };
+}
+
+function _appsTlCellBg(v, st) {
+  if (v===null || !st || st.max===st.min) return '';
+  const t = (v - st.min) / (st.max - st.min); // 0 = terendah, 1 = terbaik
+  if (t >= 0.5) return `background:rgba(22,163,74,${(0.08 + (t-0.5)*0.6).toFixed(3)})`;
+  return `background:rgba(220,38,38,${(0.08 + (0.5-t)*0.5).toFixed(3)})`;
+}
+
+function _appsTlDateLabel(d) {
+  const dt = new Date(d+'T00:00:00');
+  return { day: d.slice(8,10), wd: isNaN(dt) ? '' : _TL_HARI[dt.getDay()] };
+}
+
+function setAppsTl(key, val) {
+  _appsTlState[key] = val;
+  renderAppsTl();
+}
+
+function _appsTlInitBucket(rows) {
+  const sel = document.getElementById('appsTlBucket');
+  if (!sel) return;
+  const buckets = [...new Set(rows.map(r=>r.bucket).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="all">Semua Bucket</option>' + buckets.map(bk=>`<option value="${escH(bk)}">${escH(bk)}</option>`).join('');
+  sel.value = 'all';
+  const wrap = document.getElementById('appsTlBucketWrap');
+  if (wrap) wrap.style.display = buckets.length > 1 ? '' : 'none';
+}
+
+function renderAppsTl() {
+  const box = document.getElementById('appsTlContent');
+  if (!box) return;
+  const st = _appsTlState;
+  // Sinkronkan kontrol
+  const ms = document.getElementById('appsTlMetric'); if (ms) ms.value = st.metric;
+  const bs = document.getElementById('appsTlBucket'); if (bs && bs.value !== st.bucket) bs.value = st.bucket;
+  const isSum = (APPS_TL_METRICS[st.metric]||{}).sum !== false;
+  document.querySelectorAll('.apps-tl-seg').forEach(b=>{
+    const on = st[b.dataset.key] === b.dataset.val;
+    const disabled = b.dataset.key==='basis' && !isSum;
+    b.style.background = on && !disabled ? 'var(--accent)' : 'var(--surface2)';
+    b.style.color = on && !disabled ? '#fff' : 'var(--text2)';
+    b.style.opacity = disabled ? '.45' : '1';
+    b.disabled = disabled;
+  });
+  const cw = document.getElementById('appsTlCumulWrap');
+  if (cw) cw.style.display = (st.view==='chart' && isSum && st.basis!=='agent') ? '' : 'none';
+
+  const c = _appsTlCompute();
+  if (_appsTlChart) { _appsTlChart.destroy(); _appsTlChart = null; }
+  if (!c.tls.length || !c.dates.length) {
+    box.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3)">Tidak ada data Team Leader</div>';
+    return;
+  }
+  if (c.tls.length < 2) {
+    box.innerHTML = `<div style="padding:20px;text-align:center;color:var(--text3)">Hanya ada 1 Team Leader (${escH(c.tls[0].tl)}) di ${st.bucket==='all'?'aplikasi':'bucket'} ini — belum ada yang bisa dibandingkan.</div>`;
+    return;
+  }
+  const fmt = c.m.fmt, full = c.m.full;
+  const basisTxt = c.perAgent ? ' per agent' : '';
+
+  // ── Kartu insight ──
+  const best = c.tls[0], worst = c.tls[c.tls.length-1];
+  const champ = c.tls.slice().sort((a,b)=>b.wins-a.wins)[0];
+  const daysCompared = c.colStat.filter(Boolean).length;
+  const li = c.dates.length - 1;
+  const lastRank = c.tls.filter(t=>t.daily[li]!==null).sort((a,b)=>b.daily[li]-a.daily[li]);
+  const lastLbl = _appsTlDateLabel(c.dates[li]);
+  const card = (icon, label, main, sub) => `
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px 12px;min-width:0">
+      <div style="font-size:10.5px;color:var(--text3);font-weight:600;margin-bottom:4px">${icon} ${label}</div>
+      <div style="font-size:14px;font-weight:800;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escH(main)}">${escH(main)}</div>
+      <div style="font-size:11px;color:var(--text2);margin-top:2px">${sub}</div>
+    </div>`;
+  const gapLast = lastRank.length>=2 ? lastRank[0].daily[li]-lastRank[1].daily[li] : null;
+  const cardsHtml = `
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:10px;margin-bottom:14px">
+      ${card('🏆', c.m.sum ? 'TL Terbaik (total'+basisTxt+')' : 'TL Rate Tertinggi', best.tl, full(best.total))}
+      ${card('🥇', 'Paling Sering Juara Harian', champ.wins ? champ.tl : '—', champ.wins ? `${champ.wins} dari ${daysCompared} hari` : 'Belum ada')}
+      ${card('📅', `Juara ${lastLbl.wd} ${lastLbl.day}/${c.dates[li].slice(5,7)}`, lastRank[0] ? lastRank[0].tl : '—', lastRank[0] ? `${fmt(lastRank[0].daily[li])}${gapLast!==null?` · unggul ${fmt(gapLast)}`:''}` : '')}
+      ${card('⚖️', 'Selisih Teratas vs Terbawah', `${best.tl.split(' ')[0]} vs ${worst.tl.split(' ')[0]}`, c.m.sum ? fmt((best.total||0)-(worst.total||0)) : `${((best.total-worst.total)*100).toFixed(2)} poin`)}
+    </div>`;
+
+  // ── Tampilan grafik ──
+  if (st.view === 'chart') {
+    box.innerHTML = cardsHtml + `<div id="appsTlChartWrap" style="position:relative;height:360px"><canvas id="appsTlChartCanvas"></canvas></div>`;
+    const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    const gc = isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+    const tc = isDark ? '#94a3b8' : '#6b7280';
+    const cumul = st.cumul && c.m.sum && !c.perAgent;
+    const datasets = c.tls.map((t,i)=>{
+      let run = 0;
+      const data = t.daily.map(v=>{ if (!cumul) return v; if (v!==null) run += v; return run; });
+      const col = _TL_PALETTE[i % _TL_PALETTE.length];
+      return { label:t.tl, data, borderColor:col, backgroundColor:col+'33', borderWidth:2, pointRadius:3, pointHoverRadius:5, tension:0.25, spanGaps:true };
+    });
+    _appsTlChart = new Chart(document.getElementById('appsTlChartCanvas'), {
+      type:'line',
+      data:{ labels:c.dates.map(d=>{const l=_appsTlDateLabel(d);return `${l.wd} ${l.day}`;}), datasets },
+      options:{
+        responsive:true, maintainAspectRatio:false, interaction:{mode:'index',intersect:false},
+        plugins:{
+          legend:{position:'bottom',labels:{color:tc,boxWidth:12,font:{size:11}}},
+          tooltip:{ itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0), callbacks:{ label:x=>`${x.dataset.label}: ${full(x.parsed.y)}` } },
+          datalabels:{display:false}
+        },
+        scales:{ x:{grid:{color:gc},ticks:{color:tc,font:{size:10}}}, y:{grid:{color:gc},ticks:{color:tc,font:{size:10},callback:v=>fmt(v)}} }
+      }
+    });
+    return;
+  }
+
+  // ── Tampilan tabel heatmap ──
+  const thBase = 'padding:6px 8px;font-size:10.5px;font-weight:700;color:var(--text2);background:var(--surface2);white-space:nowrap';
+  const stickyTh = `position:sticky;left:0;z-index:2;${thBase};text-align:left;min-width:170px`;
+  const stickyTd = 'position:sticky;left:0;z-index:1;background:var(--surface);padding:6px 8px;text-align:left;border-bottom:1px solid var(--border);min-width:170px';
+  const td = 'padding:5px 7px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap';
+  const head = `<tr>
+      <th style="${stickyTh}">Team Leader</th>
+      ${c.dates.map(d=>{const l=_appsTlDateLabel(d);return `<th style="${thBase};text-align:center" title="${d}"><div style="font-weight:500;color:var(--text3)">${l.wd}</div>${l.day}</th>`;}).join('')}
+      <th style="${thBase};text-align:right;border-left:2px solid var(--border)">${c.m.sum ? 'Total'+basisTxt : 'Rate Bulan'}</th>
+      ${c.m.sum && !c.perAgent ? `<th style="${thBase};text-align:right">Rata²/Hari</th>` : ''}
+      <th style="${thBase};text-align:center" title="Berapa hari jadi #1 / terendah di antara TL">🥇 / 🔻</th>
+    </tr>`;
+  const body = c.tls.map((t,ri)=>`<tr>
+      <td style="${stickyTd}">
+        <div style="font-weight:700;font-size:11.5px;color:var(--text)">${ri+1}. ${escH(t.tl)}</div>
+        <div style="font-size:10px;color:var(--text3)">${escH(t.buckets.join(', '))} · ${t.agents} agent</div>
+      </td>
+      ${t.daily.map((v,i)=>{
+        const s = c.colStat[i];
+        const isBest = s && v!==null && v===s.max && s.max!==s.min;
+        return `<td style="${td};${_appsTlCellBg(v,s)};${isBest?'font-weight:800':''}" title="${escH(t.tl)} · ${c.dates[i]}: ${v===null?'tidak ada data':escH(full(v))}">${v===null?'<span style="color:var(--text3)">·</span>':fmt(v)}</td>`;
+      }).join('')}
+      <td style="${td};font-weight:800;border-left:2px solid var(--border)">${full(t.total)}</td>
+      ${c.m.sum && !c.perAgent ? `<td style="${td}">${fmt(t.perDay)}</td>` : ''}
+      <td style="${td};text-align:center"><b style="color:#16a34a">${t.wins}</b> / <b style="color:#dc2626">${t.lasts}</b></td>
+    </tr>`).join('');
+  let foot = '';
+  if (c.m.sum && !c.perAgent) {
+    const dayTot = c.dates.map((d,i)=>c.tls.reduce((a,t)=>a+(t.daily[i]||0),0));
+    const grand = dayTot.reduce((a,v)=>a+v,0);
+    foot = `<tr style="background:var(--surface2)">
+      <td style="${stickyTd};background:var(--surface2);font-weight:800;font-size:11.5px">Total Aplikasi</td>
+      ${dayTot.map(v=>`<td style="${td};font-weight:700">${fmt(v)}</td>`).join('')}
+      <td style="${td};font-weight:800;border-left:2px solid var(--border)">${full(grand)}</td>
+      <td style="${td};font-weight:700">${fmt(grand/(c.dates.length||1))}</td>
+      <td style="${td}"></td>
+    </tr>`;
+  }
+  const legend = `<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:10.5px;color:var(--text3);margin:8px 0 2px">
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:rgba(22,163,74,.38);vertical-align:-2px"></span> terbaik di tanggal itu</span>
+      <span><span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:rgba(220,38,38,.3);vertical-align:-2px"></span> terendah di tanggal itu</span>
+      <span>· = tidak ada data</span>
+      ${c.perAgent ? '<span>Per agent = nilai ÷ jumlah agent yang punya data di hari itu</span>' : ''}
+    </div>`;
+  box.innerHTML = cardsHtml + `
+    <div style="overflow:auto;border:1px solid var(--border);border-radius:10px;max-height:56vh">
+      <table style="border-collapse:separate;border-spacing:0;font-size:11px;width:max-content;min-width:100%">
+        <thead style="position:sticky;top:0;z-index:3">${head}</thead>
+        <tbody>${body}${foot}</tbody>
+      </table>
+    </div>` + legend;
 }
 
 async function openAppCmpBulan() {
