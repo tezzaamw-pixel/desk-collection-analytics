@@ -1178,7 +1178,7 @@ function endpointQcCheck_(e) {
     out.push([r.tanggal, r.agent, r.teamLeader, r.supervisor || '', r.aplikasi, r.bucket, r.absensi,
       r.callManual || 0, r.callTerhubung || 0,
       j ? j.attempt : null, j ? j.duration : null, j && j.off ? 1 : 0,
-      T.names[k] ? (t ? t.count : 0) : null, t ? t.dup : 0]);
+      T.names[k] ? (t ? t.count : 0) : null, t ? t.dup : 0, qcNames[k].akun || '']);
   });
   // Agent yg ada di QC (punya attempt bulan ini) tapi tidak ketemu di All Data
   const unmatched = [];
@@ -1191,7 +1191,7 @@ function endpointQcCheck_(e) {
   unmatched.sort((a, b) => b.attempt - a.attempt);
   return {
     success: true, action: 'qccheck', periode,
-    cols: ['tanggal','agent','tl','spv','aplikasi','bucket','absensi','tlCall','tlConn','qcAtt','qcDur','qcOff','qcConn','qcDup'],
+    cols: ['tanggal','agent','tl','spv','aplikasi','bucket','absensi','tlCall','tlConn','qcAtt','qcDur','qcOff','qcConn','qcDup','qcAkun'],
     rows: out, unmatched, terhubungTersedia: T.available
   };
 }

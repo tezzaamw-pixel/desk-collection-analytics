@@ -282,6 +282,11 @@ function analyze(){
   // durasi per attempt jauh di bawah median seluruh agent bulan ini.
   const dpa=ROWS.filter(r=>r.qcAtt>=50&&r.qcDur>0&&!r.qcOff).map(r=>r.qcDur/r.qcAtt).sort((a,b)=>a-b);
   DATA.medianDpa=dpa.length?dpa[Math.floor(dpa.length/2)]:null;
+  // Agent yang QC-nya 0 call di SEMUA hari yang dicek (min. 3 hari) padahal TL
+  // mengisi call → kemungkinan akun Microsip-nya tidak tercatat di sheet QC.
+  // Dipisah sbg "QC kosong sebulan" & tidak dihitung ke penilaian TL.
+  const emp={};
+  ROWS.forEach(r=>{if(r.qcAtt===null||r.qcAtt===undefined||r.qcOff)return;const o=emp[r.agent]||(emp[r.agent]={n:0,z:0});o.n++;if(r.qcAtt===0&&r.tlCall>0)o.z++;});
   ROWS.forEach(r=>{
     const hasQc=r.qcAtt!==null&&r.qcAtt!==undefined;
     const hadirTL=String(r.absensi||'').toLowerCase()==='hadir';
@@ -293,14 +298,18 @@ function analyze(){
             (hadirTL&&r.tlCall>0&&hasQc&&(r.qcOff||r.qcAtt===0))?(r.qcOff?'QC: OFF':'QC: 0 call'):'';
     r.asal=hasQc&&!r.qcOff&&r.qcAtt>=50&&r.qcDur!==null&&DATA.medianDpa>0&&(r.qcDur/r.qcAtt)<T.dur*DATA.medianDpa;
     r.conn=r.qcConn!==null&&r.qcConn!==undefined&&r.tlConn!==r.qcConn;
+    const e=emp[r.agent];
+    r.qcEmpty=!!(e&&e.n>=3&&e.z===e.n);
+    if(r.qcEmpty){r.checked=false;r.beda=false;r.diff=null;r.absen='';r.asal=false;}
     r.bad=r.beda||!!r.absen||r.copas>0||r.asal;
   });
 }
 function scoped(){return ROWS.filter(r=>!VIEW.app||r.aplikasi===VIEW.app);}
+function scored(){return scoped().filter(r=>!r.qcEmpty);}
 
 function render(){
   const box=document.getElementById('content');
-  const rows=scoped();
+  const rows=scored();
   if(!DATA.rows.length){box.innerHTML=`<div class="card"><div class="empty">Belum ada data yang bisa dicocokkan untuk bulan ini.<br><span class="muted">Pastikan nama di sheet JUMLAH DATA CALL sama dengan nama agent di All Data.</span></div></div>`+unmatchedHtml();return;}
   const chk=rows.filter(r=>r.checked), bad=chk.filter(r=>r.beda);
   const over=bad.filter(r=>r.diff>0).length;
@@ -315,13 +324,15 @@ function render(){
     <div class="kpi"><div class="l">Pola mencurigakan</div><div class="v">${absen+asal}</div><div class="s">${absen} absensi tak sesuai · ${asal} panggilan asal · ${copas} agent angka copy-paste</div></div>
   </div>
   <div class="card" id="secTl"></div>
+  ${emptyHtml()}
   <div class="card" id="secDetail"></div>
   ${unmatchedHtml()}`;
   renderTl(); renderDetail();
 }
 
 function renderTl(){
-  const rows=scoped(), by={};
+  const rows=scored(), by={};
+  const emptyBy={};scoped().filter(r=>r.qcEmpty).forEach(r=>{const k=r.tl||'(Tanpa TL)';(emptyBy[k]=emptyBy[k]||new Set()).add(r.agent);});
   rows.forEach(r=>{const k=r.tl||'(Tanpa TL)';const o=by[k]||(by[k]={tl:k,spv:r.spv,app:new Set(),agents:new Set(),chk:0,bad:0,over:0,diffPct:[],absen:0,copas:new Set(),asal:0,conn:0});
     o.app.add(r.aplikasi+' '+r.bucket);o.agents.add(r.agent);
     if(r.checked){o.chk++;if(r.beda){o.bad++;if(r.diff>0)o.over++;}if(r.qcAtt>0)o.diffPct.push(r.diff/r.qcAtt);}
@@ -330,13 +341,13 @@ function renderTl(){
     .sort((a,b)=>b.score-a.score||(b.chk?b.bad/b.chk:0)-(a.chk?a.bad/a.chk:0));
   document.getElementById('secTl').innerHTML=`
     <div class="card-head"><div><div class="card-title">👥 Per Team Leader</div><div class="card-sub">Diurutkan dari yang paling perlu dicek · klik nama TL untuk melihat daftar agent yang bermasalah beserta keterangannya</div></div></div>
-    <div class="tbl-wrap"><table class="t"><thead><tr><th>Team Leader</th><th>Aplikasi</th><th class="n">Agent</th><th class="n">Hari dicek</th><th class="n">Cocok</th><th class="n">Rata² selisih</th><th class="n">TL > QC</th><th class="n">Absensi tak sesuai</th><th class="n">Copy-paste</th><th class="n">Panggilan asal</th><th class="n">Terhubung beda</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>Team Leader</th><th>Aplikasi</th><th class="n">Agent</th><th class="n">Hari dicek</th><th class="n">Cocok</th><th class="n">Rata² selisih</th><th class="n">TL > QC</th><th class="n">Absensi tak sesuai</th><th class="n">Copy-paste</th><th class="n">Panggilan asal</th><th class="n">Terhubung beda</th><th class="n" title="Agent yang QC-nya 0 call sebulan — tidak dihitung ke penilaian">QC kosong</th></tr></thead><tbody>
     ${list.map(o=>`<tr class="clickable" onclick="openTlModal(${JSON.stringify(o.tl).replace(/"/g,'&quot;')})" title="Klik untuk melihat daftar agent yang bermasalah">
       <td><b style="color:var(--accent);text-decoration:underline dotted">${escH(o.tl)}</b>${o.spv?`<div class="muted" style="font-size:10.5px">SPV ${escH(o.spv)}</div>`:''}</td><td style="font-size:11px">${escH([...o.app].join(', '))}</td>
       <td class="n">${o.agents.size}</td><td class="n">${o.chk}</td>
       <td class="n ${o.chk&&o.bad/o.chk>.3?'bad':o.chk?'good':''}" style="font-weight:700">${fmtPct(o.chk?(o.chk-o.bad)/o.chk:null)}</td>
       <td class="n ${o.avgDiff!==null&&Math.abs(o.avgDiff)>tol().pct?'bad':''}">${o.avgDiff===null?'—':(o.avgDiff>=0?'+':'')+(o.avgDiff*100).toFixed(0)+'%'}</td>
-      <td class="n">${o.over||''}</td><td class="n">${o.absen||''}</td><td class="n">${o.copas.size?o.copas.size+' agent':''}</td><td class="n">${o.asal||''}</td><td class="n muted">${o.conn||''}</td></tr>`).join('')}
+      <td class="n">${o.over||''}</td><td class="n">${o.absen||''}</td><td class="n">${o.copas.size?o.copas.size+' agent':''}</td><td class="n">${o.asal||''}</td><td class="n muted">${o.conn||''}</td><td class="n muted">${emptyBy[o.tl]?emptyBy[o.tl].size+' agent':''}</td></tr>`).join('')}
     </tbody></table></div>`;
 }
 
@@ -365,10 +376,42 @@ function renderDetail(){
       <td class="n ${r.beda?'bad':''}" style="font-weight:700">${r.diff===null?'':(r.diff>0?'+':'')+fmtNum(r.diff)}</td>
       <td class="n">${r.qcOff?'':fmtNum(r.qcDur)}</td><td class="n ${r.asal?'bad':''}">${r.qcAtt>0&&r.qcDur!==null?(r.qcDur/r.qcAtt).toFixed(1):''}</td>
       <td class="n">${fmtNum(r.tlConn)} / ${r.qcConn===null||r.qcConn===undefined?'<span class="muted">—</span>':fmtNum(r.qcConn)}${r.qcDup?` <span class="muted" title="link rekaman dobel di sheet QC">(+${r.qcDup} dobel)</span>`:''}</td>
-      <td class="notes">${r.beda?`<span class="flag f-beda">${r.diff>0?'TL lebih besar':'TL lebih kecil'}</span>`:''}${r.absen?`<span class="flag f-absen">${escH(r.absen)}</span>`:''}${r.copas?`<span class="flag f-copas">angka ${fmtNum(r.tlCall)} muncul ${r.copas} hari</span>`:''}${r.asal?`<span class="flag f-asal">panggilan asal</span>`:''}${r.conn?`<span class="flag f-conn">terhubung beda</span>`:''}</td></tr>`).join('')}
+      <td class="notes">${r.qcEmpty?'<span class="flag f-conn">QC kosong sebulan</span>':''}${r.beda?`<span class="flag f-beda">${r.diff>0?'TL lebih besar':'TL lebih kecil'}</span>`:''}${r.absen?`<span class="flag f-absen">${escH(r.absen)}</span>`:''}${r.copas?`<span class="flag f-copas">angka ${fmtNum(r.tlCall)} muncul ${r.copas} hari</span>`:''}${r.asal?`<span class="flag f-asal">panggilan asal</span>`:''}${r.conn?`<span class="flag f-conn">terhubung beda</span>`:''}</td></tr>`).join('')}
     </tbody></table></div>`:'<div class="issues ok">✅ Tidak ada yang bermasalah untuk pilihan ini.</div>'}`;
 }
 
+function emptyList(){
+  const by={};
+  scoped().filter(r=>r.qcEmpty).forEach(r=>{const o=by[r.agent]||(by[r.agent]={agent:r.agent,tl:r.tl,spv:r.spv,app:r.aplikasi+' '+r.bucket,akun:r.qcAkun||'',hari:0,call:0,vals:new Set()});o.hari++;o.call+=r.tlCall;if(r.tlCall>0)o.vals.add(r.tlCall);});
+  return Object.values(by).sort((a,b)=>(a.tl||'').localeCompare(b.tl||'')||a.agent.localeCompare(b.agent));
+}
+function emptyHtml(){
+  const l=emptyList(); if(!l.length)return '';
+  return `<div class="card"><div class="card-head"><div><div class="card-title">📵 QC Kosong Sebulan (${l.length} agent)</div>
+    <div class="card-sub">Attempt QC selalu 0 di semua hari, padahal TL mengisi call. Bisa karena akun Microsip agent tidak tercatat di sheet QC, atau isian TL tidak sesuai. <b>Tidak dihitung</b> ke persentase Cocok & penilaian TL di atas sampai dipastikan.</div></div>
+    <div style="display:flex;gap:8px"><button class="btn btn-ghost" onclick="copyEmpty()">📋 Salin daftar</button><button class="btn btn-ghost" onclick="downloadEmpty()">⬇ Unduh CSV</button></div></div>
+    <div class="tbl-wrap" style="max-height:360px"><table class="t"><thead><tr><th>Agent</th><th>TL</th><th>Aplikasi</th><th>Akun Microsip (di QC)</th><th class="n">Hari</th><th class="n">Total call isian TL</th><th>Angka isian TL</th></tr></thead><tbody>
+    ${l.map(x=>`<tr><td><b>${escH(x.agent)}</b></td><td>${escH(x.tl)}</td><td style="font-size:11px">${escH(x.app)}</td><td>${escH(x.akun)||'<span class="muted">—</span>'}</td><td class="n">${x.hari}</td><td class="n">${fmtNum(x.call)}</td><td style="font-size:11px">${x.vals.size===1?'<span class="flag f-copas">selalu '+fmtNum([...x.vals][0])+'</span>':[...x.vals].slice(0,6).map(fmtNum).join(', ')}</td></tr>`).join('')}
+    </tbody></table></div><div id="emptyMsg" class="card-sub" style="margin-top:6px"></div></div>`;
+}
+function emptyRowsText(sep){
+  const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value;
+  const head=['Agent','TL','SPV','Aplikasi','Akun Microsip (QC)','Hari','Total call isian TL','Angka isian TL'];
+  const q=v=>{v=String(v??'');return sep===','&&/[",\n]/.test(v)?'"'+v.replace(/"/g,'""')+'"':v;};
+  return [head].concat(emptyList().map(x=>[x.agent,x.tl,x.spv,x.app,x.akun,x.hari,x.call,[...x.vals].join(' / ')]))
+    .map(r=>r.map(q).join(sep)).join('\n');
+}
+async function copyEmpty(){
+  const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value;
+  const txt=`Agent dengan QC 0 call sebulan (${bulan} ${tahun}) — mohon cek akun Microsip:\n`+emptyRowsText('\t');
+  try{await navigator.clipboard.writeText(txt);document.getElementById('emptyMsg').textContent='✅ Disalin. Bisa langsung ditempel ke Excel/Sheets atau chat tim QC.';}
+  catch(e){document.getElementById('emptyMsg').textContent='Gagal menyalin otomatis — pakai tombol Unduh CSV.';}
+}
+function downloadEmpty(){
+  const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value;
+  const blob=new Blob(['\ufeff'+emptyRowsText(',')],{type:'text/csv;charset=utf-8'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`QC-kosong-${bulan}-${tahun}.csv`;document.body.appendChild(a);a.click();a.remove();
+}
 function unmatchedHtml(){
   const u=DATA.unmatched||[];
   if(!u.length)return '';
@@ -395,6 +438,7 @@ function rowNotes(r){
 }
 function openTlModal(tl){
   const rows=scoped().filter(r=>(r.tl||'(Tanpa TL)')===tl);
+  const emptyAg=[...new Set(rows.filter(r=>r.qcEmpty).map(r=>r.agent))];
   const byAg={};rows.forEach(r=>{(byAg[r.agent]=byAg[r.agent]||[]).push(r);});
   const ags=Object.entries(byAg).map(([ag,rs])=>{
     rs.sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
@@ -412,11 +456,11 @@ function openTlModal(tl){
     if(sum.conn)ket.push(`<span class="flag f-conn">terhubung beda ${sum.conn} hari</span>`);
     const score=sum.beda+sum.absen*2+(copasVals.length?3:0)+sum.asal;
     return {ag,rs,bad,chk,sumTL,sumQC,ket,score};
-  }).filter(a=>a.bad.length).sort((a,b)=>b.score-a.score||Math.abs(b.sumTL-b.sumQC)-Math.abs(a.sumTL-a.sumQC));
+  }).filter(a=>a.bad.length&&!emptyAg.includes(a.ag)).sort((a,b)=>b.score-a.score||Math.abs(b.sumTL-b.sumQC)-Math.abs(a.sumTL-a.sumQC));
   const okCount=Object.keys(byAg).length-ags.length;
   const spv=(rows.find(r=>r.spv)||{}).spv||'';
   document.getElementById('tlModalTitle').textContent='👥 '+tl;
-  document.getElementById('tlModalSub').textContent=`${spv?'SPV '+spv+' · ':''}${ags.length} agent perlu dicek${okCount?' · '+okCount+' agent tidak ada masalah':''}`;
+  document.getElementById('tlModalSub').textContent=`${spv?'SPV '+spv+' · ':''}${ags.length} agent perlu dicek${okCount-emptyAg.length>0?' · '+(okCount-emptyAg.length)+' agent tidak ada masalah':''}${emptyAg.length?' · '+emptyAg.length+' agent QC kosong sebulan (tidak dinilai): '+emptyAg.join(', '):''}`;
   document.getElementById('tlModalBody').innerHTML=ags.length?ags.map((a,i)=>`
     <div class="agcard ${i<3?'open':''}">
       <div class="agcard-h" onclick="this.parentElement.classList.toggle('open')">
