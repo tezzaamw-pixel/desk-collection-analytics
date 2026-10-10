@@ -474,6 +474,8 @@ function renderRec(){
   const used=new Set();
   const findInt=a=>{const ki=normKey(a.kufiId),kn=normKey(a.nama);
     let i=intl.findIndex((r,ix)=>!used.has(ix)&&ki&&normKey(r.namaAkun)===ki);
+    // nama di laporan klien = nama pemilik akun (kolom NAMA AKUN di All Data), bukan selalu nama agent
+    if(i<0)i=intl.findIndex((r,ix)=>!used.has(ix)&&kn&&normKey(r.namaAkun)===kn);
     if(i<0)i=intl.findIndex((r,ix)=>!used.has(ix)&&kn&&normKey(r.agent)===kn);
     if(i>=0)used.add(i);return i>=0?intl[i]:null;};
   const rows=klien.map(a=>{const r=findInt(a);return {a,r,diff:r?(a.repay-(r.dailyPayment||0)):null};});
@@ -492,7 +494,7 @@ function renderRec(){
       <div class="kpi"><div class="l">Agent beda / tidak ketemu</div><div class="v ${beda.length?'bad':''}">${beda.length} <span style="font-size:13px;color:var(--text3)">/ ${nf.length}</span></div><div class="s">tidak ketemu = nama/ID tidak ada di All Data</div></div>
     </div>
     ${beda.length||nf.length||extra.length?`<div class="tbl-wrap" style="max-height:420px"><table class="t"><thead><tr><th>Agent (klien)</th><th>TL</th><th class="n">Repay klien</th><th class="n">Input internal</th><th class="n">Selisih</th><th>Keterangan</th></tr></thead><tbody>
-      ${beda.map(x=>`<tr><td><b>${escH(x.a.nama)}</b> <span class="muted">${escH(x.a.kufiId)}</span></td><td>${escH(x.a.tl)}</td><td class="n">${fmtRpFull(x.a.repay)}</td><td class="n">${fmtRpFull(x.r.dailyPayment)}</td><td class="n bad" style="font-weight:700">${fmtRpFull(x.diff)}</td><td>${x.diff>0?'Klien catat lebih besar':'Input internal lebih besar'}</td></tr>`).join('')}
+      ${beda.map(x=>`<tr><td><b>${escH(x.a.nama)}</b> <span class="muted">${escH(x.a.kufiId)}${x.r.agent&&normKey(x.r.agent)!==normKey(x.a.nama)?' · dipegang '+escH(x.r.agent):''}</span></td><td>${escH(x.a.tl)}</td><td class="n">${fmtRpFull(x.a.repay)}</td><td class="n">${fmtRpFull(x.r.dailyPayment)}</td><td class="n bad" style="font-weight:700">${fmtRpFull(x.diff)}</td><td>${x.diff>0?'Klien catat lebih besar':'Input internal lebih besar'}</td></tr>`).join('')}
       ${nf.map(x=>`<tr><td><b>${escH(x.a.nama)}</b> <span class="muted">${escH(x.a.kufiId)}</span></td><td>${escH(x.a.tl)}</td><td class="n">${fmtRpFull(x.a.repay)}</td><td class="n muted">—</td><td class="n"></td><td><span class="pill pill-warn">tidak ketemu di All Data</span></td></tr>`).join('')}
       ${extra.map(r=>`<tr><td><b>${escH(r.agent)}</b> <span class="muted">${escH(r.namaAkun||'')}</span></td><td>${escH(r.teamLeader||'')}</td><td class="n muted">—</td><td class="n">${fmtRpFull(r.dailyPayment)}</td><td class="n"></td><td><span class="pill pill-warn">ada di internal, tidak di laporan klien</span></td></tr>`).join('')}
     </tbody></table></div>`:'<div class="issues ok">✅ Semua payment agent EDN cocok dengan input internal.</div>'}`);
