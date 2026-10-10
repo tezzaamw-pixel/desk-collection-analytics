@@ -8288,7 +8288,12 @@ function renderAppsTl() {
   const best = c.tls[0], worst = c.tls[c.tls.length-1];
   const champ = c.tls.slice().sort((a,b)=>b.wins-a.wins)[0];
   const daysCompared = c.colStat.filter(Boolean).length;
-  const li = c.dates.length - 1;
+  // Tanggal terakhir yang sudah "lengkap": min. 2 TL punya nilai > 0
+  // (hari berjalan sering baru sebagian terisi, jadi dilewati kalau belum)
+  let li = c.dates.length - 1;
+  for (let i = c.dates.length - 1; i >= 0; i--) {
+    if (c.tls.filter(t=>t.daily[i]!==null && t.daily[i]>0).length >= 2) { li = i; break; }
+  }
   const lastRank = c.tls.filter(t=>t.daily[li]!==null).sort((a,b)=>b.daily[li]-a.daily[li]);
   const lastLbl = _appsTlDateLabel(c.dates[li]);
   const card = (icon, label, main, sub) => `
