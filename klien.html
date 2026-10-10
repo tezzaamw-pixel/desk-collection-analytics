@@ -520,12 +520,45 @@ function addFiles(list){
   renderUp();
 }
 
+// Persiapan gambar sebelum dibaca AI: baris berlatar MERAH (teks merah tua di
+// atas merah terang, sulit dibaca) diubah jadi teks hitam di atas MERAH MUDA,
+// lalu gambar diperbesar 2x supaya angka kecil lebih jelas. Status "merah" tetap
+// terbaca karena latarnya masih merah muda (bukan putih).
+function prepareImage(file){
+  return new Promise((resolve)=>{
+    const img=new Image();
+    img.onload=()=>{
+      try{
+        const scale=img.width<1800?2:1;
+        const c=document.createElement('canvas');c.width=img.width*scale;c.height=img.height*scale;
+        const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(img,0,0,c.width,c.height);
+        const id=x.getImageData(0,0,c.width,c.height),p=id.data;
+        let redPx=0;
+        for(let i=0;i<p.length;i+=4){
+          const r=p[i],g=p[i+1],b=p[i+2];
+          if(r-Math.max(g,b)>70){ // piksel kemerahan
+            const L=Math.min(1,Math.max(0,(r-90)/145)); // merah terang→1, merah tua (teks)→0
+            p[i]=255*L;p[i+1]=214*L;p[i+2]=214*L;redPx++;
+          }
+        }
+        x.putImageData(id,0,0);
+        c.toBlob(b=>{
+          if(b&&b.size<7e6)return resolve({blob:b,changed:redPx>0});
+          c.toBlob(j=>resolve({blob:j||file,changed:redPx>0}),'image/jpeg',0.93);
+        },'image/png');
+      }catch(e){resolve({blob:file,changed:false});}
+    };
+    img.onerror=()=>resolve({blob:file,changed:false});
+    img.src=URL.createObjectURL(file);
+  });
+}
+
 function fileToB64(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});}
 
 const GEM_PROMPT=`Kamu membaca gambar laporan penagihan dari klien (dibuat di Excel). Judulnya seperti "EDN NPA DAILY PERFORMANCE REPORT" atau "EDN CO3 MONTHLY PERFORMANCE REPORT".
 Isi gambar:
 1) Tabel atas = ranking TL: RANK, TL NAME, COMPANY, TOTAL LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, AVERAGE HANDLE TIME, lalu baris AVG.
-2) Tabel besar = per agent: KUFI-ID, NAME, TL NAME, COMPANY, LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, HANDLE TIME, LOAD NUMBER, lalu baris AVG. Sebagian baris berlatar MERAH.
+2) Tabel besar = per agent: KUFI-ID, NAME, TL NAME, COMPANY, LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, HANDLE TIME, LOAD NUMBER, lalu baris AVG. Sebagian baris berlatar MERAH MUDA (aslinya merah; warnanya sudah dicerahkan supaya teks mudah dibaca).
 3) Khusus laporan MONTHLY: kotak kecil di kanan berisi DATE (mis. 1-Oct-26) × kolom COMPANY (EDN, B, C, D, ...) berisi repay rate harian, lalu baris AVG.
 Aturan:
 - jenis = "DAILY" atau "MONTHLY" sesuai judul. bucket = "NPA" atau "CO3" sesuai judul.
@@ -533,7 +566,7 @@ Aturan:
 - Tulis SEMUA baris agent dari atas sampai bawah sesuai urutan, jangan ada yang dilewati, digabung, atau dikarang.
 - Angka ditulis tanpa pemisah ribuan (1,433,100,893 → 1433100893). Tanda "-" atau kosong = 0.
 - rate = angka persen tanpa tanda % (0.239% → 0.239). Kalau tertulis desimal tanpa % (mis. 0.004), tetap tulis apa adanya.
-- merah = true kalau baris agent itu berlatar merah, selain itu false.
+- merah = true kalau baris agent itu berlatar merah muda/merah, false kalau putih.
 - company ditulis persis (EDN, B, C, D, E, F, G).
 - Baris AVG jangan dimasukkan ke daftar tl/agents; masukkan ke tlAvg dan agentAvg.`;
 
@@ -553,8 +586,9 @@ async function processFile(u){
   if(!key){u.status='nokey';u.msg='butuh API key';renderUp();return;}
   u.status='busy';u.msg='membaca… (±30–60 dtk)';renderUp();
   try{
-    const b64=await fileToB64(u.file);
-    const body={contents:[{parts:[{text:GEM_PROMPT},{inline_data:{mime_type:u.file.type||'image/jpeg',data:b64}}]}],
+    if(!u.prep){u.msg='menyiapkan gambar…';renderUp();u.prep=await prepareImage(u.file);u.prepUrl=URL.createObjectURL(u.prep.blob);u.msg='membaca… (±30–60 dtk)';renderUp();}
+    const b64=await fileToB64(u.prep.blob);
+    const body={contents:[{parts:[{text:GEM_PROMPT},{inline_data:{mime_type:u.prep.blob.type||'image/jpeg',data:b64}}]}],
       generationConfig:{temperature:0,responseMimeType:'application/json',responseSchema:GEM_SCHEMA,maxOutputTokens:65536}};
     let resp=null,lastErr=null,j=null;
     for(const model of GEMINI_MODELS){
@@ -643,7 +677,7 @@ function renderUp(){
         <select onchange="upSet('${u.id}','bucket',this.value)"><option value="NPA" ${d.bucket==='NPA'?'selected':''}>NPA</option><option value="C03" ${d.bucket==='C03'?'selected':''}>CO3</option></select>
         <input type="date" value="${d.tanggal}" onchange="upSet('${u.id}','tanggal',this.value)">
         <span class="muted" style="font-size:12px">${d.tl.length} TL · ${d.agents.length} agent · ${d.agents.filter(a=>a.merah).length} merah${d.vendor.length?' · '+d.vendor.length+' rate vendor':''}</span>
-        <a href="${u.url}" target="_blank" style="margin-left:auto;font-size:12px;color:var(--accent)">Lihat gambar asli ↗</a>
+        <span style="margin-left:auto;font-size:12px;display:flex;gap:12px">${u.prepUrl?`<a href="${u.prepUrl}" target="_blank" style="color:var(--accent)">Gambar yang dibaca AI ↗</a>`:''}<a href="${u.url}" target="_blank" style="color:var(--accent)">Gambar asli ↗</a></span>
       </div>
       <div class="issues ${u.issues.length?'warn':'ok'}">${u.issues.length?`<b>⚠️ ${u.issues.length} hal perlu dicek</b> (baris kuning di bawah). Klik angka untuk memperbaiki sesuai gambar asli:<br>`+u.issues.slice(0,12).map(escH).join('<br>')+(u.issues.length>12?`<br>… dan ${u.issues.length-12} lagi`:''):'✅ Hasil bacaan cocok: rate tiap agent sesuai repay÷outstanding, dan total repay tiap TL sama dengan jumlah agent-nya.'}</div>
       <div style="font-size:12px;font-weight:700;margin:10px 0 6px">Ranking TL</div>
