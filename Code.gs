@@ -418,6 +418,7 @@ function doGet(e) {
       case 'rankdata':  result = endpointRankData_(e);  break;
       case 'paymenttrend': result = endpointPaymentTrend_(e); break;
       case 'klien':     result = endpointKlien_(e);     break;
+      case 'qccheck':   result = endpointQcCheck_(e);   break;
       default: result = { success: false, message: 'Unknown action: ' + action };
     }
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -1069,4 +1070,135 @@ function doPost(e) {
 
 function TEST_klien() {
   Logger.log(JSON.stringify(endpointKlien_({parameter:{bucket:'C03'}})).slice(0, 2000));
+}
+
+/*** ============ CEK CALL (data QC internal) ============ ***
+ * Membandingkan isian TL di "All Data" dengan data QC:
+ *   - Sheet "JUMLAH DATA CALL"    : NO | NAMA | AKUN MICROSIP | per tanggal 2 kolom
+ *                                   (Attempt, Duration (s)); "OFF" = libur.
+ *     Row 1 = tanggal (dd/mm/yyyy, merge 2 kolom), row 2 = sub-header, data mulai row 3.
+ *   - Sheet "DATA CALL TERHUBUNG" : NO | DATE | NAME | AKUN MICROSIP | BUCKET | LINK RECORDING
+ *     1 baris = 1 rekaman call terhubung (link yang sama dihitung 1).
+ * Attempt QC dibandingkan dengan kolom CALL MANUAL; jumlah rekaman dengan
+ * CALL TERHUBUNG. Pencocokan nama agent mengabaikan spasi/tanda baca/huruf besar.
+ ***********************************************************/
+const QC_SHEET_JUMLAH = 'JUMLAH DATA CALL';
+const QC_SHEET_TERHUBUNG = 'DATA CALL TERHUBUNG';
+
+function _qcName_(s) { return String(s || '').toUpperCase().replace(/[^A-Z0-9]/g, ''); }
+function _qcDate_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  const s = String(v || '').trim();
+  let m = s.match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{4})$/);
+  if (m) return m[3] + '-' + m[2].padStart(2, '0') + '-' + m[1].padStart(2, '0');
+  m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+  if (m) return m[1] + '-' + m[2].padStart(2, '0') + '-' + m[3].padStart(2, '0');
+  return '';
+}
+function _qcNum_(v) {
+  const s = String(v === null || v === undefined ? '' : v).trim();
+  if (s === '' ) return null;
+  if (s === '-') return 0;
+  const n = Number(s.replace(/[.,\s]/g, '').replace(/[^\d\-]/g, '')); // angka call/durasi selalu bulat
+  return isNaN(n) ? null : n;
+}
+
+// → { key "NAMA|yyyy-mm-dd": {attempt, duration, off}, names: {NORM: {nama, akun}} }
+function _qcReadJumlah_(ss, periode) {
+  const sh = ss.getSheetByName(QC_SHEET_JUMLAH);
+  if (!sh) throw new Error('Sheet "' + QC_SHEET_JUMLAH + '" tidak ditemukan.');
+  const lr = sh.getLastRow(), lc = sh.getLastColumn();
+  if (lr < 3) return { map: {}, names: {} };
+  const v = sh.getRange(1, 1, lr, lc).getDisplayValues();
+  const dateCols = [];
+  for (let c = 3; c < lc; c++) {
+    const d = _qcDate_(v[0][c]);
+    if (d && (!periode || d.slice(0, 7) === periode)) dateCols.push({ c, d });
+  }
+  const map = {}, names = {};
+  for (let r = 2; r < lr; r++) {
+    const nama = String(v[r][1] || '').trim(); if (!nama) continue;
+    const k = _qcName_(nama);
+    names[k] = { nama, akun: String(v[r][2] || '').trim() };
+    dateCols.forEach(dc => {
+      const a = String(v[r][dc.c] || '').trim(), du = String(v[r][dc.c + 1] || '').trim();
+      if (a === '' && du === '') return;
+      const off = a.toUpperCase() === 'OFF';
+      map[k + '|' + dc.d] = { attempt: off ? 0 : _qcNum_(a), duration: off ? 0 : _qcNum_(du), off };
+    });
+  }
+  return { map, names };
+}
+
+// → { key: {count, dup}, names: {NORM: true} }
+function _qcReadTerhubung_(ss, periode) {
+  const sh = ss.getSheetByName(QC_SHEET_TERHUBUNG);
+  if (!sh) return { map: {}, names: {}, available: false };
+  const lr = sh.getLastRow();
+  if (lr < 2) return { map: {}, names: {}, available: true };
+  const v = sh.getRange(2, 1, lr - 1, 6).getDisplayValues();
+  const map = {}, names = {}, seen = {};
+  v.forEach(r => {
+    const d = _qcDate_(r[1]), k = _qcName_(r[2]);
+    if (!d || !k) return;
+    names[k] = true;
+    if (periode && d.slice(0, 7) !== periode) return;
+    const key = k + '|' + d, link = String(r[5] || '').trim();
+    const o = map[key] || (map[key] = { count: 0, dup: 0 });
+    const lk = key + '|' + link;
+    if (link && seen[lk]) { o.dup++; return; }
+    seen[lk] = true; o.count++;
+  });
+  return { map, names, available: true };
+}
+
+// GET ?action=qccheck&bulan=Oktober&tahun=2026
+function endpointQcCheck_(e) {
+  const p = (e && e.parameter) || {};
+  const bulan = normBulan_(p.bulan || ''), tahun = normTahun_(p.tahun || '');
+  const bi = BULAN_LIST.indexOf(bulan);
+  if (bi < 0 || !tahun) throw new Error('Parameter bulan & tahun wajib.');
+  const periode = tahun + '-' + String(bi + 1).padStart(2, '0');
+  const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+  const J = _qcReadJumlah_(ss, periode);
+  const T = _qcReadTerhubung_(ss, periode);
+
+  let rows = _cacheGet('svc_agentdata_raw');
+  if (!rows) rows = readInputData().rows;
+  rows = rows.filter(r => r.bulan === bulan && r.tahun === tahun);
+
+  const qcNames = Object.assign({}, J.names);
+  const matched = {};
+  const out = [];
+  rows.forEach(r => {
+    const k = _qcName_(r.agent);
+    if (!k || !qcNames[k]) return;
+    matched[k] = true;
+    const j = J.map[k + '|' + r.tanggal], t = T.map[k + '|' + r.tanggal];
+    out.push([r.tanggal, r.agent, r.teamLeader, r.supervisor || '', r.aplikasi, r.bucket, r.absensi,
+      r.callManual || 0, r.callTerhubung || 0,
+      j ? j.attempt : null, j ? j.duration : null, j && j.off ? 1 : 0,
+      T.names[k] ? (t ? t.count : 0) : null, t ? t.dup : 0]);
+  });
+  // Agent yg ada di QC (punya attempt bulan ini) tapi tidak ketemu di All Data
+  const unmatched = [];
+  Object.keys(qcNames).forEach(k => {
+    if (matched[k]) return;
+    let tot = 0, days = 0;
+    Object.keys(J.map).forEach(key => { if (key.indexOf(k + '|') === 0 && J.map[key].attempt > 0) { tot += J.map[key].attempt; days++; } });
+    if (days) unmatched.push({ nama: qcNames[k].nama, akun: qcNames[k].akun, attempt: tot, hari: days });
+  });
+  unmatched.sort((a, b) => b.attempt - a.attempt);
+  return {
+    success: true, action: 'qccheck', periode,
+    cols: ['tanggal','agent','tl','spv','aplikasi','bucket','absensi','tlCall','tlConn','qcAtt','qcDur','qcOff','qcConn','qcDup'],
+    rows: out, unmatched, terhubungTersedia: T.available
+  };
+}
+
+function TEST_qccheck() {
+  const r = endpointQcCheck_({ parameter: { bulan: 'Oktober', tahun: '2026' } });
+  Logger.log('rows=' + r.rows.length + ' unmatched=' + r.unmatched.length);
+  Logger.log(JSON.stringify(r.rows.slice(0, 5)));
+  Logger.log(JSON.stringify(r.unmatched.slice(0, 10)));
 }

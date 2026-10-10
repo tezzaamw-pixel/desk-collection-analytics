@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cek Call QC — System TZ Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
+  --border:#e4e7ec;--text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --accent:#1d60c8;--accent-bg:#eef3fd;
+  --success:#059669;--success-bg:#ecfdf5;
+  --warning:#d97706;--warning-bg:#fffbeb;
+  --danger:#dc2626;--danger-bg:#fef2f2;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.07);--shadow-md:0 4px 12px rgba(0,0,0,0.1);
+  --sidebar-w:220px;
+}
+[data-theme="dark"]{
+  --navy:#0f1523;--bg:#0a0d14;--surface:#131825;--surface2:#1a2035;
+  --border:#252d42;--text:#f1f3f9;--text2:#9aa5be;--text3:#6b7690;
+  --accent:#4a8cf7;--accent-bg:#1a2540;
+  --success:#34d399;--success-bg:#0d2e22;
+  --warning:#fbbf24;--warning-bg:#2d200a;
+  --danger:#f87171;--danger-bg:#2d0f0f;
+  --shadow:0 1px 3px rgba(0,0,0,0.4);--shadow-md:0 4px 12px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+.navbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 calc(var(--sidebar-w) + 20px);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.nav-logo{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;text-decoration:none;}
+.nav-logo-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.nav-page-title{font-size:13px;color:rgba(255,255,255,0.5);border-left:1px solid rgba(255,255,255,0.15);padding-left:12px;margin-left:4px;}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.theme-toggle{display:flex;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-sm);overflow:hidden;}
+.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;}
+.theme-btn.active{background:rgba(255,255,255,0.2);color:#fff;}
+.sidebar{position:fixed;top:52px;left:0;width:var(--sidebar-w);height:calc(100vh - 52px);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;z-index:100;}
+.sidebar-section{padding:16px 12px 8px;}
+.sidebar-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text2);font-size:13px;font-weight:500;text-decoration:none;margin-bottom:2px;}
+.sidebar-item:hover{background:var(--surface2);color:var(--text);}
+.sidebar-item.active{background:var(--accent-bg);color:var(--accent);}
+.sidebar-item .icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
+.main{margin-left:var(--sidebar-w);margin-top:52px;padding:28px;min-height:calc(100vh - 52px);max-width:calc(1400px + var(--sidebar-w));}
+.eyebrow{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
+h1{font-size:26px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px;}
+.lead{color:var(--text2);font-size:14px;margin-bottom:20px;max-width:760px;line-height:1.5;}
+.filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:22px;}
+.filters label{font-size:12px;color:var(--text3);}
+select,input[type=date]{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;outline:none;}
+select:focus{border-color:var(--accent);}
+.btn{border:none;border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{opacity:.9;}
+.btn-ghost{background:var(--surface);color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface);}
+.seg button{padding:6px 14px;font-size:12px;font-weight:600;border:none;background:none;color:var(--text2);cursor:pointer;}
+.seg button.on{background:var(--accent);color:#fff;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:20px;}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.card-title{font-size:16px;font-weight:700;}
+.card-sub{font-size:12px;color:var(--text3);margin-top:3px;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;}
+.kpi{background:var(--surface2);border-radius:8px;padding:12px 14px;min-width:0;}
+.kpi .l{font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px;}
+.kpi .v{font-size:20px;font-weight:800;}
+.kpi .s{font-size:11.5px;color:var(--text2);margin-top:2px;}
+.good{color:var(--success)!important;}.bad{color:var(--danger)!important;}
+.chart-wrap{position:relative;height:320px;}
+.tbl-wrap{overflow:auto;border:1px solid var(--border);border-radius:8px;}
+table.t{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;}
+table.t th{position:sticky;top:0;background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;text-align:left;padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--border);z-index:1;}
+table.t td{padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;}
+table.t tr.edn td{background:var(--accent-bg);}
+table.t tr.edn td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+.pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;}
+.pill-edn{background:var(--accent);color:#fff;}
+.pill-red{background:var(--danger-bg);color:var(--danger);}
+.pill-ok{background:var(--success-bg);color:var(--success);}
+.pill-warn{background:var(--warning-bg);color:var(--warning);}
+.rankstrip{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+.rankstrip .d{background:var(--surface2);border-radius:6px;padding:5px 8px;text-align:center;min-width:54px;}
+.rankstrip .d .x{font-size:10px;color:var(--text3);}
+.rankstrip .d .y{font-size:13px;font-weight:800;}
+.tlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.tlbox{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.tlbox-h{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--surface2);font-weight:700;font-size:12.5px;gap:8px;}
+.tlbox-r{display:flex;justify-content:space-between;gap:8px;padding:6px 12px;border-top:1px solid var(--border);font-size:12px;}
+.tlbox-r .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.muted{color:var(--text3);}
+.empty{padding:36px 16px;text-align:center;color:var(--text3);font-size:13px;line-height:1.6;}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
+.lock-icon{font-size:48px;margin-bottom:16px;}
+.lock-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.lock-sub{font-size:13px;color:var(--text3);margin-bottom:24px;}
+.lock-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:14px;text-align:center;letter-spacing:2px;outline:none;margin-bottom:12px;}
+.lock-btn{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;}
+.lock-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
+@media(max-width:768px){:root{--sidebar-w:0px;}.sidebar{display:none;}.navbar{padding-left:16px;}.main{margin-left:0;padding:18px 16px;}.nav-page-title{display:none;}h1{font-size:22px;}.chart-wrap{height:260px;}}
+
+.tolbox{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:18px;}
+.tolbox input{width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px;}
+.flag{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;margin:1px 2px 1px 0;white-space:nowrap;}
+.f-beda{background:var(--danger-bg);color:var(--danger);}
+.f-absen{background:var(--warning-bg);color:var(--warning);}
+.f-copas{background:#ede9fe;color:#6d28d9;}
+[data-theme="dark"] .f-copas{background:#2a2145;color:#c4b5fd;}
+.f-asal{background:#e0f2fe;color:#0369a1;}
+[data-theme="dark"] .f-asal{background:#0c2a3d;color:#7dd3fc;}
+.f-conn{background:var(--surface2);color:var(--text2);}
+table.t tr.clickable{cursor:pointer;}
+table.t tr.clickable:hover td{background:var(--surface2);}
+details summary{cursor:pointer;font-weight:700;font-size:13px;}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">TZ</span> System TZ Analytics</a>
+    <span class="nav-page-title">Cek Call (QC)</span>
+  </div>
+  <div class="nav-right">
+    <div class="theme-toggle">
+      <button class="theme-btn active" id="btnTerang" onclick="setTheme('light')">☀ Terang</button>
+      <button class="theme-btn" id="btnGelap" onclick="setTheme('dark')">🌙 Gelap</button>
+    </div>
+  </div>
+</nav>
+
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">Cek Call (QC)</div>
+    <div class="lock-sub">Masukkan kata kunci untuk mengakses halaman ini</div>
+    <input class="lock-input" type="password" id="lockInput" placeholder="••••••" onkeydown="if(event.key==='Enter')doUnlockPage()"/>
+    <button class="lock-btn" onclick="doUnlockPage()">Masuk</button>
+    <div class="lock-error" id="lockError">Kata kunci salah. Coba lagi.</div>
+  </div>
+</div>
+
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
+  </div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="team.html"><span class="icon">👥</span> Tim</a>
+    <a class="sidebar-item" href="agent.html"><span class="icon">👤</span> Agent</a>
+    <a class="sidebar-item" href="violation.html"><span class="icon">⚠️</span> Violation</a>
+    <a class="sidebar-item" href="rank.html"><span class="icon">🏆</span> Rank Board</a>
+    <a class="sidebar-item" href="klien.html"><span class="icon">📑</span> Laporan Klien</a>
+    <a class="sidebar-item active" href="qc.html"><span class="icon">📞</span> Cek Call (QC)</a>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="eyebrow">Data QC internal vs isian TL</div>
+  <h1>Cek Call (QC)</h1>
+  <p class="lead">Call Manual yang diisi TL di All Data dibandingkan dengan Attempt di sheet <b>JUMLAH DATA CALL</b>, dan Call Terhubung dengan jumlah rekaman di sheet <b>DATA CALL TERHUBUNG</b>, per agent per tanggal.</p>
+
+  <div class="filters">
+    <label for="selBulan">Bulan</label>
+    <select id="selBulan" onchange="loadData()">
+      <option>Januari</option><option>Februari</option><option>Maret</option><option>April</option>
+      <option>Mei</option><option>Juni</option><option>Juli</option><option>Agustus</option>
+      <option>September</option><option>Oktober</option><option>November</option><option>Desember</option>
+    </select>
+    <label for="selTahun">Tahun</label>
+    <select id="selTahun" onchange="loadData()"></select>
+    <label for="selApp">Aplikasi</label>
+    <select id="selApp" onchange="VIEW.app=this.value;VIEW.tl='';render()"><option value="">Semua</option></select>
+    <button class="btn btn-ghost" id="btnRefresh" onclick="loadData()">↻ Refresh</button>
+  </div>
+
+  <div class="tolbox">
+    <b style="color:var(--text)">Toleransi</b>
+    <span>Selisih call wajar ≤ <input type="number" id="tolPct" value="10" min="0" onchange="saveTol()">%</span>
+    <span>atau ≤ <input type="number" id="tolCall" value="20" min="0" onchange="saveTol()"> call</span>
+    <span>· Panggilan asal: durasi &lt; <input type="number" id="tolDur" value="2" min="0" step="0.5" onchange="saveTol()"> detik/attempt (min. 50 attempt)</span>
+    <span>· Angka copy-paste: sama ≥ <input type="number" id="tolCopas" value="3" min="2" onchange="saveTol()"> hari</span>
+  </div>
+
+  <div id="content"><div class="empty"><div class="spinner"></div>Memuat & mencocokkan data (±30 detik)…</div></div>
+</main>
+
+<script>
+const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
+const BULAN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const BLN3=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+const HARI=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+let DATA=null, ROWS=[], VIEW={app:'',tl:'',onlyBad:true,sort:'tl'};
+
+function escH(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtNum(n){return (n===null||n===undefined||isNaN(n))?'—':Math.round(n).toLocaleString('id-ID');}
+function fmtPct(n){return (n===null||n===undefined||isNaN(n))?'—':(n*100).toFixed(0)+'%';}
+function dLabel(iso){const d=new Date(iso+'T00:00:00');return isNaN(d)?iso:`${HARI[d.getDay()]} ${d.getDate()} ${BLN3[d.getMonth()]}`;}
+function dShort(iso){const d=new Date(iso+'T00:00:00');return isNaN(d)?iso:`${d.getDate()}/${d.getMonth()+1}`;}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('dca_theme',t);}catch(e){}
+  document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');}
+(function(){let t='light';try{t=localStorage.getItem('dca_theme')||'light';}catch(e){}setTheme(t);})();
+
+/* filter awal: bulan dari kemarin */
+(function(){
+  const now=new Date(), ref=new Date(now.getTime()-86400000), st=document.getElementById('selTahun');
+  for(let y=2025;y<=now.getFullYear();y++){const o=document.createElement('option');o.textContent=y;st.appendChild(o);}
+  document.getElementById('selBulan').value=BULAN[ref.getMonth()]; st.value=String(ref.getFullYear());
+  try{const t=JSON.parse(localStorage.getItem('tz_qc_tol')||'{}');['tolPct','tolCall','tolDur','tolCopas'].forEach(k=>{if(t[k]!==undefined)document.getElementById(k).value=t[k];});}catch(e){}
+})();
+function tol(){const g=k=>parseFloat(document.getElementById(k).value)||0;return {pct:g('tolPct')/100,call:g('tolCall'),dur:g('tolDur'),copas:Math.max(2,g('tolCopas'))};}
+function saveTol(){try{localStorage.setItem('tz_qc_tol',JSON.stringify({tolPct:document.getElementById('tolPct').value,tolCall:document.getElementById('tolCall').value,tolDur:document.getElementById('tolDur').value,tolCopas:document.getElementById('tolCopas').value}));}catch(e){}if(DATA){analyze();render();}}
+
+async function loadData(){
+  const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value;
+  const box=document.getElementById('content'), btn=document.getElementById('btnRefresh');
+  box.innerHTML='<div class="empty"><div class="spinner"></div>Memuat & mencocokkan data (±30 detik)…</div>';btn.disabled=true;
+  try{
+    const res=await fetch(`${API_URL}?action=qccheck&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}&_=${Date.now()}`).then(r=>r.json());
+    if(!res.success)throw new Error(res.message||'Gagal memuat');
+    DATA=res; VIEW.tl='';
+    const apps=[...new Set(res.rows.map(r=>r[4]).filter(Boolean))].sort();
+    const sa=document.getElementById('selApp'); const keep=VIEW.app;
+    sa.innerHTML='<option value="">Semua</option>'+apps.map(a=>`<option ${a===keep?'selected':''}>${escH(a)}</option>`).join('');
+    if(!apps.includes(keep))VIEW.app='';
+    analyze(); render();
+  }catch(e){
+    const old=/Unknown action/i.test(e.message);
+    box.innerHTML=`<div class="card"><div class="empty">⚠️ ${escH(old?'Code.gs di Apps Script belum diperbarui (fitur Cek Call belum terpasang).':e.message)}<br><span class="muted">${old?'Tempel Code.gs terbaru lalu Deploy → Versi baru.':'Klik Refresh untuk coba lagi.'}</span></div></div>`;
+  }
+  btn.disabled=false;
+}
+
+/* ── analisa per baris ── */
+function analyze(){
+  const T=tol(), c=DATA.cols, idx=k=>c.indexOf(k);
+  ROWS=DATA.rows.map(a=>{const o={};c.forEach((k,i)=>o[k]=a[i]);return o;});
+  // copy-paste: nilai Call Manual sama persis (>0) di ≥N hari utk agent yg sama
+  const byAgent={};
+  ROWS.forEach(r=>{(byAgent[r.agent]=byAgent[r.agent]||[]).push(r);});
+  Object.values(byAgent).forEach(list=>{
+    const cnt={};list.forEach(r=>{if(r.tlCall>0)cnt[r.tlCall]=(cnt[r.tlCall]||0)+1;});
+    list.forEach(r=>{r.copas=r.tlCall>0&&cnt[r.tlCall]>=T.copas?cnt[r.tlCall]:0;});
+  });
+  ROWS.forEach(r=>{
+    const hasQc=r.qcAtt!==null&&r.qcAtt!==undefined;
+    const hadirTL=String(r.absensi||'').toLowerCase()==='hadir';
+    r.checked=hasQc&&!r.qcOff;
+    r.diff=r.checked?r.tlCall-r.qcAtt:null;
+    r.beda=r.checked&&Math.abs(r.diff)>Math.max(T.call,T.pct*r.qcAtt);
+    // absensi: TL bilang tidak hadir tapi QC ada call, atau TL bilang hadir+isi call tapi QC libur/0
+    r.absen=(r.absensi&&!hadirTL&&hasQc&&r.qcAtt>0)?'TL: '+(r.absensi||'-')+', QC ada call':
+            (hadirTL&&r.tlCall>0&&hasQc&&(r.qcOff||r.qcAtt===0))?(r.qcOff?'QC: OFF':'QC: 0 call'):'';
+    r.asal=hasQc&&r.qcAtt>=50&&r.qcDur!==null&&(r.qcDur/r.qcAtt)<T.dur;
+    r.conn=r.qcConn!==null&&r.qcConn!==undefined&&r.tlConn!==r.qcConn;
+    r.bad=r.beda||!!r.absen||r.copas>0||r.asal;
+  });
+}
+function scoped(){return ROWS.filter(r=>!VIEW.app||r.aplikasi===VIEW.app);}
+
+function render(){
+  const box=document.getElementById('content');
+  const rows=scoped();
+  if(!DATA.rows.length){box.innerHTML=`<div class="card"><div class="empty">Belum ada data yang bisa dicocokkan untuk bulan ini.<br><span class="muted">Pastikan nama di sheet JUMLAH DATA CALL sama dengan nama agent di All Data.</span></div></div>`+unmatchedHtml();return;}
+  const chk=rows.filter(r=>r.checked), bad=chk.filter(r=>r.beda);
+  const over=bad.filter(r=>r.diff>0).length;
+  const absen=rows.filter(r=>r.absen).length, copas=new Set(rows.filter(r=>r.copas).map(r=>r.agent)).size, asal=rows.filter(r=>r.asal).length;
+  const sumTL=chk.reduce((s,r)=>s+r.tlCall,0), sumQC=chk.reduce((s,r)=>s+r.qcAtt,0);
+  box.innerHTML=`
+  <div class="kpis">
+    <div class="kpi"><div class="l">Agent-hari dicek</div><div class="v">${fmtNum(chk.length)}</div><div class="s">${new Set(chk.map(r=>r.agent)).size} agent · ${new Set(chk.map(r=>r.tanggal)).size} hari</div></div>
+    <div class="kpi"><div class="l">Isian call cocok</div><div class="v ${chk.length&&bad.length/chk.length>.3?'bad':'good'}">${fmtPct(chk.length?(chk.length-bad.length)/chk.length:null)}</div><div class="s">${bad.length} agent-hari di luar toleransi</div></div>
+    <div class="kpi"><div class="l">TL isi lebih besar dari QC</div><div class="v ${over?'bad':''}">${over}</div><div class="s">dari ${bad.length} yang tidak cocok</div></div>
+    <div class="kpi"><div class="l">Total call TL vs QC</div><div class="v">${fmtNum(sumTL)} <span style="font-size:13px;color:var(--text3)">vs ${fmtNum(sumQC)}</span></div><div class="s ${sumTL>sumQC*1.1?'bad':''}">TL ${sumQC?((sumTL/sumQC-1)*100>=0?'+':'')+((sumTL/sumQC-1)*100).toFixed(0)+'%':'—'} dari QC</div></div>
+    <div class="kpi"><div class="l">Pola mencurigakan</div><div class="v">${absen+asal}</div><div class="s">${absen} absensi tak sesuai · ${asal} panggilan asal · ${copas} agent angka copy-paste</div></div>
+  </div>
+  <div class="card" id="secTl"></div>
+  <div class="card" id="secDetail"></div>
+  ${unmatchedHtml()}`;
+  renderTl(); renderDetail();
+}
+
+function renderTl(){
+  const rows=scoped(), by={};
+  rows.forEach(r=>{const k=r.tl||'(Tanpa TL)';const o=by[k]||(by[k]={tl:k,spv:r.spv,app:new Set(),agents:new Set(),chk:0,bad:0,over:0,diffPct:[],absen:0,copas:new Set(),asal:0,conn:0});
+    o.app.add(r.aplikasi+' '+r.bucket);o.agents.add(r.agent);
+    if(r.checked){o.chk++;if(r.beda){o.bad++;if(r.diff>0)o.over++;}if(r.qcAtt>0)o.diffPct.push(r.diff/r.qcAtt);}
+    if(r.absen)o.absen++; if(r.copas)o.copas.add(r.agent); if(r.asal)o.asal++; if(r.conn)o.conn++;});
+  const list=Object.values(by).map(o=>({...o,avgDiff:o.diffPct.length?o.diffPct.reduce((s,v)=>s+v,0)/o.diffPct.length:null,score:o.bad+o.absen*2+o.copas.size*3+o.asal}))
+    .sort((a,b)=>b.score-a.score||(b.chk?b.bad/b.chk:0)-(a.chk?a.bad/a.chk:0));
+  document.getElementById('secTl').innerHTML=`
+    <div class="card-head"><div><div class="card-title">👥 Per Team Leader</div><div class="card-sub">Diurutkan dari yang paling perlu dicek · klik baris untuk melihat detail agent-nya</div></div></div>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>Team Leader</th><th>Aplikasi</th><th class="n">Agent</th><th class="n">Hari dicek</th><th class="n">Cocok</th><th class="n">Rata² selisih</th><th class="n">TL > QC</th><th class="n">Absensi tak sesuai</th><th class="n">Copy-paste</th><th class="n">Panggilan asal</th><th class="n">Terhubung beda</th></tr></thead><tbody>
+    ${list.map(o=>`<tr class="clickable" onclick="VIEW.tl=${JSON.stringify(o.tl).replace(/"/g,'&quot;')};renderDetail();document.getElementById('secDetail').scrollIntoView({behavior:'smooth'})">
+      <td><b>${escH(o.tl)}</b>${o.spv?`<div class="muted" style="font-size:10.5px">SPV ${escH(o.spv)}</div>`:''}</td><td style="font-size:11px">${escH([...o.app].join(', '))}</td>
+      <td class="n">${o.agents.size}</td><td class="n">${o.chk}</td>
+      <td class="n ${o.chk&&o.bad/o.chk>.3?'bad':o.chk?'good':''}" style="font-weight:700">${fmtPct(o.chk?(o.chk-o.bad)/o.chk:null)}</td>
+      <td class="n ${o.avgDiff!==null&&Math.abs(o.avgDiff)>tol().pct?'bad':''}">${o.avgDiff===null?'—':(o.avgDiff>=0?'+':'')+(o.avgDiff*100).toFixed(0)+'%'}</td>
+      <td class="n">${o.over||''}</td><td class="n">${o.absen||''}</td><td class="n">${o.copas.size?o.copas.size+' agent':''}</td><td class="n">${o.asal||''}</td><td class="n muted">${o.conn||''}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+function renderDetail(){
+  const el=document.getElementById('secDetail'); if(!el)return;
+  const tls=[...new Set(scoped().map(r=>r.tl||'(Tanpa TL)'))].sort();
+  let rows=scoped().filter(r=>(!VIEW.tl||(r.tl||'(Tanpa TL)')===VIEW.tl)&&(!VIEW.onlyBad||r.bad||r.conn));
+  rows.sort((a,b)=>VIEW.sort==='selisih'?Math.abs(b.diff||0)-Math.abs(a.diff||0):(a.tl||'').localeCompare(b.tl||'')||a.agent.localeCompare(b.agent)||a.tanggal.localeCompare(b.tanggal));
+  const shown=rows.slice(0,800);
+  el.innerHTML=`
+    <div class="card-head"><div><div class="card-title">🔍 Detail per Agent per Tanggal</div><div class="card-sub">${rows.length} baris${rows.length>800?' (ditampilkan 800 pertama)':''}</div></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+        <select onchange="VIEW.tl=this.value;renderDetail()"><option value="">Semua TL</option>${tls.map(t=>`<option ${t===VIEW.tl?'selected':''}>${escH(t)}</option>`).join('')}</select>
+        <select onchange="VIEW.sort=this.value;renderDetail()"><option value="tl" ${VIEW.sort==='tl'?'selected':''}>Urut: TL → agent → tanggal</option><option value="selisih" ${VIEW.sort==='selisih'?'selected':''}>Urut: selisih terbesar</option></select>
+        <label style="font-size:12px;color:var(--text2);display:flex;gap:4px;align-items:center"><input type="checkbox" ${VIEW.onlyBad?'checked':''} onchange="VIEW.onlyBad=this.checked;renderDetail()"> Hanya yang bermasalah</label>
+      </div></div>
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap">
+      <span class="flag f-beda">selisih call</span><span class="flag f-absen">absensi</span><span class="flag f-copas">copy-paste</span><span class="flag f-asal">panggilan asal</span><span class="flag f-conn">terhubung beda</span>
+    </div>
+    ${rows.length?`<div class="tbl-wrap" style="max-height:560px"><table class="t"><thead><tr><th>Tanggal</th><th>Agent</th><th>TL</th><th>Absensi TL</th><th class="n">Call TL</th><th class="n">Attempt QC</th><th class="n">Selisih</th><th class="n">Durasi QC</th><th class="n">Dtk/attempt</th><th class="n">Terhubung TL / QC</th><th>Catatan</th></tr></thead><tbody>
+    ${shown.map(r=>`<tr>
+      <td>${dLabel(r.tanggal)}</td><td><b>${escH(r.agent)}</b></td><td style="font-size:11px">${escH(r.tl)}</td><td>${escH(r.absensi)}</td>
+      <td class="n">${fmtNum(r.tlCall)}</td><td class="n">${r.qcOff?'<span class="muted">OFF</span>':fmtNum(r.qcAtt)}</td>
+      <td class="n ${r.beda?'bad':''}" style="font-weight:700">${r.diff===null?'':(r.diff>0?'+':'')+fmtNum(r.diff)}</td>
+      <td class="n">${r.qcOff?'':fmtNum(r.qcDur)}</td><td class="n ${r.asal?'bad':''}">${r.qcAtt>0&&r.qcDur!==null?(r.qcDur/r.qcAtt).toFixed(1):''}</td>
+      <td class="n">${fmtNum(r.tlConn)} / ${r.qcConn===null||r.qcConn===undefined?'<span class="muted">—</span>':fmtNum(r.qcConn)}${r.qcDup?` <span class="muted" title="link rekaman dobel di sheet QC">(+${r.qcDup} dobel)</span>`:''}</td>
+      <td>${r.beda?`<span class="flag f-beda">${r.diff>0?'TL lebih besar':'TL lebih kecil'}</span>`:''}${r.absen?`<span class="flag f-absen">${escH(r.absen)}</span>`:''}${r.copas?`<span class="flag f-copas">angka ${fmtNum(r.tlCall)} muncul ${r.copas} hari</span>`:''}${r.asal?`<span class="flag f-asal">panggilan asal</span>`:''}${r.conn?`<span class="flag f-conn">terhubung beda</span>`:''}</td></tr>`).join('')}
+    </tbody></table></div>`:'<div class="issues ok">✅ Tidak ada yang bermasalah untuk pilihan ini.</div>'}`;
+}
+
+function unmatchedHtml(){
+  const u=DATA.unmatched||[];
+  if(!u.length)return '';
+  return `<div class="card"><details><summary>⚠ ${u.length} nama di data QC tidak ketemu di All Data bulan ini</summary>
+    <div class="card-sub" style="margin:8px 0">Biasanya karena beda penulisan nama, atau agent dari aplikasi/bucket yang belum diinput. Samakan penulisan namanya di salah satu sheet supaya ikut dicek.</div>
+    <div class="tbl-wrap" style="max-height:300px"><table class="t"><thead><tr><th>Nama di QC</th><th>Akun Microsip</th><th class="n">Hari ada call</th><th class="n">Total attempt</th></tr></thead><tbody>
+    ${u.map(x=>`<tr><td>${escH(x.nama)}</td><td class="muted">${escH(x.akun)}</td><td class="n">${x.hari}</td><td class="n">${fmtNum(x.attempt)}</td></tr>`).join('')}</tbody></table></div></details></div>`;
+}
+
+/* ── LOCK ── */
+const PAGE_PASSWORD='Marki';
+const PAGE_SESSION_KEY='tz_page_auth_qc';
+(function(){let ok=false;try{ok=sessionStorage.getItem(PAGE_SESSION_KEY)==='1';}catch(e){}
+  if(ok)document.getElementById('lockOverlay').remove();else document.body.style.overflow='hidden';})();
+function doUnlockPage(){
+  if(document.getElementById('lockInput').value===PAGE_PASSWORD){try{sessionStorage.setItem(PAGE_SESSION_KEY,'1');}catch(e){}document.getElementById('lockOverlay').remove();document.body.style.overflow='';}
+  else{document.getElementById('lockError').style.display='block';document.getElementById('lockInput').value='';}
+}
+loadData();
+</script>
+</body>
+</html>
