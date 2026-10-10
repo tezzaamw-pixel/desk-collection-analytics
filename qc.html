@@ -185,7 +185,7 @@ details summary{cursor:pointer;font-weight:700;font-size:13px;}
     <b style="color:var(--text)">Toleransi</b>
     <span>Selisih call wajar ≤ <input type="number" id="tolPct" value="10" min="0" onchange="saveTol()">%</span>
     <span>atau ≤ <input type="number" id="tolCall" value="20" min="0" onchange="saveTol()"> call</span>
-    <span>· Panggilan asal: durasi &lt; <input type="number" id="tolDur" value="2" min="0" step="0.5" onchange="saveTol()"> detik/attempt (min. 50 attempt)</span>
+    <span>· Panggilan asal: durasi per attempt &lt; <input type="number" id="tolDur" value="25" min="0" step="5" onchange="saveTol()">% dari median semua agent (min. 50 attempt)</span>
     <span>· Angka copy-paste: sama ≥ <input type="number" id="tolCopas" value="3" min="2" onchange="saveTol()"> hari</span>
   </div>
 
@@ -215,7 +215,7 @@ function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{l
   document.getElementById('selBulan').value=BULAN[ref.getMonth()]; st.value=String(ref.getFullYear());
   try{const t=JSON.parse(localStorage.getItem('tz_qc_tol')||'{}');['tolPct','tolCall','tolDur','tolCopas'].forEach(k=>{if(t[k]!==undefined)document.getElementById(k).value=t[k];});}catch(e){}
 })();
-function tol(){const g=k=>parseFloat(document.getElementById(k).value)||0;return {pct:g('tolPct')/100,call:g('tolCall'),dur:g('tolDur'),copas:Math.max(2,g('tolCopas'))};}
+function tol(){const g=k=>parseFloat(document.getElementById(k).value)||0;return {pct:g('tolPct')/100,call:g('tolCall'),dur:g('tolDur')/100,copas:Math.max(2,g('tolCopas'))};}
 function saveTol(){try{localStorage.setItem('tz_qc_tol',JSON.stringify({tolPct:document.getElementById('tolPct').value,tolCall:document.getElementById('tolCall').value,tolDur:document.getElementById('tolDur').value,tolCopas:document.getElementById('tolCopas').value}));}catch(e){}if(DATA){analyze();render();}}
 
 async function loadData(){
@@ -249,6 +249,10 @@ function analyze(){
     const cnt={};list.forEach(r=>{if(r.tlCall>0)cnt[r.tlCall]=(cnt[r.tlCall]||0)+1;});
     list.forEach(r=>{r.copas=r.tlCall>0&&cnt[r.tlCall]>=T.copas?cnt[r.tlCall]:0;});
   });
+  // Satuan "Duration" di sheet QC belum pasti, jadi panggilan asal dinilai RELATIF:
+  // durasi per attempt jauh di bawah median seluruh agent bulan ini.
+  const dpa=ROWS.filter(r=>r.qcAtt>=50&&r.qcDur>0&&!r.qcOff).map(r=>r.qcDur/r.qcAtt).sort((a,b)=>a-b);
+  DATA.medianDpa=dpa.length?dpa[Math.floor(dpa.length/2)]:null;
   ROWS.forEach(r=>{
     const hasQc=r.qcAtt!==null&&r.qcAtt!==undefined;
     const hadirTL=String(r.absensi||'').toLowerCase()==='hadir';
@@ -258,7 +262,7 @@ function analyze(){
     // absensi: TL bilang tidak hadir tapi QC ada call, atau TL bilang hadir+isi call tapi QC libur/0
     r.absen=(r.absensi&&!hadirTL&&hasQc&&r.qcAtt>0)?'TL: '+(r.absensi||'-')+', QC ada call':
             (hadirTL&&r.tlCall>0&&hasQc&&(r.qcOff||r.qcAtt===0))?(r.qcOff?'QC: OFF':'QC: 0 call'):'';
-    r.asal=hasQc&&r.qcAtt>=50&&r.qcDur!==null&&(r.qcDur/r.qcAtt)<T.dur;
+    r.asal=hasQc&&!r.qcOff&&r.qcAtt>=50&&r.qcDur!==null&&DATA.medianDpa>0&&(r.qcDur/r.qcAtt)<T.dur*DATA.medianDpa;
     r.conn=r.qcConn!==null&&r.qcConn!==undefined&&r.tlConn!==r.qcConn;
     r.bad=r.beda||!!r.absen||r.copas>0||r.asal;
   });
@@ -323,7 +327,7 @@ function renderDetail(){
     <div style="font-size:11px;color:var(--text3);margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap">
       <span class="flag f-beda">selisih call</span><span class="flag f-absen">absensi</span><span class="flag f-copas">copy-paste</span><span class="flag f-asal">panggilan asal</span><span class="flag f-conn">terhubung beda</span>
     </div>
-    ${rows.length?`<div class="tbl-wrap" style="max-height:560px"><table class="t"><thead><tr><th>Tanggal</th><th>Agent</th><th>TL</th><th>Absensi TL</th><th class="n">Call TL</th><th class="n">Attempt QC</th><th class="n">Selisih</th><th class="n">Durasi QC</th><th class="n">Dtk/attempt</th><th class="n">Terhubung TL / QC</th><th>Catatan</th></tr></thead><tbody>
+    ${rows.length?`<div class="tbl-wrap" style="max-height:560px"><table class="t"><thead><tr><th>Tanggal</th><th>Agent</th><th>TL</th><th>Absensi TL</th><th class="n">Call TL</th><th class="n">Attempt QC</th><th class="n">Selisih</th><th class="n">Durasi QC</th><th class="n" title="Durasi ÷ attempt. Median semua agent bulan ini: ${DATA.medianDpa?DATA.medianDpa.toFixed(1):'—'}">Durasi/attempt</th><th class="n">Terhubung TL / QC</th><th>Catatan</th></tr></thead><tbody>
     ${shown.map(r=>`<tr>
       <td>${dLabel(r.tanggal)}</td><td><b>${escH(r.agent)}</b></td><td style="font-size:11px">${escH(r.tl)}</td><td>${escH(r.absensi)}</td>
       <td class="n">${fmtNum(r.tlCall)}</td><td class="n">${r.qcOff?'<span class="muted">OFF</span>':fmtNum(r.qcAtt)}</td>
