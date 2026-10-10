@@ -307,14 +307,40 @@ function tlDailyDates(){return [...new Set(DATA.tl.filter(t=>t.jenis==='DAILY').
 function vendorMatrix(){
   const m={}; // m[tgl][company]=rate
   DATA.vendor.forEach(v=>{(m[v.tanggal]=m[v.tanggal]||{})[v.company]=v.rate;});
-  const byDay={};
-  DATA.agents.filter(a=>a.jenis==='DAILY').forEach(a=>{
+  // Tanggal yg belum ada di tabel vendor: hitung dari TABEL TL laporan Daily
+  // (Σ repay ÷ Σ outstanding per vendor) — tabel TL selalu jadi acuan karena
+  // terbaca lebih akurat daripada ratusan baris agent. Tabel agent hanya
+  // dipakai kalau tabel TL tanggal itu tidak ada.
+  const byDay={}, tlDays=new Set();
+  DATA.tl.filter(t=>t.jenis==='DAILY').forEach(t=>{
+    tlDays.add(t.tanggal);
+    const k=t.tanggal+'|'+t.company; const o=byDay[k]||(byDay[k]={os:0,rp:0,t:t.tanggal,c:t.company}); o.os+=t.outstanding; o.rp+=t.repay;
+  });
+  DATA.agents.filter(a=>a.jenis==='DAILY'&&!tlDays.has(a.tanggal)).forEach(a=>{
     const k=a.tanggal+'|'+a.company; const o=byDay[k]||(byDay[k]={os:0,rp:0,t:a.tanggal,c:a.company}); o.os+=a.outstanding; o.rp+=a.repay;
   });
   Object.values(byDay).forEach(o=>{ if(!(m[o.t]&&m[o.t][o.c]!==undefined) && o.os>0){(m[o.t]=m[o.t]||{})[o.c]=o.rp/o.os*100;} });
   const dates=Object.keys(m).sort();
   const companies=[...new Set(dates.flatMap(d=>Object.keys(m[d])))].sort((a,b)=>a===OWN?-1:b===OWN?1:a.localeCompare(b));
   return {m,dates,companies};
+}
+
+// Selisih "repay TL di tabel atas" vs "Σ repay agent-nya" per jenis+tanggal+TL.
+// Selisih ≠ 0 berarti ada baris agent yang belum lengkap/terbaca salah saat upload.
+function agentGap(jenis,tanggal){
+  const sum={};
+  DATA.agents.filter(a=>a.jenis===jenis&&(jenis==='MONTHLY'||a.tanggal===tanggal)).forEach(a=>{const k=normKey(a.tl);sum[k]=(sum[k]||0)+a.repay;});
+  const out={};
+  DATA.tl.filter(t=>t.jenis===jenis&&(jenis==='MONTHLY'||t.tanggal===tanggal)).forEach(t=>{
+    const d=(sum[normKey(t.tl)]||0)-t.repay;
+    if(Math.abs(d)>Math.max(1000,t.repay*0.0005))out[t.tl]={diff:d,company:t.company};
+  });
+  return out;
+}
+function gapBanner(gaps,onlyOwn){
+  const list=Object.entries(gaps).filter(([,g])=>!onlyOwn||g.company===OWN);
+  if(!list.length)return '';
+  return `<div class="issues warn">⚠ Data agent belum lengkap untuk ${list.length} TL (total TL di laporan ≠ jumlah agent yang tersimpan): ${list.map(([tl,g])=>`<b>${escH(tl)}</b> selisih ${fmtRpFull(g.diff)}`).join(' · ')}. Angka per agent di bagian ini bisa kurang tepat — upload ulang gambarnya untuk memperbaiki.</div>`;
 }
 
 /* ══════════════ RENDER ══════════════ */
@@ -384,6 +410,7 @@ function renderTl(){
     .sort((a,b)=>(a.rank||99)-(b.rank||99)||b.rate-a.rate);
   const top=rows[0];
   const own=rows.filter(r=>r.company===OWN);
+  const gaps=agentGap(VIEW.tlMode==='monthly'?'MONTHLY':'DAILY',VIEW.tlDate);
   const monthlyAsOf=hasMonthly?DATA.tl.filter(t=>t.jenis==='MONTHLY')[0].tanggal:'';
   el.innerHTML=`
     <div class="card-head"><div><div class="card-title">🏆 Ranking TL Semua Vendor</div>
@@ -394,7 +421,7 @@ function renderTl(){
       </div></div>
     <div class="kpis">${own.map(o=>`<div class="kpi"><div class="l">${escH(o.tl)}</div><div class="v">#${o.rank||'—'} <span style="font-size:13px;color:var(--text3)">dari ${rows.length}</span></div><div class="s">${fmtPct(o.rate)}${top&&o!==top?' · selisih '+fmtPct(top.rate-o.rate)+' dari #1':' · peringkat 1'}</div></div>`).join('')||'<div class="muted" style="font-size:12px">Tidak ada TL EDN di laporan ini.</div>'}</div>
     <div class="tbl-wrap"><table class="t"><thead><tr><th>#</th><th>TL</th><th>Vendor</th><th class="n">Outstanding</th><th class="n">Repay</th><th class="n">Rate</th><th class="n">Selisih dari #1</th><th class="n">AHT</th></tr></thead>
-    <tbody>${rows.map(r=>`<tr class="${r.company===OWN?'edn':''}"><td>${r.rank||''}</td><td style="font-weight:${r.company===OWN?700:500}">${escH(r.tl)}</td><td>${r.company===OWN?'<span class="pill pill-edn">EDN</span>':escH(r.company)}</td><td class="n">${fmtRp(r.outstanding)}</td><td class="n">${fmtRpFull(r.repay)}</td><td class="n" style="font-weight:700">${fmtPct(r.rate)}</td><td class="n muted">${top&&r!==top?'-'+fmtPct(top.rate-r.rate):''}</td><td class="n">${fmtNum(r.aht)}</td></tr>`).join('')}</tbody></table></div>`;
+    <tbody>${rows.map(r=>`<tr class="${r.company===OWN?'edn':''}"><td>${r.rank||''}</td><td style="font-weight:${r.company===OWN?700:500}">${escH(r.tl)}${gaps[r.tl]?` <span title="Data agent TL ini belum lengkap: jumlah repay agent selisih ${fmtRpFull(gaps[r.tl].diff)} dari total TL. Angka TL (baris ini) tetap sesuai laporan." style="cursor:help">⚠</span>`:''}</td><td>${r.company===OWN?'<span class="pill pill-edn">EDN</span>':escH(r.company)}</td><td class="n">${fmtRp(r.outstanding)}</td><td class="n">${fmtRpFull(r.repay)}</td><td class="n" style="font-weight:700">${fmtPct(r.rate)}</td><td class="n muted">${top&&r!==top?'-'+fmtPct(top.rate-r.rate):''}</td><td class="n">${fmtNum(r.aht)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
 /* ── 3. Agent merah EDN per TL ── */
@@ -420,6 +447,7 @@ function renderRed(){
     <div class="card-head"><div><div class="card-title">🚩 Agent Merah EDN per TL</div>
       <div class="card-sub">Agent yang ditandai merah oleh klien · ${totRed} dari ${today.length} agent EDN merah pada ${dLabel(VIEW.redDate)}</div></div>
       <select onchange="VIEW.redDate=this.value;renderRed()">${dates.slice().reverse().map(d=>`<option value="${d}" ${d===VIEW.redDate?'selected':''}>${dLabel(d)}</option>`).join('')}</select></div>
+    ${gapBanner(agentGap('DAILY',VIEW.redDate),true)}
     ${today.length?`<div class="tlgrid">${tls.map(t=>`<div class="tlbox">
       <div class="tlbox-h"><span>${escH(t.tl)}</span><span class="pill ${t.pct>=.7?'pill-red':t.pct>=.4?'pill-warn':'pill-ok'}">${t.red.length}/${t.all.length} merah</span></div>
       ${t.red.sort((a,b)=>stat(b).streak-stat(a).streak||a.rate-b.rate).map(a=>{const s=stat(a);return `<div class="tlbox-r"><span class="nm" title="${escH(a.kufiId)}">${escH(a.nama)} <span class="muted" style="font-size:10.5px">${escH(a.kufiId)}</span></span><span style="flex-shrink:0;text-align:right">${fmtPct(a.rate)} · <b class="${s.streak>=3?'bad':''}" title="hari merah bulan ini / hari ada data">${s.streak>=2?s.streak+' hr berturut':s.days+'/'+s.seen+' hr'}</b></span></div>`;}).join('')||'<div class="tlbox-r muted">Tidak ada agent merah 👍</div>'}
@@ -456,7 +484,7 @@ function renderRec(){
   const nf=rows.filter(x=>!x.r);
   const sumK=klien.reduce((s,a)=>s+a.repay,0), sumI=intl.reduce((s,r)=>s+(r.dailyPayment||0),0);
   const noIntData=!intl.length;
-  el.innerHTML=head+(noIntData?`<div class="empty">Belum ada input internal tanggal ${dLabel(VIEW.recDate)} di All Data (Rupiah Cepat · ${BUCKET==='C03'?'C03':'NPA'}).</div>`:`
+  el.innerHTML=head+gapBanner(agentGap('DAILY',VIEW.recDate),true)+(noIntData?`<div class="empty">Belum ada input internal tanggal ${dLabel(VIEW.recDate)} di All Data (Rupiah Cepat · ${BUCKET==='C03'?'C03':'NPA'}).</div>`:`
     <div class="kpis">
       <div class="kpi"><div class="l">Total repay versi klien</div><div class="v">${fmtRp(sumK)}</div><div class="s">${klien.length} agent EDN</div></div>
       <div class="kpi"><div class="l">Total input internal</div><div class="v">${fmtRp(sumI)}</div><div class="s ${Math.abs(sumK-sumI)>TOL?'bad':'good'}">selisih ${fmtRpFull(sumK-sumI)}</div></div>
@@ -520,10 +548,12 @@ function addFiles(list){
   renderUp();
 }
 
-// Persiapan gambar sebelum dibaca AI: baris berlatar MERAH (teks merah tua di
-// atas merah terang, sulit dibaca) diubah jadi teks hitam di atas MERAH MUDA,
-// lalu gambar diperbesar 2x supaya angka kecil lebih jelas. Status "merah" tetap
-// terbaca karena latarnya masih merah muda (bukan putih).
+// ── Persiapan gambar ──────────────────────────────────────────
+// 1) Baris berlatar MERAH (teks merah tua di atas merah terang) → teks hitam di
+//    atas MERAH MUDA, supaya terbaca tapi status "merah" tetap kelihatan.
+// 2) Diperbesar 2x supaya angka kecil tajam.
+// 3) Dipotong jadi beberapa bagian (atas→bawah, sedikit tumpang tindih) karena
+//    gambar yang sangat panjang membuat AI sering melewatkan baris di tengah.
 function prepareImage(file){
   return new Promise((resolve)=>{
     const img=new Image();
@@ -533,102 +563,212 @@ function prepareImage(file){
         const c=document.createElement('canvas');c.width=img.width*scale;c.height=img.height*scale;
         const x=c.getContext('2d');x.imageSmoothingQuality='high';x.drawImage(img,0,0,c.width,c.height);
         const id=x.getImageData(0,0,c.width,c.height),p=id.data;
-        let redPx=0;
         for(let i=0;i<p.length;i+=4){
           const r=p[i],g=p[i+1],b=p[i+2];
-          if(r-Math.max(g,b)>70){ // piksel kemerahan
-            const L=Math.min(1,Math.max(0,(r-90)/145)); // merah terang→1, merah tua (teks)→0
-            p[i]=255*L;p[i+1]=214*L;p[i+2]=214*L;redPx++;
-          }
+          if(r-Math.max(g,b)>70){const L=Math.min(1,Math.max(0,(r-90)/145));p[i]=255*L;p[i+1]=214*L;p[i+2]=214*L;}
         }
         x.putImageData(id,0,0);
-        c.toBlob(b=>{
-          if(b&&b.size<7e6)return resolve({blob:b,changed:redPx>0});
-          c.toBlob(j=>resolve({blob:j||file,changed:redPx>0}),'image/jpeg',0.93);
-        },'image/png');
-      }catch(e){resolve({blob:file,changed:false});}
+        resolve({canvas:c,origH:img.height,origW:img.width});
+      }catch(e){resolve(null);}
     };
-    img.onerror=()=>resolve({blob:file,changed:false});
+    img.onerror=()=>resolve(null);
     img.src=URL.createObjectURL(file);
   });
+}
+function canvasToBlob(c,type,q){return new Promise(r=>c.toBlob(b=>r(b),type,q));}
+async function canvasBlob(c){const b=await canvasToBlob(c,'image/png');if(b&&b.size<7e6)return b;return canvasToBlob(c,'image/jpeg',0.93);}
+// Potong kanvas jadi n bagian dgn tumpang tindih ±4% tinggi (min 2 baris tabel)
+async function sliceCanvas(c,n){
+  if(n<=1)return [{blob:await canvasBlob(c),idx:0}];
+  const ov=Math.max(Math.round(c.height*0.04),60), step=Math.ceil(c.height/n), out=[];
+  for(let i=0;i<n;i++){
+    const y0=Math.max(0,i*step-(i?ov:0)), y1=Math.min(c.height,(i+1)*step+(i<n-1?ov:0));
+    const s=document.createElement('canvas');s.width=c.width;s.height=y1-y0;
+    s.getContext('2d').drawImage(c,0,y0,c.width,y1-y0,0,0,c.width,y1-y0);
+    out.push({blob:await canvasBlob(s),idx:i});
+  }
+  return out;
+}
+function partCount(prep){ // ±70 baris per bagian; gambar laporan ±13 px per baris di ukuran asli
+  if(!prep)return 1;
+  const ratio=prep.origH/prep.origW;
+  return ratio<1.2?1:Math.min(4,Math.max(2,Math.ceil(prep.origH/950)));
 }
 
 function fileToB64(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});}
 
+const GEM_RULES=`Aturan:
+- Angka ditulis tanpa pemisah ribuan (1,433,100,893 → 1433100893). Tanda "-" atau kosong = 0.
+- rate = angka persen tanpa tanda % (0.239% → 0.239). Kalau tertulis desimal tanpa % (mis. 0.004), tulis apa adanya.
+- merah = true kalau baris agent itu berlatar merah muda/merah, false kalau putih.
+- company ditulis persis (EDN, B, C, D, E, F, G).
+- Tulis SEMUA baris yang diminta dari atas sampai bawah sesuai urutan; jangan ada yang dilewati, digabung, atau dikarang.
+- Baris AVG jangan dimasukkan ke daftar tl/agents; masukkan ke tlAvg dan agentAvg.`;
 const GEM_PROMPT=`Kamu membaca gambar laporan penagihan dari klien (dibuat di Excel). Judulnya seperti "EDN NPA DAILY PERFORMANCE REPORT" atau "EDN CO3 MONTHLY PERFORMANCE REPORT".
 Isi gambar:
 1) Tabel atas = ranking TL: RANK, TL NAME, COMPANY, TOTAL LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, AVERAGE HANDLE TIME, lalu baris AVG.
 2) Tabel besar = per agent: KUFI-ID, NAME, TL NAME, COMPANY, LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, HANDLE TIME, LOAD NUMBER, lalu baris AVG. Sebagian baris berlatar MERAH MUDA (aslinya merah; warnanya sudah dicerahkan supaya teks mudah dibaca).
 3) Khusus laporan MONTHLY: kotak kecil di kanan berisi DATE (mis. 1-Oct-26) × kolom COMPANY (EDN, B, C, D, ...) berisi repay rate harian, lalu baris AVG.
-Aturan:
+Isian:
 - jenis = "DAILY" atau "MONTHLY" sesuai judul. bucket = "NPA" atau "CO3" sesuai judul.
-- tanggal (format YYYY-MM-DD): DAILY = tanggal di header tabel agent (mis. "9-Oct-26" → 2026-10-09). MONTHLY = tanggal terakhir di kotak rate harian; kalau tidak ada, kosongkan.
-- Tulis SEMUA baris agent dari atas sampai bawah sesuai urutan, jangan ada yang dilewati, digabung, atau dikarang.
-- Angka ditulis tanpa pemisah ribuan (1,433,100,893 → 1433100893). Tanda "-" atau kosong = 0.
-- rate = angka persen tanpa tanda % (0.239% → 0.239). Kalau tertulis desimal tanpa % (mis. 0.004), tetap tulis apa adanya.
-- merah = true kalau baris agent itu berlatar merah muda/merah, false kalau putih.
-- company ditulis persis (EDN, B, C, D, E, F, G).
-- Baris AVG jangan dimasukkan ke daftar tl/agents; masukkan ke tlAvg dan agentAvg.`;
+- tanggal (format YYYY-MM-DD): DAILY = tanggal di header tabel agent (mis. "9-Oct-26" → 2026-10-09). MONTHLY = tanggal terakhir di kotak rate harian.
+${GEM_RULES}`;
+function partPrompt(i,n){
+  if(n<=1)return GEM_PROMPT;
+  return GEM_PROMPT+`
+PENTING: gambar ini POTONGAN ke-${i+1} dari ${n} (laporan panjang dipotong dari atas ke bawah, antar potongan sedikit tumpang tindih).
+- Baca hanya yang terlihat di potongan ini. Lewati baris yang terpotong setengah di tepi atas/bawah.${i>0?`
+- Potongan ini tidak punya judul/header kolom. Urutan kolom tabel agent: KUFI-ID, NAME, TL NAME, COMPANY, LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, HANDLE TIME, LOAD NUMBER.
+- Kalau judul, tanggal, tabel TL, atau kotak rate harian tidak terlihat, biarkan kosong.`:''}`;
+}
+function rereadPrompt(tl){
+  return `Gambar ini bagian dari laporan penagihan klien (Excel). Tabel agent punya kolom: KUFI-ID, NAME, TL NAME, COMPANY, LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, HANDLE TIME, LOAD NUMBER. Baris berlatar merah muda = merah.
+Tugas: tulis SEMUA baris agent yang kolom TL NAME-nya "${tl}" — teliti satu per satu, jangan ada yang terlewat. Jangan tulis baris TL lain. Lewati baris yang terpotong setengah di tepi gambar.
+${GEM_RULES}`;
+}
 
+const AGENT_ITEM={type:'OBJECT',properties:{kufiId:{type:'STRING'},nama:{type:'STRING'},tl:{type:'STRING'},company:{type:'STRING'},outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'},handleTime:{type:'NUMBER'},load:{type:'NUMBER'},merah:{type:'BOOLEAN'}},required:['kufiId','nama','tl','company','outstanding','repay','rate','merah']};
 const GEM_SCHEMA={type:'OBJECT',properties:{
-  jenis:{type:'STRING',enum:['DAILY','MONTHLY']},
-  bucket:{type:'STRING'},
-  tanggal:{type:'STRING'},
+  jenis:{type:'STRING'},bucket:{type:'STRING'},tanggal:{type:'STRING'},
   tl:{type:'ARRAY',items:{type:'OBJECT',properties:{rank:{type:'INTEGER'},tl:{type:'STRING'},company:{type:'STRING'},outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'},aht:{type:'NUMBER'}},required:['tl','company','outstanding','repay','rate']}},
   tlAvg:{type:'OBJECT',properties:{outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'}}},
-  agents:{type:'ARRAY',items:{type:'OBJECT',properties:{kufiId:{type:'STRING'},nama:{type:'STRING'},tl:{type:'STRING'},company:{type:'STRING'},outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'},handleTime:{type:'NUMBER'},load:{type:'NUMBER'},merah:{type:'BOOLEAN'}},required:['kufiId','nama','tl','company','outstanding','repay','rate','merah']}},
+  agents:{type:'ARRAY',items:AGENT_ITEM},
   agentAvg:{type:'OBJECT',properties:{outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'}}},
   vendor:{type:'ARRAY',items:{type:'OBJECT',properties:{tanggal:{type:'STRING'},company:{type:'STRING'},rate:{type:'NUMBER'}},required:['tanggal','company','rate']}}
-},required:['jenis','bucket','tl','agents']};
+},required:['tl','agents']};
+const REREAD_SCHEMA={type:'OBJECT',properties:{agents:{type:'ARRAY',items:AGENT_ITEM}},required:['agents']};
+
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// Panggil Gemini: coba tiap model; ulang otomatis kalau kena batas kuota (429/503)
+async function gemCall(blob,prompt,schema){
+  const key=getGeminiKey();
+  const b64=await fileToB64(blob);
+  const body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:blob.type||'image/png',data:b64}}]}],
+    generationConfig:{temperature:0,responseMimeType:'application/json',responseSchema:schema,maxOutputTokens:65536}};
+  let lastErr=null;
+  for(const model of GEMINI_MODELS){
+    for(let attempt=0;attempt<4;attempt++){
+      let resp,j;
+      try{
+        resp=await fetch(GEMINI_URL_BASE+model+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+        j=await resp.json().catch(()=>({}));
+      }catch(e){lastErr=e;await sleep(3000);continue;}
+      if(resp.status===404){lastErr=new Error('model '+model+' tidak tersedia');break;}
+      if(resp.status===429||resp.status===503||resp.status===500){lastErr=new Error('Gemini sibuk/kuota per menit habis');await sleep([8000,20000,40000,40000][attempt]);continue;}
+      if(resp.status===400&&/output.?tokens/i.test(JSON.stringify(j))&&body.generationConfig.maxOutputTokens>32768){body.generationConfig.maxOutputTokens=32768;attempt--;continue;}
+      if(!resp.ok){
+        if(resp.status===400&&/API key/i.test(JSON.stringify(j))){try{localStorage.removeItem('tz_gemini_key');}catch(e){}renderKeyBox();}
+        throw new Error((j.error&&j.error.message)||('HTTP '+resp.status));
+      }
+      const cand=(j.candidates||[])[0]||{};
+      if(cand.finishReason==='MAX_TOKENS')throw new Error('Jawaban AI terpotong (bagian gambar terlalu padat).');
+      const txt=((cand.content||{}).parts||[]).map(p=>p.text||'').join('');
+      return JSON.parse(txt);
+    }
+  }
+  throw lastErr||new Error('Gemini tidak merespons');
+}
+
+function rateOK(a){if(!(a.outstanding>0))return true;const c=a.repay/a.outstanding*100,r=Number(a.rate)||0;return Math.abs(c-r)<=0.0051||Math.abs(c-r*100)<=0.06;}
+function agentKey(a){return normKey(a.kufiId)||(normKey(a.nama)+'|'+normKey(a.tl));}
+function numv(v){if(typeof v==='number')return v;const n=parseFloat(String(v||'').replace(/[^\d.\-]/g,''));return isNaN(n)?0:n;}
+function cleanAgent(a){return {kufiId:String(a.kufiId||'').trim(),nama:String(a.nama||'').trim(),tl:String(a.tl||'').trim(),company:String(a.company||'').trim().toUpperCase(),outstanding:numv(a.outstanding),repay:numv(a.repay),rate:numv(a.rate),handleTime:numv(a.handleTime),load:numv(a.load),merah:!!a.merah};}
+// Gabung daftar agent: baris dobel (dari tumpang tindih potongan) dibuang;
+// kalau dobel, pakai yang rate-nya konsisten dgn repay÷outstanding.
+function dedupeAgents(list){
+  const out=[],pos={};
+  list.map(cleanAgent).filter(a=>a.kufiId||a.nama).forEach(a=>{
+    const k=agentKey(a);
+    if(pos[k]===undefined){pos[k]=out.length;out.push(a);}
+    else if(!rateOK(out[pos[k]])&&rateOK(a))out[pos[k]]=a;
+  });
+  return out;
+}
+function mergeParts(parts){
+  const first=f=>{for(const p of parts){const v=p[f];if(v!==undefined&&v!==null&&String(v).trim()!=='')return v;}return '';};
+  const tlSeen={},tl=[];
+  parts.forEach(p=>(p.tl||[]).forEach(t=>{const k=normKey(t.tl);if(k&&!tlSeen[k]){tlSeen[k]=1;tl.push(t);}}));
+  const vSeen={},vendor=[];
+  parts.forEach(p=>(p.vendor||[]).forEach(v=>{const k=v.tanggal+'|'+String(v.company).toUpperCase();if(!vSeen[k]){vSeen[k]=1;vendor.push(v);}}));
+  const avgOf=f=>{for(const p of parts.slice().reverse()){if(p[f]&&numv(p[f].repay)>0)return p[f];}return null;};
+  const tAvg=(()=>{for(const p of parts){if(p.tlAvg&&numv(p.tlAvg.repay)>0)return p.tlAvg;}return null;})();
+  return {jenis:first('jenis'),bucket:first('bucket'),tanggal:(parts.map(p=>p.tanggal).find(t=>/^\d{4}-\d{2}-\d{2}$/.test(t||''))||''),
+    tl,tlAvg:tAvg,agents:dedupeAgents(parts.flatMap(p=>p.agents||[])),agentAvg:avgOf('agentAvg'),vendor};
+}
 
 async function processFile(u){
-  const key=getGeminiKey();
-  if(!key){u.status='nokey';u.msg='butuh API key';renderUp();return;}
-  u.status='busy';u.msg='membaca… (±30–60 dtk)';renderUp();
+  if(!getGeminiKey()){u.status='nokey';u.msg='butuh API key';renderUp();return;}
+  u.status='busy';u.msg='menyiapkan gambar…';u.reread={};renderUp();
   try{
-    if(!u.prep){u.msg='menyiapkan gambar…';renderUp();u.prep=await prepareImage(u.file);u.prepUrl=URL.createObjectURL(u.prep.blob);u.msg='membaca… (±30–60 dtk)';renderUp();}
-    const b64=await fileToB64(u.prep.blob);
-    const body={contents:[{parts:[{text:GEM_PROMPT},{inline_data:{mime_type:u.prep.blob.type||'image/jpeg',data:b64}}]}],
-      generationConfig:{temperature:0,responseMimeType:'application/json',responseSchema:GEM_SCHEMA,maxOutputTokens:65536}};
-    let resp=null,lastErr=null,j=null;
-    for(const model of GEMINI_MODELS){
-      try{
-        const call=()=>fetch(GEMINI_URL_BASE+model+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
-        resp=await call();
-        if(resp.status===404){lastErr=new Error('model '+model+' tidak tersedia');resp=null;continue;}
-        j=await resp.json();
-        // beberapa model membatasi output lebih kecil → ulang dgn batas 32k
-        if(resp.status===400&&/output.?tokens/i.test(JSON.stringify(j))){body.generationConfig.maxOutputTokens=32768;resp=await call();j=await resp.json();}
-        break;
-      }catch(e){lastErr=e;resp=null;}
+    if(!u.prep){
+      u.prep=await prepareImage(u.file);
+      if(u.prep){u.prepUrl=URL.createObjectURL(await canvasToBlob(u.prep.canvas,'image/jpeg',0.9));}
     }
-    if(!resp)throw lastErr||new Error('Gemini tidak merespons');
-    if(!resp.ok){
-      if(resp.status===400&&/API key/i.test(JSON.stringify(j))){try{localStorage.removeItem('tz_gemini_key');}catch(e){}renderKeyBox();}
-      throw new Error((j.error&&j.error.message)||('HTTP '+resp.status));
+    const n=partCount(u.prep);
+    u.slices=u.prep?await sliceCanvas(u.prep.canvas,n):[{blob:u.file,idx:0}];
+    const parts=[];
+    for(let i=0;i<u.slices.length;i++){
+      u.msg=u.slices.length>1?`membaca bagian ${i+1}/${u.slices.length}…`:'membaca… (±30–60 dtk)';renderUp();
+      const d=await gemCall(u.slices[i].blob,partPrompt(i,u.slices.length),GEM_SCHEMA);
+      d._part=i;parts.push(d);
     }
-    const cand=(j.candidates||[])[0]||{};
-    if(cand.finishReason==='MAX_TOKENS')throw new Error('Jawaban AI terpotong (gambar terlalu panjang). Coba potong gambar jadi 2.');
-    const txt=((cand.content||{}).parts||[]).map(p=>p.text||'').join('');
-    const d=JSON.parse(txt);
-    u.data=normalizeParsed(d); u.status='done';
+    u.parts=parts;
+    u.data=normalizeParsed(mergeParts(parts));
     validate(u);
+    // Solusi 2: baca ulang otomatis TL yang total repay-nya belum cocok
+    const bad=tlMismatches(u.data).slice(0,6);
+    for(const m of bad){
+      u.msg=`baca ulang TL ${m.tl.split(' ')[0]}…`;renderUp();
+      try{await rereadTl(u,m);}catch(e){console.warn('baca ulang gagal',m.tl,e);}
+    }
+    validate(u);
+    u.status='done';
   }catch(e){u.status='error';u.msg='gagal: '+e.message;}
   renderUp();
 }
 
+function tlSums(d){const s={};d.agents.forEach(a=>{const k=normKey(a.tl);(s[k]=s[k]||{repay:0,os:0,n:0});s[k].repay+=a.repay;s[k].os+=a.outstanding;s[k].n++;});return s;}
+function tlTol(t){return Math.max(1000,t.repay*0.0005);}
+function tlMismatches(d){
+  const s=tlSums(d);
+  return d.tl.map(t=>{const x=s[normKey(t.tl)];return {tl:t.tl,repay:t.repay,sum:x?x.repay:0,n:x?x.n:0,diff:(x?x.repay:0)-t.repay};})
+    .filter(m=>Math.abs(m.diff)>tlTol(m));
+}
+async function rereadTl(u,m){
+  const k=normKey(m.tl);
+  // potongan yang berisi agent TL ini (+ potongan sesudahnya, kalau barisnya bersambung)
+  const idx=new Set();
+  (u.parts||[]).forEach(p=>{if((p.agents||[]).some(a=>normKey(a.tl)===k)){idx.add(p._part);if(p._part+1<u.slices.length)idx.add(p._part+1);}});
+  if(!idx.size)u.slices.forEach(s=>idx.add(s.idx));
+  let found=[];
+  for(const i of [...idx].sort()){
+    const r=await gemCall(u.slices[i].blob,rereadPrompt(m.tl),REREAD_SCHEMA);
+    found=found.concat((r.agents||[]).filter(a=>normKey(a.tl)===k));
+  }
+  found=dedupeAgents(found);
+  if(!found.length)return;
+  const newSum=found.reduce((s,a)=>s+a.repay,0);
+  const oldDiff=Math.abs(m.diff), newDiff=Math.abs(newSum-m.repay);
+  u.reread[m.tl]={before:m.diff,after:newSum-m.repay,used:newDiff<oldDiff};
+  if(newDiff<oldDiff){
+    const agents=u.data.agents, firstIdx=agents.findIndex(a=>normKey(a.tl)===k);
+    const rest=agents.filter(a=>normKey(a.tl)!==k);
+    const at=firstIdx<0?rest.length:agents.slice(0,firstIdx).filter(a=>normKey(a.tl)!==k).length;
+    u.data.agents=rest.slice(0,at).concat(found,rest.slice(at));
+  }
+}
+
 function normalizeParsed(d){
-  const num=v=>{if(typeof v==='number')return v;const n=parseFloat(String(v||'').replace(/[^\d.\-]/g,''));return isNaN(n)?0:n;};
   const bucket=String(d.bucket||'').toUpperCase().replace(/\s/g,'').replace('CO3','C03');
   return {
     jenis:String(d.jenis||'').toUpperCase()==='MONTHLY'?'MONTHLY':'DAILY',
     bucket:bucket==='C03'||bucket==='NPA'?bucket:BUCKET,
     tanggal:/^\d{4}-\d{2}-\d{2}$/.test(d.tanggal||'')?d.tanggal:'',
-    tl:(d.tl||[]).map((t,i)=>({rank:num(t.rank)||i+1,tl:String(t.tl||'').trim(),company:String(t.company||'').trim().toUpperCase(),outstanding:num(t.outstanding),repay:num(t.repay),rate:num(t.rate),aht:num(t.aht)})),
+    tl:(d.tl||[]).map((t,i)=>({rank:numv(t.rank)||i+1,tl:String(t.tl||'').trim(),company:String(t.company||'').trim().toUpperCase(),outstanding:numv(t.outstanding),repay:numv(t.repay),rate:numv(t.rate),aht:numv(t.aht)})),
     tlAvg:d.tlAvg||null,
-    agents:(d.agents||[]).map(a=>({kufiId:String(a.kufiId||'').trim(),nama:String(a.nama||'').trim(),tl:String(a.tl||'').trim(),company:String(a.company||'').trim().toUpperCase(),outstanding:num(a.outstanding),repay:num(a.repay),rate:num(a.rate),handleTime:num(a.handleTime),load:num(a.load),merah:!!a.merah})),
+    agents:(d.agents||[]).map(cleanAgent),
     agentAvg:d.agentAvg||null,
-    vendor:(d.vendor||[]).filter(v=>/^\d{4}-\d{2}-\d{2}$/.test(v.tanggal||'')).map(v=>({tanggal:v.tanggal,company:String(v.company||'').trim().toUpperCase(),rate:num(v.rate)}))
+    vendor:(d.vendor||[]).filter(v=>/^\d{4}-\d{2}-\d{2}$/.test(v.tanggal||'')).map(v=>({tanggal:v.tanggal,company:String(v.company||'').trim().toUpperCase(),rate:numv(v.rate)}))
   };
 }
 
@@ -638,31 +778,28 @@ function normalizeParsed(d){
 //  (c) rata-rata repay agent ≈ baris AVG
 function validate(u){
   const d=u.data, issues=[]; u.flags={};
-  if(!d.tanggal)issues.push('Tanggal laporan tidak terbaca — isi manual di atas.');
-  // rate di gambar dibulatkan 2–3 desimal → toleransi pembulatan 2 desimal
-  const tolRate=0.0051;
+  if(!d.tanggal)issues.push({text:'Tanggal laporan tidak terbaca — isi manual di atas.'});
   d.agents.forEach((a,i)=>{
-    if(a.outstanding>0){const calc=a.repay/a.outstanding*100;
-      // laporan kadang menulis rate sbg desimal (0.004 = 0.4%) → terima juga
-      const ok=Math.abs(calc-a.rate)<=tolRate||Math.abs(calc-a.rate*100)<=tolRate*100;
-      if(!ok){u.flags['a'+i]=true;issues.push(`Baris ${i+1} ${a.nama}: rate ${a.rate}% tidak cocok dgn repay÷outstanding (${calc.toFixed(3)}%).`);}}
+    if(!rateOK(a)){u.flags['a'+i]=true;issues.push({text:`${a.nama} (${a.tl}): rate ${a.rate}% tidak cocok dgn repay÷outstanding (${(a.repay/a.outstanding*100).toFixed(3)}%).`,tl:a.tl});}
   });
-  const sumByTl={};d.agents.forEach(a=>{const k=normKey(a.tl);sumByTl[k]=(sumByTl[k]||0)+a.repay;});
-  d.tl.forEach((t,i)=>{const s=sumByTl[normKey(t.tl)];
-    if(s===undefined){issues.push(`TL ${t.tl}: tidak ada agent-nya di tabel bawah.`);u.flags['t'+i]=true;}
-    else if(Math.abs(s-t.repay)>Math.max(1000,t.repay*0.0005)){issues.push(`TL ${t.tl}: repay ${fmtRpFull(t.repay)} ≠ jumlah repay agent-nya ${fmtRpFull(s)} (selisih ${fmtRpFull(s-t.repay)}).`);u.flags['t'+i]=true;}});
-  if(d.agentAvg&&num0(d.agentAvg.repay)>0&&d.agents.length){
-    const avg=d.agents.reduce((s,a)=>s+a.repay,0)/d.agents.length;
-    if(Math.abs(avg-d.agentAvg.repay)/d.agentAvg.repay>0.005)issues.push(`Rata-rata repay agent ${fmtRpFull(avg)} ≠ baris AVG ${fmtRpFull(d.agentAvg.repay)} — mungkin ada baris yang terlewat/terbaca salah (${d.agents.length} baris terbaca).`);
+  const s=tlSums(d);
+  d.tl.forEach((t,i)=>{const x=s[normKey(t.tl)];
+    if(!x){issues.push({text:`TL ${t.tl}: tidak ada agent-nya di tabel bawah.`,tl:t.tl});u.flags['t'+i]=true;}
+    else if(Math.abs(x.repay-t.repay)>tlTol(t)){
+      const rr=u.reread&&u.reread[t.tl];
+      issues.push({text:`TL ${t.tl}: repay ${fmtRpFull(t.repay)} ≠ jumlah repay ${x.n} agent-nya ${fmtRpFull(x.repay)} (selisih ${fmtRpFull(x.repay-t.repay)})${rr?' — sudah dibaca ulang otomatis':''}.`,tl:t.tl});u.flags['t'+i]=true;}});
+  if(d.agentAvg&&numv(d.agentAvg.repay)>0&&d.agents.length){
+    const avg=d.agents.reduce((q,a)=>q+a.repay,0)/d.agents.length;
+    if(Math.abs(avg-d.agentAvg.repay)/d.agentAvg.repay>0.005)issues.push({text:`Rata-rata repay agent ${fmtRpFull(avg)} ≠ baris AVG ${fmtRpFull(d.agentAvg.repay)} — kemungkinan ada baris terlewat/terbaca salah (${d.agents.length} baris terbaca).`});
   }
-  if(d.jenis==='MONTHLY'&&!d.vendor.length)issues.push('Kotak rate harian per vendor tidak terbaca.');
+  if(d.jenis==='MONTHLY'&&!d.vendor.length)issues.push({text:'Kotak rate harian per vendor tidak terbaca.'});
   u.issues=issues; u.msg=issues.length?`${issues.length} perlu dicek`:'✓ semua cocok';
 }
 function num0(v){const n=Number(v);return isNaN(n)?0:n;}
 
 function renderUp(){
   document.getElementById('fileList').innerHTML=UP.map(u=>{
-    const d=u.data, lbl=d?`${d.bucket==='C03'?'CO3':d.bucket} ${d.jenis==='DAILY'?'Daily':'Monthly'}`:(u.file.name||'gambar');
+    const d=u.data, lbl=d?`${d.bucket==='C03'?'CO3':d.bucket} ${d.jenis==='DAILY'?'Daily':'Monthly'}${d.tanggal?' '+dShort(d.tanggal):''}`:(u.file.name||'gambar');
     const ic=u.status==='busy'?'⏳':u.status==='error'?'❌':u.status==='saved'?'💾':u.status==='done'?(u.issues&&u.issues.length?'⚠️':'✅'):u.status==='nokey'?'🔑':'…';
     return `<div class="fchip ${u.id===UPSEL?'sel':''}" onclick="UPSEL='${u.id}';renderUp()"><img src="${u.url}" alt=""><div style="min-width:0"><div class="fn">${ic} ${escH(lbl)}</div><div class="st">${escH(u.msg)}</div></div>
       <span title="Hapus" onclick="event.stopPropagation();UP=UP.filter(x=>x.id!=='${u.id}');if(UPSEL==='${u.id}')UPSEL=UP[0]?UP[0].id:null;renderUp()" style="margin-left:4px;color:var(--text3)">✕</span></div>`;
@@ -671,18 +808,25 @@ function renderUp(){
   const rb=document.getElementById('resultBox');
   if(!u||!u.data){rb.innerHTML=u&&u.status==='error'?`<div class="issues warn" style="margin-top:14px">${escH(u.msg)} <button class="btn btn-ghost" style="margin-left:8px" onclick="processFile(UP.find(x=>x.id==='${u.id}'))">Coba lagi</button></div>`:'';}
   else{
-    const d=u.data;
+    const d=u.data, ft=u.filterTl||'';
+    const rr=Object.entries(u.reread||{});
+    const issueLine=(it)=>it.tl?`<a href="javascript:void 0" onclick="upFilter('${u.id}',${JSON.stringify(it.tl).replace(/"/g,'&quot;')})" style="color:inherit;text-decoration:underline dotted">${escH(it.text)}</a>`:escH(it.text);
+    let ftInfo='';
+    if(ft){const t=d.tl.find(x=>normKey(x.tl)===normKey(ft)), s=tlSums(d)[normKey(ft)]||{repay:0,n:0};
+      ftInfo=`<div class="issues ${t&&Math.abs(s.repay-t.repay)<=tlTol(t)?'ok':'warn'}" style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">🔎 Menampilkan agent TL <b>${escH(ft)}</b>: ${s.n} baris · jumlah repay <b>${fmtRpFull(s.repay)}</b>${t?` · tabel TL <b>${fmtRpFull(t.repay)}</b> · selisih <b>${fmtRpFull(s.repay-t.repay)}</b>`:''}
+        <span style="margin-left:auto;display:flex;gap:6px"><button class="btn btn-ghost" onclick="upAddRow('${u.id}')">+ Tambah baris</button><button class="btn btn-ghost" onclick="upFilter('${u.id}','')">Tampilkan semua</button></span></div>`;}
     rb.innerHTML=`<div class="res-meta">
         <select onchange="upSet('${u.id}','jenis',this.value)"><option ${d.jenis==='DAILY'?'selected':''}>DAILY</option><option ${d.jenis==='MONTHLY'?'selected':''}>MONTHLY</option></select>
         <select onchange="upSet('${u.id}','bucket',this.value)"><option value="NPA" ${d.bucket==='NPA'?'selected':''}>NPA</option><option value="C03" ${d.bucket==='C03'?'selected':''}>CO3</option></select>
         <input type="date" value="${d.tanggal}" onchange="upSet('${u.id}','tanggal',this.value)">
-        <span class="muted" style="font-size:12px">${d.tl.length} TL · ${d.agents.length} agent · ${d.agents.filter(a=>a.merah).length} merah${d.vendor.length?' · '+d.vendor.length+' rate vendor':''}</span>
+        <span class="muted" style="font-size:12px">${d.tl.length} TL · ${d.agents.length} agent · ${d.agents.filter(a=>a.merah).length} merah${d.vendor.length?' · '+d.vendor.length+' rate vendor':''}${u.slices&&u.slices.length>1?' · dibaca dalam '+u.slices.length+' bagian':''}</span>
         <span style="margin-left:auto;font-size:12px;display:flex;gap:12px">${u.prepUrl?`<a href="${u.prepUrl}" target="_blank" style="color:var(--accent)">Gambar yang dibaca AI ↗</a>`:''}<a href="${u.url}" target="_blank" style="color:var(--accent)">Gambar asli ↗</a></span>
       </div>
-      <div class="issues ${u.issues.length?'warn':'ok'}">${u.issues.length?`<b>⚠️ ${u.issues.length} hal perlu dicek</b> (baris kuning di bawah). Klik angka untuk memperbaiki sesuai gambar asli:<br>`+u.issues.slice(0,12).map(escH).join('<br>')+(u.issues.length>12?`<br>… dan ${u.issues.length-12} lagi`:''):'✅ Hasil bacaan cocok: rate tiap agent sesuai repay÷outstanding, dan total repay tiap TL sama dengan jumlah agent-nya.'}</div>
-      <div style="font-size:12px;font-weight:700;margin:10px 0 6px">Ranking TL</div>
-      <div class="tbl-wrap" style="max-height:240px">${upTable(u,'tl')}</div>
+      ${rr.length?`<div class="issues ok" style="background:var(--accent-bg);color:var(--accent)">🔁 Dibaca ulang otomatis: ${rr.map(([tl,v])=>`${escH(tl)} (selisih ${fmtRpFull(v.before)} → ${v.used?fmtRpFull(v.after):'tidak membaik, dipakai hasil pertama'})`).join(' · ')}</div>`:''}
+      <div class="issues ${u.issues.length?'warn':'ok'}">${u.issues.length?`<b>⚠️ ${u.issues.length} hal perlu dicek.</b> Klik baris peringatan TL untuk menyaring agent TL itu, lalu cocokkan dengan gambar asli (klik angka untuk memperbaiki, ✕ untuk hapus baris, + untuk baris yang terlewat). Kalau tetap disimpan, selisihnya ditandai ⚠ di dashboard.<br>`+u.issues.slice(0,12).map(issueLine).join('<br>')+(u.issues.length>12?`<br>… dan ${u.issues.length-12} lagi`:''):'✅ Hasil bacaan cocok: rate tiap agent sesuai repay÷outstanding, dan total repay tiap TL sama dengan jumlah agent-nya.'}</div>
+      ${ft?'':`<div style="font-size:12px;font-weight:700;margin:10px 0 6px">Ranking TL</div><div class="tbl-wrap" style="max-height:240px">${upTable(u,'tl')}</div>`}
       <div style="font-size:12px;font-weight:700;margin:14px 0 6px">Agent</div>
+      ${ftInfo}
       <div class="tbl-wrap" style="max-height:420px">${upTable(u,'agents')}</div>`;
   }
   const ready=UP.filter(x=>x.status==='done'&&x.data&&x.data.tanggal);
@@ -697,11 +841,12 @@ const UP_COLS={
   agents:[['kufiId','KUFI-ID',''],['nama','Nama',''],['tl','TL',''],['company','Vendor',''],['outstanding','Outstanding','n'],['repay','Repay','n'],['rate','Rate %','n'],['handleTime','Handle','n'],['load','Load','n'],['merah','Merah','']]
 };
 function upTable(u,kind){
-  const cols=UP_COLS[kind], rows=u.data[kind], fk=kind==='tl'?'t':'a';
-  return `<table class="t"><thead><tr><th></th>${cols.map(c=>`<th class="${c[2]}">${c[1]}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr class="${u.flags[fk+i]?'flag':''}"><td class="muted">${i+1}</td>${cols.map(c=>{
+  const cols=UP_COLS[kind], fk=kind==='tl'?'t':'a', ft=kind==='agents'?(u.filterTl||''):'';
+  const rows=u.data[kind].map((r,i)=>({r,i})).filter(x=>!ft||normKey(x.r.tl)===normKey(ft));
+  return `<table class="t"><thead><tr><th></th>${cols.map(c=>`<th class="${c[2]}">${c[1]}</th>`).join('')}${kind==='agents'?'<th></th>':''}</tr></thead><tbody>${rows.map(({r,i})=>`<tr class="${u.flags[fk+i]?'flag':''}"><td class="muted">${i+1}</td>${cols.map(c=>{
     if(c[0]==='merah')return `<td><input type="checkbox" ${r.merah?'checked':''} onchange="upCell('${u.id}','${kind}',${i},'merah',this.checked)"></td>`;
     const v=r[c[0]], isNum=c[2]==='n';
-    return `<td class="${c[2]}" contenteditable="true" onblur="upCell('${u.id}','${kind}',${i},'${c[0]}',this.textContent)">${isNum?(c[0]==='rate'?v:(v===0?'0':Math.round(v).toLocaleString('id-ID'))):escH(v)}</td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
+    return `<td class="${c[2]}" contenteditable="true" onblur="upCell('${u.id}','${kind}',${i},'${c[0]}',this.textContent)">${isNum?(c[0]==='rate'?v:(v===0?'0':Math.round(v).toLocaleString('id-ID'))):escH(v)}</td>`;}).join('')}${kind==='agents'?`<td><span title="Hapus baris" style="cursor:pointer;color:var(--text3)" onclick="upDelRow('${u.id}',${i})">✕</span></td>`:''}</tr>`).join('')}</tbody></table>`;
 }
 function upCell(id,kind,i,col,val){
   const u=UP.find(x=>x.id===id);if(!u)return;
@@ -709,6 +854,16 @@ function upCell(id,kind,i,col,val){
   if(col==='merah')r.merah=!!val;
   else if(typeof r[col]==='number'){const s=String(val).trim();r[col]=col==='rate'?(parseFloat(s.replace(',','.'))||0):(parseFloat(s.replace(/\./g,'').replace(',','.').replace(/[^\d.\-]/g,''))||0);}
   else r[col]=String(val).trim();
+  validate(u);renderUp();
+}
+function upFilter(id,tl){const u=UP.find(x=>x.id===id);if(!u)return;u.filterTl=tl;renderUp();}
+function upDelRow(id,i){const u=UP.find(x=>x.id===id);if(!u)return;const a=u.data.agents[i];if(!confirm(`Hapus baris ${a.nama||a.kufiId}?`))return;u.data.agents.splice(i,1);validate(u);renderUp();}
+function upAddRow(id){
+  const u=UP.find(x=>x.id===id);if(!u)return;
+  const tl=u.filterTl||'', t=u.data.tl.find(x=>normKey(x.tl)===normKey(tl));
+  const k=normKey(tl), last=u.data.agents.map((a,i)=>normKey(a.tl)===k?i:-1).filter(i=>i>=0).pop();
+  const row={kufiId:'',nama:'(baris baru)',tl:tl,company:t?t.company:'',outstanding:0,repay:0,rate:0,handleTime:0,load:0,merah:false};
+  u.data.agents.splice(last===undefined?u.data.agents.length:last+1,0,row);
   validate(u);renderUp();
 }
 function upSet(id,k,v){const u=UP.find(x=>x.id===id);if(!u)return;u.data[k]=v;validate(u);renderUp();}
