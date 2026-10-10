@@ -1189,10 +1189,21 @@ function endpointQcCheck_(e) {
     if (days) unmatched.push({ nama: qcNames[k].nama, akun: qcNames[k].akun, attempt: tot, hari: days });
   });
   unmatched.sort((a, b) => b.attempt - a.attempt);
+  // Daftar semua agent per TL bulan ini (termasuk yg tidak ada di QC) + tanggal
+  // pertama/terakhir muncul → dipakai utk "X dari Y agent" & label rotasi.
+  const ros = {};
+  rows.forEach(r => {
+    const key = (r.teamLeader || '') + '|' + _qcName_(r.agent);
+    const o = ros[key] || (ros[key] = [r.teamLeader || '', r.agent, r.aplikasi, r.bucket, r.tanggal, r.tanggal, 0]);
+    if (r.tanggal < o[4]) o[4] = r.tanggal;
+    if (r.tanggal > o[5]) o[5] = r.tanggal;
+    if (_qcName_(r.agent) && qcNames[_qcName_(r.agent)]) o[6] = 1;
+  });
   return {
     success: true, action: 'qccheck', periode,
     cols: ['tanggal','agent','tl','spv','aplikasi','bucket','absensi','tlCall','tlConn','qcAtt','qcDur','qcOff','qcConn','qcDup','qcAkun'],
-    rows: out, unmatched, terhubungTersedia: T.available
+    rows: out, unmatched, terhubungTersedia: T.available,
+    roster: Object.keys(ros).map(k => ros[k]) // [tl, agent, aplikasi, bucket, tglPertama, tglTerakhir, adaDiQC]
   };
 }
 

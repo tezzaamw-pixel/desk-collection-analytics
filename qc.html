@@ -305,6 +305,19 @@ function analyze(){
   });
 }
 function scoped(){return ROWS.filter(r=>!VIEW.app||r.aplikasi===VIEW.app);}
+// Roster semua agent per TL bulan ini (dari All Data) — butuh Code.gs terbaru
+function roster(){return (DATA.roster||[]).map(a=>({tl:a[0]||'(Tanpa TL)',agent:a[1],app:a[2],first:a[4],last:a[5],inQc:!!a[6]})).filter(x=>!VIEW.app||x.app===VIEW.app);}
+// Label rotasi: agent yg baru muncul setelah awal bulan / berhenti sebelum akhir data TL
+function rotLabel(tl,agent){
+  const ros=roster().filter(x=>x.tl===tl); if(!ros.length)return '';
+  const nk=v=>String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
+  const me=ros.find(x=>nk(x.agent)===nk(agent)); if(!me)return '';
+  const minD=ros.reduce((m,x)=>x.first<m?x.first:m,ros[0].first), maxD=ros.reduce((m,x)=>x.last>m?x.last:m,ros[0].last);
+  const out=[];
+  if(me.first>minD)out.push('pengganti mulai '+dLabel(me.first));
+  if(me.last<maxD)out.push('diganti/terakhir '+dLabel(me.last));
+  return out.join(' · ');
+}
 function scored(){return scoped().filter(r=>!r.qcEmpty);}
 
 function render(){
@@ -334,17 +347,27 @@ function renderTl(){
   const rows=scored(), by={};
   const emptyBy={};scoped().filter(r=>r.qcEmpty).forEach(r=>{const k=r.tl||'(Tanpa TL)';(emptyBy[k]=emptyBy[k]||new Set()).add(r.agent);});
   rows.forEach(r=>{const k=r.tl||'(Tanpa TL)';const o=by[k]||(by[k]={tl:k,spv:r.spv,app:new Set(),agents:new Set(),chk:0,bad:0,over:0,diffPct:[],absen:0,copas:new Set(),asal:0,conn:0});
-    o.app.add(r.aplikasi+' '+r.bucket);o.agents.add(r.agent);
+    o.app.add(r.aplikasi+' '+r.bucket);o.agents.add(String(r.agent).toUpperCase().replace(/[^A-Z0-9]/g,''));
     if(r.checked){o.chk++;if(r.beda){o.bad++;if(r.diff>0)o.over++;}if(r.qcAtt>0)o.diffPct.push(r.diff/r.qcAtt);}
     if(r.absen)o.absen++; if(r.copas)o.copas.add(r.agent); if(r.asal)o.asal++; if(r.conn)o.conn++;});
   const list=Object.values(by).map(o=>({...o,avgDiff:o.diffPct.length?o.diffPct.reduce((s,v)=>s+v,0)/o.diffPct.length:null,score:o.bad+o.absen*2+o.copas.size*3+o.asal}))
     .sort((a,b)=>b.score-a.score||(b.chk?b.bad/b.chk:0)-(a.chk?a.bad/a.chk:0));
   document.getElementById('secTl').innerHTML=`
     <div class="card-head"><div><div class="card-title">👥 Per Team Leader</div><div class="card-sub">Diurutkan dari yang paling perlu dicek · klik nama TL untuk melihat daftar agent yang bermasalah beserta keterangannya</div></div></div>
-    <div class="tbl-wrap"><table class="t"><thead><tr><th>Team Leader</th><th>Aplikasi</th><th class="n">Agent</th><th class="n">Hari dicek</th><th class="n">Cocok</th><th class="n">Rata² selisih</th><th class="n">TL > QC</th><th class="n">Absensi tak sesuai</th><th class="n">Copy-paste</th><th class="n">Panggilan asal</th><th class="n">Terhubung beda</th><th class="n" title="Agent yang QC-nya 0 call sebulan — tidak dihitung ke penilaian">QC kosong</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>Team Leader</th><th>Aplikasi</th>
+      <th class="n" title="Agent yang dicek (namanya ada di data QC) dari total agent TL ini di All Data bulan ini — termasuk agent rotasi/pengganti">Agent dicek ⓘ</th>
+      <th class="n" title="Jumlah pasangan agent × tanggal yang dibandingkan: ada baris di All Data DAN ada angka Attempt di QC (bukan OFF/kosong). Persentase Cocok dihitung dari angka ini.">Agent-hari dicek ⓘ</th>
+      <th class="n" title="Persentase agent-hari yang selisih Call TL vs Attempt QC masih dalam toleransi">Cocok ⓘ</th>
+      <th class="n" title="Rata-rata (Call TL − Attempt QC) ÷ Attempt QC. Plus = TL mengisi lebih besar dari QC">Rata² selisih ⓘ</th>
+      <th class="n" title="Berapa agent-hari TL mengisi call lebih besar dari QC (di luar toleransi)">TL > QC ⓘ</th>
+      <th class="n" title="TL tulis Sakit/Izin/Off tapi QC ada call, atau TL tulis Hadir + isi call tapi QC OFF/0 call">Absensi tak sesuai ⓘ</th>
+      <th class="n" title="Jumlah agent yang angka Call-nya sama persis berulang di beberapa hari">Copy-paste ⓘ</th>
+      <th class="n" title="Agent-hari dengan durasi per attempt jauh di bawah median semua agent">Panggilan asal ⓘ</th>
+      <th class="n" title="Agent-hari dengan Call Terhubung TL ≠ jumlah rekaman di sheet QC">Terhubung beda ⓘ</th>
+      <th class="n" title="Agent yang QC-nya 0 call sebulan — tidak dihitung ke penilaian">QC kosong ⓘ</th></tr></thead><tbody>
     ${list.map(o=>`<tr class="clickable" onclick="openTlModal(${JSON.stringify(o.tl).replace(/"/g,'&quot;')})" title="Klik untuk melihat daftar agent yang bermasalah">
       <td><b style="color:var(--accent);text-decoration:underline dotted">${escH(o.tl)}</b>${o.spv?`<div class="muted" style="font-size:10.5px">SPV ${escH(o.spv)}</div>`:''}</td><td style="font-size:11px">${escH([...o.app].join(', '))}</td>
-      <td class="n">${o.agents.size}</td><td class="n">${o.chk}</td>
+      <td class="n">${(()=>{const tot=new Set(roster().filter(x=>x.tl===o.tl).map(x=>String(x.agent).toUpperCase().replace(/[^A-Z0-9]/g,''))).size;return tot?`${o.agents.size} <span class="muted">dari ${tot}</span>`:o.agents.size;})()}</td><td class="n">${o.chk}</td>
       <td class="n ${o.chk&&o.bad/o.chk>.3?'bad':o.chk?'good':''}" style="font-weight:700">${fmtPct(o.chk?(o.chk-o.bad)/o.chk:null)}</td>
       <td class="n ${o.avgDiff!==null&&Math.abs(o.avgDiff)>tol().pct?'bad':''}">${o.avgDiff===null?'—':(o.avgDiff>=0?'+':'')+(o.avgDiff*100).toFixed(0)+'%'}</td>
       <td class="n">${o.over||''}</td><td class="n">${o.absen||''}</td><td class="n">${o.copas.size?o.copas.size+' agent':''}</td><td class="n">${o.asal||''}</td><td class="n muted">${o.conn||''}</td><td class="n muted">${emptyBy[o.tl]?emptyBy[o.tl].size+' agent':''}</td></tr>`).join('')}
@@ -464,12 +487,14 @@ function openTlModal(tl){
   document.getElementById('tlModalBody').innerHTML=ags.length?ags.map((a,i)=>`
     <div class="agcard ${i<3?'open':''}">
       <div class="agcard-h" onclick="this.parentElement.classList.toggle('open')">
-        <div><div class="nm">${escH(a.ag)}</div>
+        <div><div class="nm">${escH(a.ag)}${(()=>{const l=rotLabel(tl,a.ag);return l?` <span class="flag f-conn" style="font-weight:600">${escH(l)}</span>`:'';})()}</div>
           <div style="font-size:11px;color:var(--text2);margin-top:2px">Call TL <b>${fmtNum(a.sumTL)}</b> vs QC <b>${fmtNum(a.sumQC)}</b> (${a.chk.length} hari dicek)${a.sumQC?` · <span class="${a.sumTL>a.sumQC?'bad':''}">${a.sumTL>=a.sumQC?'+':''}${((a.sumTL/a.sumQC-1)*100).toFixed(0)}%</span>`:''}</div></div>
         <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:60%">${a.ket.join('')}</div>
       </div>
       <div class="agcard-b">${a.bad.map(r=>`<div class="agline"><span class="d">${dLabel(r.tanggal)}</span><span class="n">TL ${fmtNum(r.tlCall)} · QC ${r.qcOff?'OFF':fmtNum(r.qcAtt)} · ${escH(r.absensi||'-')}</span><span>${rowNotes(r)}</span></div>`).join('')}</div>
     </div>`).join(''):'<div class="issues ok">✅ Semua agent TL ini sesuai data QC.</div>';
+  const notInQc=roster().filter(x=>x.tl===tl&&!x.inQc);
+  if(notInQc.length)document.getElementById('tlModalBody').insertAdjacentHTML('beforeend',`<div class="issues warn" style="margin-top:6px">ℹ ${notInQc.length} agent TL ini tidak ada di data QC (tidak bisa dicek): ${notInQc.map(x=>escH(x.agent)+(rotLabel(tl,x.agent)?' <span class="muted">('+escH(rotLabel(tl,x.agent))+')</span>':'')).join(', ')}</div>`);
   document.getElementById('tlModalDetailBtn').onclick=()=>{closeTlModal();VIEW.tl=tl;renderDetail();document.getElementById('secDetail').scrollIntoView({behavior:'smooth'});};
   document.getElementById('tlModal').classList.add('open');
 }
