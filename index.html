@@ -207,9 +207,35 @@ select:focus{border-color:var(--accent);}
       <option>Oktober</option><option>November</option><option>Desember</option>
     </select>
     <label>Tahun</label>
-    <select id="selTahun" onchange="loadData()">
-      <option>2025</option><option>2026</option><option>2027</option>
-    </select>
+    <select id="selTahun" onchange="loadData()"></select>
+<script>
+/* Pilihan Tahun otomatis: 2025 s/d tahun berjalan, ditambah tahun yang ada di
+   data (disimpan di localStorage 'tz_tahun_list' setiap kali API mengirim
+   tahunList) dan tahun dari URL ?tahun=. */
+(function(){
+  var KEY='tz_tahun_list', START=2025;
+  function stored(){try{return JSON.parse(localStorage.getItem(KEY)||'[]')||[];}catch(e){return [];}}
+  function fill(extra){
+    var s=document.getElementById('selTahun'); if(!s) return;
+    var cur=s.value, ys={}, now=new Date().getFullYear(), y;
+    for(y=START;y<=now;y++) ys[y]=1;
+    stored().concat(extra||[]).forEach(function(v){v=String(v);if(/^\d{4}$/.test(v))ys[v]=1;});
+    var u=new URLSearchParams(location.search).get('tahun'); if(u&&/^\d{4}$/.test(u)) ys[u]=1;
+    if(cur) ys[cur]=1;
+    var list=Object.keys(ys).sort();
+    if(Array.prototype.map.call(s.options,function(o){return o.value;}).join()===list.join()) return;
+    s.innerHTML=list.map(function(v){return '<option>'+v+'</option>';}).join('');
+    s.value=cur&&ys[cur]?cur:String(now);
+  }
+  window.tzMergeTahun=function(list){
+    if(!list||!list.length) return;
+    try{var m={};stored().concat(list).forEach(function(v){v=String(v);if(/^\d{4}$/.test(v))m[v]=1;});
+        localStorage.setItem(KEY,JSON.stringify(Object.keys(m).sort()));}catch(e){}
+    fill(list);
+  };
+  fill();
+})();
+</script>
   </div>
   <div class="stat-grid" id="statGrid">
     <div class="state-box" style="grid-column:1/-1"><div class="spinner"></div><p>Memuat data...</p></div>
@@ -219,6 +245,7 @@ select:focus{border-color:var(--accent);}
       <div>
         <div class="chart-card-title">Tren Akun Bulanan</div>
         <div class="chart-card-subtitle" id="chartSubtitle">Semua Project — Jan s/d <span id="chartBulan">—</span></div>
+        <div id="chartNote" style="display:none;font-size:12px;color:var(--text3,#9ca3af);margin-top:4px"></div>
       </div>
       <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
         <div class="chart-legend" id="chartLegend"></div>
@@ -269,6 +296,24 @@ let refTahun='';     // tahun yang sedang dipilih di filter
 let agentData=[];
 let chartInstance=null;
 let currentChart='akun';
+// Tren payment per bulan (dari action=paymenttrend) untuk tahun terpilih
+let payTrend=null, payTrendTahun='', payTrendState='idle'; // idle|loading|ok|error
+async function loadPayTrend(tahun){
+  if(payTrendTahun===String(tahun)&&(payTrendState==='ok'||payTrendState==='loading'))return;
+  payTrendTahun=String(tahun);payTrendState='loading';payTrend=null;
+  if(currentChart==='payment')renderChart();
+  try{
+    const d=await fetchJSON(API_URL+'?action=paymenttrend&tahun='+tahun);
+    if(payTrendTahun!==String(tahun))return; // filter tahun sudah berganti
+    if(!d||!d.success)throw new Error((d&&d.message)||'gagal');
+    payTrend=d.trend||{};payTrendState='ok';
+    if(window.tzMergeTahun)tzMergeTahun(d.tahunList);
+  }catch(e){
+    if(payTrendTahun!==String(tahun))return;
+    payTrendState='error';console.warn('paymenttrend:',e);
+  }
+  if(currentChart==='payment')renderChart();
+}
 let appSummaries={};
 
 function summarizeRows(rows){
@@ -327,6 +372,7 @@ async function loadData(){
     agentData=agentRes.rows||[];
     refData=refRes.rows||[];
     refTahun=String(tahun);
+    if(window.tzMergeTahun)tzMergeTahun(refRes.tahunList);
 
     // Group agent by aplikasi
     const byApp={};
@@ -348,6 +394,7 @@ async function loadData(){
 
     renderStats(totalAkunRef,selisihAkun,totalS,appList.length);
     renderChart();
+    loadPayTrend(tahun);
     renderProjects(appSummaries,bulan,tahun,bulanKey,prevRef);
 
     document.getElementById('navTimestamp').textContent='Update: '+new Date().toLocaleDateString('id-ID')+', '+new Date().toLocaleTimeString('id-ID');
@@ -386,7 +433,8 @@ function renderStats(totalAkun,selisih,s,projectCount){
 
 function switchChart(type){
   currentChart=type;
-  document.querySelectorAll('.chart-tab').forEach(t=>t.classList.toggle('active',t.textContent.trim()===(type==='akun'?'Jumlah Akun':'Payment')));
+  document.querySelectorAll('.chart-tab').forEach((t,i)=>t.classList.toggle('active',i===(type==='akun'?0:1)));
+  if(type==='payment')loadPayTrend(document.getElementById('selTahun').value);
   renderChart();
 }
 
@@ -403,10 +451,29 @@ function renderChart(){
   const gc=isDark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.05)';
   const tc=isDark?'#4a5568':'#9ca3af';
 
+  // Payment: bulan sebelumnya dari paymenttrend, bulan terpilih dari data yang
+  // sama dengan kartu KPI (supaya angkanya selalu cocok).
+  const BULAN_FULL=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const payVal=(ap,i)=>{
+    if(i===bulanIdx)return appSummaries[ap]?appSummaries[ap].dailyPayment:0;
+    if(payTrendState!=='ok')return null; // belum dimuat / gagal → titik kosong
+    const m=payTrend[ap]&&payTrend[ap][BULAN_FULL[i]];
+    return m?m.dailyPayment:0;
+  };
+  const titleEl=document.querySelector('.chart-card-title');
+  if(titleEl){const tt=currentChart==='akun'?'Tren Akun Bulanan':'Tren Payment Bulanan';titleEl.textContent=(typeof tzT==='function')?tzT(tt):tt;}
+  const noteEl=document.getElementById('chartNote');
+  if(noteEl){
+    noteEl.textContent=currentChart!=='payment'?'':
+      payTrendState==='loading'?'⏳ Memuat payment bulan-bulan sebelumnya…':
+      payTrendState==='error'?'⚠ Payment bulan sebelumnya belum tersedia (perbarui Code.gs di Apps Script) — hanya bulan terpilih yang ditampilkan.':'';
+    noteEl.style.display=noteEl.textContent?'block':'none';
+  }
+
   const datasets=appList.map(ap=>({
     label:ap,
-    data:BULAN_KEYS.slice(0,bulanIdx+1).map(bk=>
-      currentChart==='akun'?getAkunFromRef(ap,bk):(appSummaries[ap]?appSummaries[ap].dailyPayment:0)
+    data:BULAN_KEYS.slice(0,bulanIdx+1).map((bk,i)=>
+      currentChart==='akun'?getAkunFromRef(ap,bk):payVal(ap,i)
     ),
     borderColor:getColor(ap),
     backgroundColor:getColor(ap)+'22',
@@ -414,8 +481,6 @@ function renderChart(){
     fill:false,tension:0.3
   }));
 
-  // Untuk payment hanya pakai data bulan ini (tidak ada historis)
-  // Untuk akun pakai data referensi per bulan (historis ada)
 
   document.getElementById('chartLegend').innerHTML=appList.map(ap=>`<div class="legend-item"><div class="legend-dot" style="background:${getColor(ap)}"></div>${ap.charAt(0)+ap.slice(1).toLowerCase()}</div>`).join('');
 

@@ -399,7 +399,7 @@ function _cacheRemove(key) {
 
 /** Panggil dari trigger / manual setelah update sheet agar cache segar */
 function clearAllServerCache() {
-  const keys = ['svc_referensi', 'svc_violation', 'svc_agentdata_raw', 'svc_rankdata'];
+  const keys = ['svc_referensi', 'svc_violation', 'svc_agentdata_raw', 'svc_rankdata', 'svc_paytrend'];
   keys.forEach(k => _cacheRemove(k));
   Logger.log('Server cache cleared: ' + keys.join(', '));
 }
@@ -416,6 +416,7 @@ function doGet(e) {
       case 'violation': result = endpointViolation_(e); break;
       case 'jumlahakun': result = endpointJumlahAkun_(e); break;
       case 'rankdata':  result = endpointRankData_(e);  break;
+      case 'paymenttrend': result = endpointPaymentTrend_(e); break;
       default: result = { success: false, message: 'Unknown action: ' + action };
     }
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -548,6 +549,45 @@ function referensiAll_() {
   };
   _cachePut(CACHE_KEY, result);
   return result;
+}
+
+/*** ============ PAYMENT TREND (grafik Payment di index.html) ============ ***
+ * Ringkasan kecil payment per tahun → aplikasi → bulan, supaya grafik tren
+ * Payment tidak perlu menarik data mentah agentdata (±4 MB) untuk tiap bulan.
+ * Output: { tahunList:[...], trend:{ aplikasi:{ Januari:{dailyPayment,
+ *          paymentOvertime, jmlDataBayar}, ... } } }  (trend = tahun diminta)
+ *************************************************************************/
+function endpointPaymentTrend_(e) {
+  const p = (e && e.parameter) || {};
+  const CACHE_KEY = 'svc_paytrend';
+  let agg = _cacheGet(CACHE_KEY);
+  if (!agg) {
+    let rows = _cacheGet('svc_agentdata_raw');
+    if (!rows) rows = readInputData().rows;
+    const byYear = {};
+    rows.forEach(r => {
+      const t = r.tahun, b = r.bulan, ap = r.aplikasi || 'LAINNYA';
+      if (!t || BULAN_LIST.indexOf(b) < 0) return;
+      const y = byYear[t] || (byYear[t] = {});
+      const a = y[ap] || (y[ap] = {});
+      const m = a[b] || (a[b] = { dailyPayment: 0, paymentOvertime: 0, jmlDataBayar: 0 });
+      m.dailyPayment    += r.dailyPayment || 0;
+      m.paymentOvertime += r.paymentOvertime || 0;
+      m.jmlDataBayar    += r.jmlDataBayar || 0;
+    });
+    agg = { tahunList: Object.keys(byYear).filter(t => /^\d{4}$/.test(t)).sort(), byYear: byYear };
+    _cachePut(CACHE_KEY, agg);
+  }
+  const tahun = normTahun_(p.tahun || '');
+  return {
+    success: true, action: 'paymenttrend', tahun: tahun,
+    tahunList: agg.tahunList,
+    trend: tahun ? (agg.byYear[tahun] || {}) : agg.byYear
+  };
+}
+
+function TEST_paymenttrend() {
+  Logger.log(JSON.stringify(endpointPaymentTrend_({parameter:{tahun:'2026'}}), null, 2));
 }
 
 /*** ============ VIOLATION ENDPOINT ============ ***/
