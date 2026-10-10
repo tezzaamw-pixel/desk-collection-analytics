@@ -417,6 +417,7 @@ function doGet(e) {
       case 'jumlahakun': result = endpointJumlahAkun_(e); break;
       case 'rankdata':  result = endpointRankData_(e);  break;
       case 'paymenttrend': result = endpointPaymentTrend_(e); break;
+      case 'klien':     result = endpointKlien_(e);     break;
       default: result = { success: false, message: 'Unknown action: ' + action };
     }
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -906,4 +907,166 @@ function endpointRankData_(e) {
 
 function TEST_rankdata() {
   Logger.log(JSON.stringify(endpointRankData_({parameter:{}}), null, 2));
+}
+
+/*** ============ LAPORAN KLIEN (upload gambar laporan klien) ============ ***
+ * Laporan harian/bulanan dari klien (dikirim sbg gambar di grup) dibaca di
+ * klien.html memakai Gemini, lalu disimpan ke 3 sheet berikut (dibuat otomatis
+ * kalau belum ada):
+ *   KLIEN_AGENT  : 1 baris per agent per laporan (DAILY = per tanggal,
+ *                  MONTHLY = snapshot akumulasi per periode, diganti tiap upload)
+ *   KLIEN_TL     : ranking TL lintas vendor (tabel atas di gambar)
+ *   KLIEN_VENDOR : repay rate harian per vendor (kotak kanan di laporan Monthly)
+ * Upload ulang laporan yg sama (jenis+tanggal/periode+bucket) MENGGANTI data
+ * lama, tidak dobel.
+ ***********************************************************************/
+const KLIEN_SHEETS = {
+  AGENT:  { name: 'KLIEN_AGENT',  head: ['JENIS','TANGGAL','PERIODE','BUCKET','KUFI_ID','NAMA','TL','COMPANY','OUTSTANDING','REPAY','RATE_PCT','HANDLE_TIME','LOAD','MERAH','DIUPLOAD'], textCols: 8 },
+  TL:     { name: 'KLIEN_TL',     head: ['JENIS','TANGGAL','PERIODE','BUCKET','RANK','TL','COMPANY','OUTSTANDING','REPAY','RATE_PCT','AHT','DIUPLOAD'], textCols: 4 },
+  VENDOR: { name: 'KLIEN_VENDOR', head: ['TANGGAL','PERIODE','BUCKET','COMPANY','RATE_PCT','DIUPLOAD'], textCols: 4 }
+};
+
+function _klienSheet_(ss, def) {
+  let sh = ss.getSheetByName(def.name);
+  if (!sh) {
+    sh = ss.insertSheet(def.name);
+    sh.getRange(1, 1, 1, def.head.length).setValues([def.head]).setFontWeight('bold');
+    sh.setFrozenRows(1);
+    // Kolom teks (tanggal/periode/ID) dipaksa format teks supaya tidak
+    // dikonversi otomatis jadi Date oleh Google Sheets.
+    sh.getRange(1, 1, sh.getMaxRows(), def.textCols).setNumberFormat('@');
+  }
+  return sh;
+}
+
+function _klienReadAll_(sh, width) {
+  const last = sh.getLastRow();
+  if (last < 2) return [];
+  return sh.getRange(2, 1, last - 1, width).getValues();
+}
+
+function _klienTxt_(v) {
+  if (v instanceof Date) {
+    return Utilities.formatDate(v, Session.getScriptTimeZone(), 'yyyy-MM-dd');
+  }
+  return v === null || v === undefined ? '' : String(v).trim();
+}
+
+// Ganti baris yg cocok `isOld` dengan `newRows` (tulis ulang seluruh isi sheet)
+function _klienReplace_(sh, def, isOld, newRows) {
+  const width = def.head.length;
+  const keep = _klienReadAll_(sh, width).filter(r => !isOld(r));
+  const all = keep.concat(newRows);
+  const last = sh.getLastRow();
+  if (last >= 2) sh.getRange(2, 1, last - 1, width).clearContent();
+  if (all.length) {
+    sh.getRange(2, 1, all.length, def.textCols).setNumberFormat('@');
+    sh.getRange(2, 1, all.length, width).setValues(all);
+  }
+  return { kept: keep.length, added: newRows.length };
+}
+
+function _klienBucket_(b) {
+  const s = String(b || '').toUpperCase().replace(/\s+/g, '');
+  if (s === 'CO3' || s === 'C03' || s === 'C0З') return 'C03';
+  return s;
+}
+
+function klienSave_(body) {
+  const jenis = String(body.jenis || '').toUpperCase() === 'MONTHLY' ? 'MONTHLY' : 'DAILY';
+  const bucket = _klienBucket_(body.bucket);
+  const tanggal = String(body.tanggal || '').slice(0, 10);
+  if (!bucket) throw new Error('Bucket kosong.');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) throw new Error('Tanggal laporan tidak valid: ' + tanggal);
+  const periode = tanggal.slice(0, 7);
+  const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  const num = v => { const n = Number(v); return isNaN(n) ? 0 : n; };
+
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+    const res = {};
+    // Daily diganti per (tanggal,bucket); Monthly diganti per (periode,bucket)
+    const isOldOf = r => _klienTxt_(r[0]) === jenis && _klienTxt_(r[3]) === bucket &&
+      (jenis === 'DAILY' ? _klienTxt_(r[1]) === tanggal : _klienTxt_(r[2]) === periode);
+
+    const agents = (body.agents || []).map(a => [jenis, tanggal, periode, bucket,
+      String(a.kufiId || ''), String(a.nama || ''), String(a.tl || ''), String(a.company || ''),
+      num(a.outstanding), num(a.repay), num(a.rate), num(a.handleTime), num(a.load), a.merah ? 1 : 0, now]);
+    const shA = _klienSheet_(ss, KLIEN_SHEETS.AGENT);
+    res.agent = _klienReplace_(shA, KLIEN_SHEETS.AGENT, isOldOf, agents);
+
+    const tls = (body.tl || []).map(t => [jenis, tanggal, periode, bucket,
+      num(t.rank), String(t.tl || ''), String(t.company || ''),
+      num(t.outstanding), num(t.repay), num(t.rate), num(t.aht), now]);
+    const shT = _klienSheet_(ss, KLIEN_SHEETS.TL);
+    res.tl = _klienReplace_(shT, KLIEN_SHEETS.TL, isOldOf, tls);
+
+    const vend = (body.vendor || []).filter(v => /^\d{4}-\d{2}-\d{2}$/.test(String(v.tanggal || '')));
+    if (vend.length) {
+      const keys = {};
+      vend.forEach(v => { keys[String(v.tanggal) + '|' + String(v.company).toUpperCase()] = true; });
+      const shV = _klienSheet_(ss, KLIEN_SHEETS.VENDOR);
+      res.vendor = _klienReplace_(shV, KLIEN_SHEETS.VENDOR,
+        r => _klienTxt_(r[2]) === bucket && keys[_klienTxt_(r[0]) + '|' + _klienTxt_(r[3]).toUpperCase()],
+        vend.map(v => [String(v.tanggal), String(v.tanggal).slice(0, 7), bucket,
+          String(v.company || '').toUpperCase(), num(v.rate), now]));
+    }
+    return { success: true, action: 'klien_save', jenis, bucket, tanggal, result: res };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// GET ?action=klien&bucket=C03&bulan=Oktober&tahun=2026
+function endpointKlien_(e) {
+  const p = (e && e.parameter) || {};
+  const bucket = _klienBucket_(p.bucket || '');
+  let periode = '';
+  if (p.bulan && p.tahun) {
+    const idx = BULAN_LIST.indexOf(normBulan_(p.bulan));
+    if (idx >= 0) periode = normTahun_(p.tahun) + '-' + String(idx + 1).padStart(2, '0');
+  }
+  const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+  const pick = (def, mapFn, bIdx, pIdx) => {
+    const sh = ss.getSheetByName(def.name);
+    if (!sh) return [];
+    return _klienReadAll_(sh, def.head.length)
+      .filter(r => (!bucket || _klienTxt_(r[bIdx]) === bucket) && (!periode || _klienTxt_(r[pIdx]) === periode))
+      .map(mapFn);
+  };
+  const agents = pick(KLIEN_SHEETS.AGENT, r => ({
+    jenis: _klienTxt_(r[0]), tanggal: _klienTxt_(r[1]), bucket: _klienTxt_(r[3]),
+    kufiId: _klienTxt_(r[4]), nama: _klienTxt_(r[5]), tl: _klienTxt_(r[6]), company: _klienTxt_(r[7]),
+    outstanding: Number(r[8]) || 0, repay: Number(r[9]) || 0, rate: Number(r[10]) || 0,
+    handleTime: Number(r[11]) || 0, load: Number(r[12]) || 0, merah: Number(r[13]) === 1
+  }), 3, 2);
+  const tls = pick(KLIEN_SHEETS.TL, r => ({
+    jenis: _klienTxt_(r[0]), tanggal: _klienTxt_(r[1]), bucket: _klienTxt_(r[3]),
+    rank: Number(r[4]) || 0, tl: _klienTxt_(r[5]), company: _klienTxt_(r[6]),
+    outstanding: Number(r[7]) || 0, repay: Number(r[8]) || 0, rate: Number(r[9]) || 0, aht: Number(r[10]) || 0
+  }), 3, 2);
+  const vendor = pick(KLIEN_SHEETS.VENDOR, r => ({
+    tanggal: _klienTxt_(r[0]), bucket: _klienTxt_(r[2]), company: _klienTxt_(r[3]), rate: Number(r[4]) || 0
+  }), 2, 1);
+  return { success: true, action: 'klien', bucket, periode, agents, tl: tls, vendor };
+}
+
+function doPost(e) {
+  let result;
+  try {
+    const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    switch (String(body.action || '').toLowerCase()) {
+      case 'klien_save': result = klienSave_(body); break;
+      default: result = { success: false, message: 'Unknown action: ' + body.action };
+    }
+  } catch (err) {
+    result = { success: false, message: err.message };
+  }
+  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
+}
+
+function TEST_klien() {
+  Logger.log(JSON.stringify(endpointKlien_({parameter:{bucket:'C03'}})).slice(0, 2000));
 }
