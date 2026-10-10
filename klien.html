@@ -290,6 +290,7 @@ async function loadData(){
     const url=`${API_URL}?action=klien&bucket=${BUCKET}&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}&_=${Date.now()}`;
     const res=await fetch(url).then(r=>r.json());
     if(!res.success)throw new Error(res.message||'Gagal memuat');
+    recomputeRed(res);
     DATA=res; VIEW={tlMode:'daily',tlDate:'',redDate:'',recDate:''};
     render();
   }catch(e){
@@ -297,6 +298,18 @@ async function loadData(){
     box.innerHTML=`<div class="card"><div class="empty">⚠️ ${escH(old?'Code.gs di Apps Script belum diperbarui (fitur Laporan Klien belum terpasang).':e.message)}<br><span class="muted">${old?'Tempel Code.gs terbaru lalu Deploy → Versi baru.':'Klik Refresh untuk coba lagi.'}</span></div></div>`;
   }
   btn.disabled=false;
+}
+
+// Hitung ulang status merah data tersimpan: rate < rata-rata rate semua agent
+// di laporan yang sama (jenis+tanggal). Memperbaiki data lama yang warna merahnya
+// tidak terbaca AI, tanpa perlu upload ulang.
+function recomputeRed(res){
+  const g={};
+  res.agents.forEach(a=>{const k=a.jenis+'|'+(a.jenis==='MONTHLY'?'M':a.tanggal);(g[k]=g[k]||[]).push(a);});
+  Object.values(g).forEach(list=>{
+    const avg=list.reduce((s,a)=>s+(a.rate||0),0)/list.length;
+    list.forEach(a=>{a.merahStored=a.merah;if(Math.abs((a.rate||0)-avg)>0.005)a.merah=(a.rate||0)<avg;});
+  });
 }
 
 /* turunan data */
@@ -768,6 +781,7 @@ async function processFile(u){
       let done=0;u.msg=`baca ulang ${bad.length} TL…`;renderUp();
       await pool(bad.map(m=>async()=>{try{await rereadTl(u,m);}catch(e){console.warn('baca ulang gagal',m.tl,e);}done++;u.msg=`baca ulang TL ${done}/${bad.length}…`;renderUp();}),2);
     }
+    applyRedRule(u.data);
     validate(u);
     u.secs=Math.round((Date.now()-t0)/1000);
     u.status='done';
@@ -824,6 +838,25 @@ function normalizeParsed(d){
 //  (a) rate tiap agent ≈ repay ÷ outstanding (angka salah baca biasanya ketahuan)
 //  (b) repay TL di tabel atas = Σ repay agent TL tsb
 //  (c) rata-rata repay agent ≈ baris AVG
+// ── Status MERAH dihitung dari angka: aturan klien = rate agent < rate baris AVG.
+// Kalau rate sangat dekat dgn AVG (beda pembulatan ≤0,005), pakai bacaan warna AI.
+const RED_TIE=0.005;
+function redAvg(d){
+  const rates=d.agents.map(a=>a.rate).filter(r=>!isNaN(r));
+  const mean=rates.length?rates.reduce((s,v)=>s+v,0)/rates.length:0;
+  let avg=d.agentAvg&&numv(d.agentAvg.rate)>0?numv(d.agentAvg.rate):null;
+  if(avg!==null&&mean>0&&avg*20<mean)avg*=100; // AVG ditulis desimal (0.004 = 0.4%)
+  return {avg:avg!==null?avg:mean, src:avg!==null?'baris AVG':'rata-rata rate agent'};
+}
+function applyRedRule(d){
+  const {avg,src}=redAvg(d); d.redAvg=avg; d.redSrc=src;
+  d.agents.forEach(a=>{
+    if(a.merahAI===undefined)a.merahAI=!!a.merah;
+    if(a.merahManual)return;
+    a.merah=Math.abs(a.rate-avg)<=RED_TIE?a.merahAI:(a.rate<avg);
+  });
+}
+
 function validate(u){
   const d=u.data, issues=[]; u.flags={};
   if(!d.tanggal)issues.push({text:'Tanggal laporan tidak terbaca — isi manual di atas.'});
@@ -870,6 +903,8 @@ function renderUp(){
         <span class="muted" style="font-size:12px">${d.tl.length} TL · ${d.agents.length} agent · ${d.agents.filter(a=>a.merah).length} merah${d.vendor.length?' · '+d.vendor.length+' rate vendor':''}${u.nParts>1?' · dibaca dalam '+u.nParts+' bagian':''}${u.secs?' · '+u.secs+' dtk':''}</span>
         <span style="margin-left:auto;font-size:12px;display:flex;gap:12px">${u.prepUrl?`<a href="${u.prepUrl}" target="_blank" style="color:var(--accent)">Gambar yang dibaca AI ↗</a>`:''}<a href="${u.url}" target="_blank" style="color:var(--accent)">Gambar asli ↗</a></span>
       </div>
+      ${(()=>{if(d.redAvg===undefined)return '';const diff=d.agents.filter(a=>!a.merahManual&&a.merahAI!==undefined&&a.merahAI!==a.merah).length;const ai=d.agents.filter(a=>a.merahAI).length;
+        return `<div class="issues ${diff?'warn':'ok'}" style="${diff?'':'background:var(--surface2);color:var(--text2)'}">🚩 Status merah dihitung dari aturan klien: <b>rate &lt; ${fmtPct(d.redAvg)}</b> (${escH(d.redSrc)}) → <b>${d.agents.filter(a=>a.merah).length}</b> agent merah. AI membaca warna: ${ai} merah${diff?` — <b>beda di ${diff} baris</b> (ditandai ⚑). Kalau perbedaannya banyak, mungkin klien mengubah aturan warnanya.`:' — sama.'}</div>`;})()}
       ${rr.length?`<div class="issues ok" style="background:var(--accent-bg);color:var(--accent)">🔁 Dibaca ulang otomatis: ${rr.map(([tl,v])=>`${escH(tl)} (selisih ${fmtRpFull(v.before)} → ${v.used?fmtRpFull(v.after):'tidak membaik, dipakai hasil pertama'})`).join(' · ')}</div>`:''}
       <div class="issues ${u.issues.length?'warn':'ok'}">${u.issues.length?`<b>⚠️ ${u.issues.length} hal perlu dicek.</b> Klik baris peringatan TL untuk menyaring agent TL itu, lalu cocokkan dengan gambar asli (klik angka untuk memperbaiki, ✕ untuk hapus baris, + untuk baris yang terlewat). Kalau tetap disimpan, selisihnya ditandai ⚠ di dashboard.<br>`+u.issues.slice(0,12).map(issueLine).join('<br>')+(u.issues.length>12?`<br>… dan ${u.issues.length-12} lagi`:''):'✅ Hasil bacaan cocok: rate tiap agent sesuai repay÷outstanding, dan total repay tiap TL sama dengan jumlah agent-nya.'}</div>
       ${ft?'':`<div style="font-size:12px;font-weight:700;margin:10px 0 6px">Ranking TL</div><div class="tbl-wrap" style="max-height:240px">${upTable(u,'tl')}</div>`}
@@ -892,16 +927,17 @@ function upTable(u,kind){
   const cols=UP_COLS[kind], fk=kind==='tl'?'t':'a', ft=kind==='agents'?(u.filterTl||''):'';
   const rows=u.data[kind].map((r,i)=>({r,i})).filter(x=>!ft||normKey(x.r.tl)===normKey(ft));
   return `<table class="t"><thead><tr><th></th>${cols.map(c=>`<th class="${c[2]}">${c[1]}</th>`).join('')}${kind==='agents'?'<th></th>':''}</tr></thead><tbody>${rows.map(({r,i})=>`<tr class="${u.flags[fk+i]?'flag':''}"><td class="muted">${i+1}</td>${cols.map(c=>{
-    if(c[0]==='merah')return `<td><input type="checkbox" ${r.merah?'checked':''} onchange="upCell('${u.id}','${kind}',${i},'merah',this.checked)"></td>`;
+    if(c[0]==='merah')return `<td style="white-space:nowrap"><input type="checkbox" ${r.merah?'checked':''} onchange="upCell('${u.id}','${kind}',${i},'merah',this.checked)">${!r.merahManual&&r.merahAI!==undefined&&r.merahAI!==r.merah?` <span title="Warna yang dibaca AI: ${r.merahAI?'merah':'putih'}; menurut aturan rate: ${r.merah?'merah':'putih'}" style="color:var(--warning);cursor:help">⚑</span>`:''}</td>`;
     const v=r[c[0]], isNum=c[2]==='n';
     return `<td class="${c[2]}" contenteditable="true" onblur="upCell('${u.id}','${kind}',${i},'${c[0]}',this.textContent)">${isNum?(c[0]==='rate'?v:(v===0?'0':Math.round(v).toLocaleString('id-ID'))):escH(v)}</td>`;}).join('')}${kind==='agents'?`<td><span title="Hapus baris" style="cursor:pointer;color:var(--text3)" onclick="upDelRow('${u.id}',${i})">✕</span></td>`:''}</tr>`).join('')}</tbody></table>`;
 }
 function upCell(id,kind,i,col,val){
   const u=UP.find(x=>x.id===id);if(!u)return;
   const r=u.data[kind][i];
-  if(col==='merah')r.merah=!!val;
+  if(col==='merah'){r.merah=!!val;r.merahManual=true;}
   else if(typeof r[col]==='number'){const s=String(val).trim();r[col]=col==='rate'?(parseFloat(s.replace(',','.'))||0):(parseFloat(s.replace(/\./g,'').replace(',','.').replace(/[^\d.\-]/g,''))||0);}
   else r[col]=String(val).trim();
+  if(kind==='agents'&&(col==='rate'||col==='repay'||col==='outstanding'))applyRedRule(u.data);
   validate(u);renderUp();
 }
 function upFilter(id,tl){const u=UP.find(x=>x.id===id);if(!u)return;u.filterTl=tl;renderUp();}
