@@ -581,14 +581,18 @@ function prepareImage(file){
 function canvasToBlob(c,type,q){return new Promise(r=>c.toBlob(b=>r(b),type,q));}
 async function canvasBlob(c){const b=await canvasToBlob(c,'image/png');if(b&&b.size<7e6)return b;return canvasToBlob(c,'image/jpeg',0.93);}
 // Potong kanvas jadi n bagian dgn tumpang tindih ±4% tinggi (min 2 baris tabel)
-async function sliceCanvas(c,n){
-  if(n<=1)return [{blob:await canvasBlob(c),idx:0}];
+function cropCanvas(c,y0,y1){
+  const s=document.createElement('canvas');s.width=c.width;s.height=y1-y0;
+  s.getContext('2d').drawImage(c,0,y0,c.width,y1-y0,0,0,c.width,y1-y0);
+  return s;
+}
+// Potong kanvas jadi n bagian dgn tumpang tindih ±4% tinggi (min 60 px)
+function sliceCanvas(c,n){
+  if(n<=1)return [{canvas:c,top:true,whole:true}];
   const ov=Math.max(Math.round(c.height*0.04),60), step=Math.ceil(c.height/n), out=[];
   for(let i=0;i<n;i++){
     const y0=Math.max(0,i*step-(i?ov:0)), y1=Math.min(c.height,(i+1)*step+(i<n-1?ov:0));
-    const s=document.createElement('canvas');s.width=c.width;s.height=y1-y0;
-    s.getContext('2d').drawImage(c,0,y0,c.width,y1-y0,0,0,c.width,y1-y0);
-    out.push({blob:await canvasBlob(s),idx:i});
+    out.push({canvas:cropCanvas(c,y0,y1),top:i===0,whole:false});
   }
   return out;
 }
@@ -600,73 +604,92 @@ function partCount(prep){ // ±70 baris per bagian; gambar laporan ±13 px per b
 
 function fileToB64(f){return new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(String(r.result).split(',')[1]);r.onerror=rej;r.readAsDataURL(f);});}
 
-const GEM_RULES=`Aturan:
-- Angka ditulis tanpa pemisah ribuan (1,433,100,893 → 1433100893). Tanda "-" atau kosong = 0.
-- rate = angka persen tanpa tanda % (0.239% → 0.239). Kalau tertulis desimal tanpa % (mis. 0.004), tulis apa adanya.
-- merah = true kalau baris agent itu berlatar merah muda/merah, false kalau putih.
-- company ditulis persis (EDN, B, C, D, E, F, G).
-- Tulis SEMUA baris yang diminta dari atas sampai bawah sesuai urutan; jangan ada yang dilewati, digabung, atau dikarang.
-- Baris AVG jangan dimasukkan ke daftar tl/agents; masukkan ke tlAvg dan agentAvg.`;
-const GEM_PROMPT=`Kamu membaca gambar laporan penagihan dari klien (dibuat di Excel). Judulnya seperti "EDN NPA DAILY PERFORMANCE REPORT" atau "EDN CO3 MONTHLY PERFORMANCE REPORT".
-Isi gambar:
-1) Tabel atas = ranking TL: RANK, TL NAME, COMPANY, TOTAL LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, AVERAGE HANDLE TIME, lalu baris AVG.
-2) Tabel besar = per agent: KUFI-ID, NAME, TL NAME, COMPANY, LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, HANDLE TIME, LOAD NUMBER, lalu baris AVG. Sebagian baris berlatar MERAH MUDA (aslinya merah; warnanya sudah dicerahkan supaya teks mudah dibaca).
-3) Khusus laporan MONTHLY: kotak kecil di kanan berisi DATE (mis. 1-Oct-26) × kolom COMPANY (EDN, B, C, D, ...) berisi repay rate harian, lalu baris AVG.
-Isian:
-- jenis = "DAILY" atau "MONTHLY" sesuai judul. bucket = "NPA" atau "CO3" sesuai judul.
-- tanggal (format YYYY-MM-DD): DAILY = tanggal di header tabel agent (mis. "9-Oct-26" → 2026-10-09). MONTHLY = tanggal terakhir di kotak rate harian.
+// ── Format jawaban RINGKAS: 1 baris teks per agent, kolom dipisah "|" ──
+// (jauh lebih pendek daripada JSON ber-nama-kolom → cepat & tidak terpotong)
+const AGENT_FMT='KUFI-ID|NAME|TL NAME|COMPANY|LEFT UNPAID PRINCIPAL|REPAY AMOUNT|REPAY RATE|HANDLE TIME|LOAD NUMBER|M';
+const GEM_RULES=`Aturan penulisan:
+- agents: 1 teks per baris agent, persis format: ${AGENT_FMT}
+  M = 1 kalau baris berlatar merah muda/merah, 0 kalau putih. Contoh: KUFI LMB-299|MAESARAH|APRIAN NIKO PRASETYO 2|EDN|401867294|2733543|0.68|314|347|0
+- tl: 1 teks per baris tabel TL, format: RANK|TL NAME|COMPANY|TOTAL LEFT UNPAID PRINCIPAL|REPAY AMOUNT|REPAY RATE|AVERAGE HANDLE TIME
+- vendor (kotak rate harian, hanya laporan MONTHLY): 1 teks per sel, format: YYYY-MM-DD|COMPANY|RATE
+- tlAvg / agentAvg (baris AVG): format LEFT UNPAID PRINCIPAL|REPAY AMOUNT|REPAY RATE
+- Angka tanpa pemisah ribuan (1,433,100,893 → 1433100893). Tanda "-" atau kosong = 0. Rate tanpa tanda % (0.239% → 0.239).
+- Jangan ada "|" di dalam nama. Tulis SEMUA baris sesuai urutan dari atas ke bawah, jangan dilewati, digabung, diulang, atau dikarang.
+- Baris AVG tidak dimasukkan ke tl/agents.`;
+function promptFor(o){
+  const base=`Kamu membaca gambar laporan penagihan dari klien (Excel). Judulnya seperti "EDN NPA DAILY PERFORMANCE REPORT" atau "EDN CO3 MONTHLY PERFORMANCE REPORT".
+Isi laporan: (1) tabel atas ranking TL + baris AVG; (2) tabel besar per agent (${AGENT_FMT.replace('|M','')}) + baris AVG; sebagian baris agent berlatar MERAH MUDA (aslinya merah, warnanya sudah dicerahkan); (3) khusus MONTHLY: kotak kecil di kanan berisi DATE × COMPANY berisi repay rate harian.
+Isian: jenis = "DAILY"/"MONTHLY" dan bucket = "NPA"/"CO3" sesuai judul. tanggal (YYYY-MM-DD): DAILY = tanggal di header tabel agent (mis. "9-Oct-26" → 2026-10-09); MONTHLY = tanggal terakhir di kotak rate harian.
 ${GEM_RULES}`;
-function partPrompt(i,n){
-  if(n<=1)return GEM_PROMPT;
-  return GEM_PROMPT+`
-PENTING: gambar ini POTONGAN ke-${i+1} dari ${n} (laporan panjang dipotong dari atas ke bawah, antar potongan sedikit tumpang tindih).
-- Baca hanya yang terlihat di potongan ini. Lewati baris yang terpotong setengah di tepi atas/bawah.${i>0?`
-- Potongan ini tidak punya judul/header kolom. Urutan kolom tabel agent: KUFI-ID, NAME, TL NAME, COMPANY, LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, HANDLE TIME, LOAD NUMBER.
-- Kalau judul, tanggal, tabel TL, atau kotak rate harian tidak terlihat, biarkan kosong.`:''}`;
+  if(o.whole)return base;
+  return base+`
+PENTING: gambar ini hanya POTONGAN dari laporan panjang (dipotong atas→bawah, antar potongan sedikit tumpang tindih). Baca hanya yang terlihat; lewati baris yang terpotong setengah di tepi atas/bawah.${o.top?'':`
+Potongan ini tidak punya judul/header kolom — urutan kolom tabel agent tetap: ${AGENT_FMT.replace('|M','')}. Kalau judul, tanggal, tabel TL, atau kotak rate tidak terlihat, biarkan kosong.`}`;
 }
 function rereadPrompt(tl){
-  return `Gambar ini bagian dari laporan penagihan klien (Excel). Tabel agent punya kolom: KUFI-ID, NAME, TL NAME, COMPANY, LEFT UNPAID PRINCIPAL, REPAY AMOUNT, REPAY RATE, HANDLE TIME, LOAD NUMBER. Baris berlatar merah muda = merah.
+  return `Gambar ini bagian dari laporan penagihan klien (Excel). Kolom tabel agent: ${AGENT_FMT.replace('|M','')}. Baris berlatar merah muda = merah.
 Tugas: tulis SEMUA baris agent yang kolom TL NAME-nya "${tl}" — teliti satu per satu, jangan ada yang terlewat. Jangan tulis baris TL lain. Lewati baris yang terpotong setengah di tepi gambar.
 ${GEM_RULES}`;
 }
+const GEM_SCHEMA={type:'OBJECT',properties:{jenis:{type:'STRING'},bucket:{type:'STRING'},tanggal:{type:'STRING'},
+  tl:{type:'ARRAY',items:{type:'STRING'}},tlAvg:{type:'STRING'},agents:{type:'ARRAY',items:{type:'STRING'}},agentAvg:{type:'STRING'},vendor:{type:'ARRAY',items:{type:'STRING'}}},required:['agents']};
+const REREAD_SCHEMA={type:'OBJECT',properties:{agents:{type:'ARRAY',items:{type:'STRING'}}},required:['agents']};
 
-const AGENT_ITEM={type:'OBJECT',properties:{kufiId:{type:'STRING'},nama:{type:'STRING'},tl:{type:'STRING'},company:{type:'STRING'},outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'},handleTime:{type:'NUMBER'},load:{type:'NUMBER'},merah:{type:'BOOLEAN'}},required:['kufiId','nama','tl','company','outstanding','repay','rate','merah']};
-const GEM_SCHEMA={type:'OBJECT',properties:{
-  jenis:{type:'STRING'},bucket:{type:'STRING'},tanggal:{type:'STRING'},
-  tl:{type:'ARRAY',items:{type:'OBJECT',properties:{rank:{type:'INTEGER'},tl:{type:'STRING'},company:{type:'STRING'},outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'},aht:{type:'NUMBER'}},required:['tl','company','outstanding','repay','rate']}},
-  tlAvg:{type:'OBJECT',properties:{outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'}}},
-  agents:{type:'ARRAY',items:AGENT_ITEM},
-  agentAvg:{type:'OBJECT',properties:{outstanding:{type:'NUMBER'},repay:{type:'NUMBER'},rate:{type:'NUMBER'}}},
-  vendor:{type:'ARRAY',items:{type:'OBJECT',properties:{tanggal:{type:'STRING'},company:{type:'STRING'},rate:{type:'NUMBER'}},required:['tanggal','company','rate']}}
-},required:['tl','agents']};
-const REREAD_SCHEMA={type:'OBJECT',properties:{agents:{type:'ARRAY',items:AGENT_ITEM}},required:['agents']};
+// Ubah jawaban ringkas → objek (bentuk yang dipakai bagian lain)
+function splitLine(s){return String(s||'').split('|').map(x=>x.trim());}
+function nv(x){const n=parseFloat(String(x||'').replace(/[^\d.\-]/g,''));return isNaN(n)?0:n;}
+function parseAgentLine(s){const p=splitLine(s);if(p.length<8)return null;
+  return {kufiId:p[0],nama:p[1],tl:p[2],company:p[3],outstanding:nv(p[4]),repay:nv(p[5]),rate:nv(p[6]),handleTime:nv(p[7]),load:nv(p[8]),merah:/^(1|true|ya|y|m|merah)$/i.test(p[9]||'')};}
+function parseTlLine(s){const p=splitLine(s);if(p.length<6)return null;return {rank:nv(p[0]),tl:p[1],company:p[2],outstanding:nv(p[3]),repay:nv(p[4]),rate:nv(p[5]),aht:nv(p[6])};}
+function parseVendorLine(s){const p=splitLine(s);if(p.length<3)return null;return {tanggal:p[0],company:p[1],rate:nv(p[2])};}
+function parseAvg(s){if(!s)return null;const p=splitLine(s);return p.length>=2?{outstanding:nv(p[0]),repay:nv(p[1]),rate:nv(p[2])}:null;}
+function toObjects(r){
+  return {jenis:r.jenis||'',bucket:r.bucket||'',tanggal:r.tanggal||'',
+    tl:(r.tl||[]).map(parseTlLine).filter(Boolean),tlAvg:parseAvg(r.tlAvg),
+    agents:(r.agents||[]).map(parseAgentLine).filter(Boolean),agentAvg:parseAvg(r.agentAvg),
+    vendor:(r.vendor||[]).map(parseVendorLine).filter(Boolean)};
+}
 
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
-// Panggil Gemini: coba tiap model; ulang otomatis kalau kena batas kuota (429/503)
+// Jalankan tugas paralel maksimal `n` sekaligus, hasil tetap urut
+async function pool(tasks,n){
+  const out=new Array(tasks.length);let i=0;
+  await Promise.all(Array.from({length:Math.min(n,tasks.length)},async()=>{while(i<tasks.length){const k=i++;out[k]=await tasks[k]();}}));
+  return out;
+}
+// Mode "berpikir" AI dimatikan supaya cepat & jatah jawaban tidak termakan.
+// Tiap model beda cara mematikannya → dicoba berurutan, yang berhasil diingat.
+const THINK_OPTS=[{thinkingBudget:0},{thinkingLevel:'minimal'},{thinkingLevel:'low'},null];
+const THINK_OK={};
 async function gemCall(blob,prompt,schema){
   const key=getGeminiKey();
   const b64=await fileToB64(blob);
-  const body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:blob.type||'image/png',data:b64}}]}],
-    generationConfig:{temperature:0,responseMimeType:'application/json',responseSchema:schema,maxOutputTokens:65536}};
   let lastErr=null;
   for(const model of GEMINI_MODELS){
-    for(let attempt=0;attempt<4;attempt++){
+    let ti=THINK_OK[model]!==undefined?THINK_OK[model]:0, maxTok=65536;
+    for(let attempt=0;attempt<8;attempt++){
+      const gc={temperature:0,responseMimeType:'application/json',responseSchema:schema,maxOutputTokens:maxTok};
+      if(THINK_OPTS[ti])gc.thinkingConfig=THINK_OPTS[ti];
+      const body={contents:[{parts:[{text:prompt},{inline_data:{mime_type:blob.type||'image/png',data:b64}}]}],generationConfig:gc};
       let resp,j;
       try{
         resp=await fetch(GEMINI_URL_BASE+model+':generateContent?key='+encodeURIComponent(key),{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
         j=await resp.json().catch(()=>({}));
       }catch(e){lastErr=e;await sleep(3000);continue;}
+      const msg=JSON.stringify(j.error||'');
       if(resp.status===404){lastErr=new Error('model '+model+' tidak tersedia');break;}
-      if(resp.status===429||resp.status===503||resp.status===500){lastErr=new Error('Gemini sibuk/kuota per menit habis');await sleep([8000,20000,40000,40000][attempt]);continue;}
-      if(resp.status===400&&/output.?tokens/i.test(JSON.stringify(j))&&body.generationConfig.maxOutputTokens>32768){body.generationConfig.maxOutputTokens=32768;attempt--;continue;}
+      if(resp.status===400&&/thinking/i.test(msg)&&ti<THINK_OPTS.length-1){ti++;continue;}
+      if(resp.status===400&&/output.?tokens/i.test(msg)&&maxTok>32768){maxTok=32768;continue;}
+      if(resp.status===429||resp.status===503||resp.status===500){lastErr=new Error('Gemini sibuk/kuota per menit habis');await sleep([8000,20000,40000,40000,40000][Math.min(attempt,4)]);continue;}
       if(!resp.ok){
-        if(resp.status===400&&/API key/i.test(JSON.stringify(j))){try{localStorage.removeItem('tz_gemini_key');}catch(e){}renderKeyBox();}
+        if(resp.status===400&&/API key/i.test(msg)){try{localStorage.removeItem('tz_gemini_key');}catch(e){}renderKeyBox();}
         throw new Error((j.error&&j.error.message)||('HTTP '+resp.status));
       }
+      THINK_OK[model]=ti;
       const cand=(j.candidates||[])[0]||{};
-      if(cand.finishReason==='MAX_TOKENS')throw new Error('Jawaban AI terpotong (bagian gambar terlalu padat).');
-      const txt=((cand.content||{}).parts||[]).map(p=>p.text||'').join('');
-      return JSON.parse(txt);
+      if(cand.finishReason==='MAX_TOKENS'){const e=new Error('Jawaban AI terpotong');e.code='MAXTOK';throw e;}
+      const txt=((cand.content||{}).parts||[]).filter(p=>!p.thought).map(p=>p.text||'').join('');
+      try{return JSON.parse(txt);}catch(e){const er=new Error('Jawaban AI tidak lengkap');er.code='MAXTOK';throw er;}
     }
   }
   throw lastErr||new Error('Gemini tidak merespons');
@@ -699,34 +722,57 @@ function mergeParts(parts){
     tl,tlAvg:tAvg,agents:dedupeAgents(parts.flatMap(p=>p.agents||[])),agentAvg:avgOf('agentAvg'),vendor};
 }
 
+// Baca satu potongan; kalau jawabannya terpotong → potongan dibelah 2 lalu dibaca lagi
+async function readSlice(u,sl,depth){
+  const blob=await canvasBlob(sl.canvas);
+  try{
+    const r=toObjects(await gemCall(blob,promptFor(sl),GEM_SCHEMA));
+    u.doneParts++;u.msg=`membaca… ${u.doneParts} bagian selesai`;renderUp();
+    return [{r,blob}];
+  }catch(e){
+    if(e.code!=='MAXTOK'||depth>=2||sl.canvas.height<400)throw e;
+    const c=sl.canvas, mid=Math.round(c.height/2), ov=Math.max(60,Math.round(c.height*0.04));
+    const a={canvas:cropCanvas(c,0,Math.min(c.height,mid+ov)),top:sl.top,whole:false};
+    const b={canvas:cropCanvas(c,Math.max(0,mid-ov),c.height),top:false,whole:false};
+    u.msg='bagian terlalu padat, dibelah 2…';renderUp();
+    const res=await pool([()=>readSlice(u,a,depth+1),()=>readSlice(u,b,depth+1)],2);
+    return res.flat();
+  }
+}
+
 async function processFile(u){
   if(!getGeminiKey()){u.status='nokey';u.msg='butuh API key';renderUp();return;}
-  u.status='busy';u.msg='menyiapkan gambar…';u.reread={};renderUp();
+  u.status='busy';u.msg='menyiapkan gambar…';u.reread={};u.leaves=[];u.doneParts=0;renderUp();
+  const t0=Date.now();
   try{
     if(!u.prep){
       u.prep=await prepareImage(u.file);
       if(u.prep){u.prepUrl=URL.createObjectURL(await canvasToBlob(u.prep.canvas,'image/jpeg',0.9));}
     }
-    const n=partCount(u.prep);
-    u.slices=u.prep?await sliceCanvas(u.prep.canvas,n):[{blob:u.file,idx:0}];
-    const parts=[];
-    for(let i=0;i<u.slices.length;i++){
-      u.msg=u.slices.length>1?`membaca bagian ${i+1}/${u.slices.length}…`:'membaca… (±30–60 dtk)';renderUp();
-      const d=await gemCall(u.slices[i].blob,partPrompt(i,u.slices.length),GEM_SCHEMA);
-      d._part=i;parts.push(d);
+    const slices=u.prep?sliceCanvas(u.prep.canvas,partCount(u.prep)):[{canvas:null,top:true,whole:true}];
+    if(!u.prep){ // gambar tidak bisa diolah → kirim apa adanya
+      const r=toObjects(await gemCall(u.file,promptFor({top:true,whole:true}),GEM_SCHEMA));r._leaf=0;u.leaves=[{blob:u.file}];u.parts=[r];
+    }else{
+      u.msg=`membaca ${slices.length} bagian…`;renderUp();
+      const res=await pool(slices.map(sl=>()=>readSlice(u,sl,0)),2); // 2 bagian sekaligus
+      const flat=res.flat(); // urut atas→bawah
+      u.leaves=flat.map(x=>({blob:x.blob}));
+      u.parts=flat.map((x,i)=>{x.r._leaf=i;return x.r;});
     }
-    u.parts=parts;
-    u.data=normalizeParsed(mergeParts(parts));
+    u.nParts=u.leaves.length;
+    u.data=normalizeParsed(mergeParts(u.parts));
     validate(u);
-    // Solusi 2: baca ulang otomatis TL yang total repay-nya belum cocok
+    // baca ulang otomatis TL yang total repay-nya belum cocok (2 sekaligus)
     const bad=tlMismatches(u.data).slice(0,6);
-    for(const m of bad){
-      u.msg=`baca ulang TL ${m.tl.split(' ')[0]}…`;renderUp();
-      try{await rereadTl(u,m);}catch(e){console.warn('baca ulang gagal',m.tl,e);}
+    if(bad.length){
+      let done=0;u.msg=`baca ulang ${bad.length} TL…`;renderUp();
+      await pool(bad.map(m=>async()=>{try{await rereadTl(u,m);}catch(e){console.warn('baca ulang gagal',m.tl,e);}done++;u.msg=`baca ulang TL ${done}/${bad.length}…`;renderUp();}),2);
     }
     validate(u);
+    u.secs=Math.round((Date.now()-t0)/1000);
     u.status='done';
-  }catch(e){u.status='error';u.msg='gagal: '+e.message;}
+    if(!u.issues.length)u.msg=`✓ semua cocok · ${u.secs} dtk`;else u.msg+=` · ${u.secs} dtk`;
+  }catch(e){u.status='error';u.msg='gagal: '+(e.code==='MAXTOK'?'gambar terlalu padat walau sudah dibelah — coba potong gambarnya manual jadi 2':e.message);}
   renderUp();
 }
 
@@ -741,19 +787,18 @@ async function rereadTl(u,m){
   const k=normKey(m.tl);
   // potongan yang berisi agent TL ini (+ potongan sesudahnya, kalau barisnya bersambung)
   const idx=new Set();
-  (u.parts||[]).forEach(p=>{if((p.agents||[]).some(a=>normKey(a.tl)===k)){idx.add(p._part);if(p._part+1<u.slices.length)idx.add(p._part+1);}});
-  if(!idx.size)u.slices.forEach(s=>idx.add(s.idx));
-  let found=[];
-  for(const i of [...idx].sort()){
-    const r=await gemCall(u.slices[i].blob,rereadPrompt(m.tl),REREAD_SCHEMA);
-    found=found.concat((r.agents||[]).filter(a=>normKey(a.tl)===k));
-  }
-  found=dedupeAgents(found);
+  (u.parts||[]).forEach(p=>{if((p.agents||[]).some(a=>normKey(a.tl)===k)){idx.add(p._leaf);if(p._leaf+1<u.leaves.length)idx.add(p._leaf+1);}});
+  if(!idx.size)u.leaves.forEach((l,i)=>idx.add(i));
+  const res=await pool([...idx].sort((a,b)=>a-b).map(i=>async()=>{
+    const r=await gemCall(u.leaves[i].blob,rereadPrompt(m.tl),REREAD_SCHEMA);
+    return (r.agents||[]).map(parseAgentLine).filter(a=>a&&normKey(a.tl)===k);
+  }),2);
+  const found=dedupeAgents(res.flat());
   if(!found.length)return;
   const newSum=found.reduce((s,a)=>s+a.repay,0);
-  const oldDiff=Math.abs(m.diff), newDiff=Math.abs(newSum-m.repay);
-  u.reread[m.tl]={before:m.diff,after:newSum-m.repay,used:newDiff<oldDiff};
-  if(newDiff<oldDiff){
+  const cur=tlSums(u.data)[k], curDiff=Math.abs((cur?cur.repay:0)-m.repay), newDiff=Math.abs(newSum-m.repay);
+  u.reread[m.tl]={before:m.diff,after:newSum-m.repay,used:newDiff<curDiff};
+  if(newDiff<curDiff){
     const agents=u.data.agents, firstIdx=agents.findIndex(a=>normKey(a.tl)===k);
     const rest=agents.filter(a=>normKey(a.tl)!==k);
     const at=firstIdx<0?rest.length:agents.slice(0,firstIdx).filter(a=>normKey(a.tl)!==k).length;
@@ -822,7 +867,7 @@ function renderUp(){
         <select onchange="upSet('${u.id}','jenis',this.value)"><option ${d.jenis==='DAILY'?'selected':''}>DAILY</option><option ${d.jenis==='MONTHLY'?'selected':''}>MONTHLY</option></select>
         <select onchange="upSet('${u.id}','bucket',this.value)"><option value="NPA" ${d.bucket==='NPA'?'selected':''}>NPA</option><option value="C03" ${d.bucket==='C03'?'selected':''}>CO3</option></select>
         <input type="date" value="${d.tanggal}" onchange="upSet('${u.id}','tanggal',this.value)">
-        <span class="muted" style="font-size:12px">${d.tl.length} TL · ${d.agents.length} agent · ${d.agents.filter(a=>a.merah).length} merah${d.vendor.length?' · '+d.vendor.length+' rate vendor':''}${u.slices&&u.slices.length>1?' · dibaca dalam '+u.slices.length+' bagian':''}</span>
+        <span class="muted" style="font-size:12px">${d.tl.length} TL · ${d.agents.length} agent · ${d.agents.filter(a=>a.merah).length} merah${d.vendor.length?' · '+d.vendor.length+' rate vendor':''}${u.nParts>1?' · dibaca dalam '+u.nParts+' bagian':''}${u.secs?' · '+u.secs+' dtk':''}</span>
         <span style="margin-left:auto;font-size:12px;display:flex;gap:12px">${u.prepUrl?`<a href="${u.prepUrl}" target="_blank" style="color:var(--accent)">Gambar yang dibaca AI ↗</a>`:''}<a href="${u.url}" target="_blank" style="color:var(--accent)">Gambar asli ↗</a></span>
       </div>
       ${rr.length?`<div class="issues ok" style="background:var(--accent-bg);color:var(--accent)">🔁 Dibaca ulang otomatis: ${rr.map(([tl,v])=>`${escH(tl)} (selisih ${fmtRpFull(v.before)} → ${v.used?fmtRpFull(v.after):'tidak membaik, dipakai hasil pertama'})`).join(' · ')}</div>`:''}
