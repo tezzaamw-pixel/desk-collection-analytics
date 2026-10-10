@@ -119,6 +119,25 @@ table.t tr.edn td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
 table.t tr.clickable{cursor:pointer;}
 table.t tr.clickable:hover td{background:var(--surface2);}
 details summary{cursor:pointer;font-weight:700;font-size:13px;}
+td.notes{white-space:normal!important;min-width:260px;}
+/* Fullscreen tabel detail */
+.card.fs{position:fixed;inset:0;z-index:600;margin:0;border-radius:0;overflow:auto;display:flex;flex-direction:column;}
+.card.fs .tbl-wrap{max-height:none!important;flex:1;}
+body.fs-open{overflow:hidden;}
+/* Popup agent per TL */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;align-items:flex-start;justify-content:center;padding:30px 12px;overflow-y:auto;}
+.modal.open{display:flex;}
+.modal-box{background:var(--surface);border-radius:var(--radius);width:100%;max-width:1000px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:calc(100vh - 60px);}
+.modal-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);}
+.modal-b{padding:14px 18px;overflow:auto;}
+.agcard{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.agcard-h{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);cursor:pointer;flex-wrap:wrap;}
+.agcard-h .nm{font-weight:800;font-size:13px;}
+.agcard-b{display:none;padding:4px 12px 10px;}
+.agcard.open .agcard-b{display:block;}
+.agline{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:12px;flex-wrap:wrap;align-items:baseline;}
+.agline .d{width:80px;flex-shrink:0;font-weight:700;}
+.agline .n{width:150px;flex-shrink:0;color:var(--text2);font-variant-numeric:tabular-nums;}
 </style>
 </head>
 <body>
@@ -191,6 +210,16 @@ details summary{cursor:pointer;font-weight:700;font-size:13px;}
 
   <div id="content"><div class="empty"><div class="spinner"></div>Memuat & mencocokkan data (±30 detik)…</div></div>
 </main>
+
+<div class="modal" id="tlModal" onclick="if(event.target===this)closeTlModal()">
+  <div class="modal-box">
+    <div class="modal-h">
+      <div><div class="card-title" id="tlModalTitle"></div><div class="card-sub" id="tlModalSub"></div></div>
+      <div style="display:flex;gap:8px"><button class="btn btn-ghost" id="tlModalDetailBtn">Lihat di tabel detail</button><button class="btn btn-ghost" onclick="closeTlModal()">✕</button></div>
+    </div>
+    <div class="modal-b" id="tlModalBody"></div>
+  </div>
+</div>
 
 <script>
 const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
@@ -300,10 +329,10 @@ function renderTl(){
   const list=Object.values(by).map(o=>({...o,avgDiff:o.diffPct.length?o.diffPct.reduce((s,v)=>s+v,0)/o.diffPct.length:null,score:o.bad+o.absen*2+o.copas.size*3+o.asal}))
     .sort((a,b)=>b.score-a.score||(b.chk?b.bad/b.chk:0)-(a.chk?a.bad/a.chk:0));
   document.getElementById('secTl').innerHTML=`
-    <div class="card-head"><div><div class="card-title">👥 Per Team Leader</div><div class="card-sub">Diurutkan dari yang paling perlu dicek · klik baris untuk melihat detail agent-nya</div></div></div>
+    <div class="card-head"><div><div class="card-title">👥 Per Team Leader</div><div class="card-sub">Diurutkan dari yang paling perlu dicek · klik nama TL untuk melihat daftar agent yang bermasalah beserta keterangannya</div></div></div>
     <div class="tbl-wrap"><table class="t"><thead><tr><th>Team Leader</th><th>Aplikasi</th><th class="n">Agent</th><th class="n">Hari dicek</th><th class="n">Cocok</th><th class="n">Rata² selisih</th><th class="n">TL > QC</th><th class="n">Absensi tak sesuai</th><th class="n">Copy-paste</th><th class="n">Panggilan asal</th><th class="n">Terhubung beda</th></tr></thead><tbody>
-    ${list.map(o=>`<tr class="clickable" onclick="VIEW.tl=${JSON.stringify(o.tl).replace(/"/g,'&quot;')};renderDetail();document.getElementById('secDetail').scrollIntoView({behavior:'smooth'})">
-      <td><b>${escH(o.tl)}</b>${o.spv?`<div class="muted" style="font-size:10.5px">SPV ${escH(o.spv)}</div>`:''}</td><td style="font-size:11px">${escH([...o.app].join(', '))}</td>
+    ${list.map(o=>`<tr class="clickable" onclick="openTlModal(${JSON.stringify(o.tl).replace(/"/g,'&quot;')})" title="Klik untuk melihat daftar agent yang bermasalah">
+      <td><b style="color:var(--accent);text-decoration:underline dotted">${escH(o.tl)}</b>${o.spv?`<div class="muted" style="font-size:10.5px">SPV ${escH(o.spv)}</div>`:''}</td><td style="font-size:11px">${escH([...o.app].join(', '))}</td>
       <td class="n">${o.agents.size}</td><td class="n">${o.chk}</td>
       <td class="n ${o.chk&&o.bad/o.chk>.3?'bad':o.chk?'good':''}" style="font-weight:700">${fmtPct(o.chk?(o.chk-o.bad)/o.chk:null)}</td>
       <td class="n ${o.avgDiff!==null&&Math.abs(o.avgDiff)>tol().pct?'bad':''}">${o.avgDiff===null?'—':(o.avgDiff>=0?'+':'')+(o.avgDiff*100).toFixed(0)+'%'}</td>
@@ -313,6 +342,7 @@ function renderTl(){
 
 function renderDetail(){
   const el=document.getElementById('secDetail'); if(!el)return;
+  el.classList.toggle('fs',!!VIEW.fs); document.body.classList.toggle('fs-open',!!VIEW.fs);
   const tls=[...new Set(scoped().map(r=>r.tl||'(Tanpa TL)'))].sort();
   let rows=scoped().filter(r=>(!VIEW.tl||(r.tl||'(Tanpa TL)')===VIEW.tl)&&(!VIEW.onlyBad||r.bad||r.conn));
   rows.sort((a,b)=>VIEW.sort==='selisih'?Math.abs(b.diff||0)-Math.abs(a.diff||0):(a.tl||'').localeCompare(b.tl||'')||a.agent.localeCompare(b.agent)||a.tanggal.localeCompare(b.tanggal));
@@ -323,6 +353,7 @@ function renderDetail(){
         <select onchange="VIEW.tl=this.value;renderDetail()"><option value="">Semua TL</option>${tls.map(t=>`<option ${t===VIEW.tl?'selected':''}>${escH(t)}</option>`).join('')}</select>
         <select onchange="VIEW.sort=this.value;renderDetail()"><option value="tl" ${VIEW.sort==='tl'?'selected':''}>Urut: TL → agent → tanggal</option><option value="selisih" ${VIEW.sort==='selisih'?'selected':''}>Urut: selisih terbesar</option></select>
         <label style="font-size:12px;color:var(--text2);display:flex;gap:4px;align-items:center"><input type="checkbox" ${VIEW.onlyBad?'checked':''} onchange="VIEW.onlyBad=this.checked;renderDetail()"> Hanya yang bermasalah</label>
+        <button class="btn btn-ghost" onclick="toggleFs()" title="Layar penuh (Esc untuk keluar)">${VIEW.fs?'⊠ Keluar layar penuh':'⛶ Layar penuh'}</button>
       </div></div>
     <div style="font-size:11px;color:var(--text3);margin-bottom:8px;display:flex;gap:6px;flex-wrap:wrap">
       <span class="flag f-beda">selisih call</span><span class="flag f-absen">absensi</span><span class="flag f-copas">copy-paste</span><span class="flag f-asal">panggilan asal</span><span class="flag f-conn">terhubung beda</span>
@@ -334,7 +365,7 @@ function renderDetail(){
       <td class="n ${r.beda?'bad':''}" style="font-weight:700">${r.diff===null?'':(r.diff>0?'+':'')+fmtNum(r.diff)}</td>
       <td class="n">${r.qcOff?'':fmtNum(r.qcDur)}</td><td class="n ${r.asal?'bad':''}">${r.qcAtt>0&&r.qcDur!==null?(r.qcDur/r.qcAtt).toFixed(1):''}</td>
       <td class="n">${fmtNum(r.tlConn)} / ${r.qcConn===null||r.qcConn===undefined?'<span class="muted">—</span>':fmtNum(r.qcConn)}${r.qcDup?` <span class="muted" title="link rekaman dobel di sheet QC">(+${r.qcDup} dobel)</span>`:''}</td>
-      <td>${r.beda?`<span class="flag f-beda">${r.diff>0?'TL lebih besar':'TL lebih kecil'}</span>`:''}${r.absen?`<span class="flag f-absen">${escH(r.absen)}</span>`:''}${r.copas?`<span class="flag f-copas">angka ${fmtNum(r.tlCall)} muncul ${r.copas} hari</span>`:''}${r.asal?`<span class="flag f-asal">panggilan asal</span>`:''}${r.conn?`<span class="flag f-conn">terhubung beda</span>`:''}</td></tr>`).join('')}
+      <td class="notes">${r.beda?`<span class="flag f-beda">${r.diff>0?'TL lebih besar':'TL lebih kecil'}</span>`:''}${r.absen?`<span class="flag f-absen">${escH(r.absen)}</span>`:''}${r.copas?`<span class="flag f-copas">angka ${fmtNum(r.tlCall)} muncul ${r.copas} hari</span>`:''}${r.asal?`<span class="flag f-asal">panggilan asal</span>`:''}${r.conn?`<span class="flag f-conn">terhubung beda</span>`:''}</td></tr>`).join('')}
     </tbody></table></div>`:'<div class="issues ok">✅ Tidak ada yang bermasalah untuk pilihan ini.</div>'}`;
 }
 
@@ -346,6 +377,59 @@ function unmatchedHtml(){
     <div class="tbl-wrap" style="max-height:300px"><table class="t"><thead><tr><th>Nama di QC</th><th>Akun Microsip</th><th class="n">Hari ada call</th><th class="n">Total attempt</th></tr></thead><tbody>
     ${u.map(x=>`<tr><td>${escH(x.nama)}</td><td class="muted">${escH(x.akun)}</td><td class="n">${x.hari}</td><td class="n">${fmtNum(x.attempt)}</td></tr>`).join('')}</tbody></table></div></details></div>`;
 }
+
+function toggleFs(){VIEW.fs=!VIEW.fs;renderDetail();}
+document.addEventListener('keydown',e=>{if(e.key!=='Escape')return;
+  if(document.getElementById('tlModal').classList.contains('open'))closeTlModal();
+  else if(VIEW.fs){VIEW.fs=false;renderDetail();}});
+
+/* ── Popup: daftar agent bermasalah per TL ── */
+function rowNotes(r){
+  const n=[];
+  if(r.beda)n.push(`<span class="flag f-beda">${r.diff>0?'TL isi lebih besar':'TL isi lebih kecil'} ${r.diff>0?'+':''}${fmtNum(r.diff)} call</span>`);
+  if(r.absen)n.push(`<span class="flag f-absen">${escH(r.absen)}</span>`);
+  if(r.copas)n.push(`<span class="flag f-copas">angka ${fmtNum(r.tlCall)} dipakai ${r.copas} hari</span>`);
+  if(r.asal)n.push(`<span class="flag f-asal">panggilan asal (${(r.qcDur/r.qcAtt).toFixed(1)}/attempt)</span>`);
+  if(r.conn)n.push(`<span class="flag f-conn">terhubung TL ${fmtNum(r.tlConn)} vs QC ${fmtNum(r.qcConn)}</span>`);
+  return n.join('');
+}
+function openTlModal(tl){
+  const rows=scoped().filter(r=>(r.tl||'(Tanpa TL)')===tl);
+  const byAg={};rows.forEach(r=>{(byAg[r.agent]=byAg[r.agent]||[]).push(r);});
+  const ags=Object.entries(byAg).map(([ag,rs])=>{
+    rs.sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+    const bad=rs.filter(r=>r.bad||r.conn), chk=rs.filter(r=>r.checked);
+    const sumTL=chk.reduce((s,r)=>s+r.tlCall,0), sumQC=chk.reduce((s,r)=>s+r.qcAtt,0);
+    const copasVals=[...new Set(rs.filter(r=>r.copas).map(r=>r.tlCall))];
+    const sum={beda:rs.filter(r=>r.beda).length,over:rs.filter(r=>r.beda&&r.diff>0).length,absen:rs.filter(r=>r.absen).length,asal:rs.filter(r=>r.asal).length,conn:rs.filter(r=>r.conn).length,qc0:rs.filter(r=>r.checked&&r.qcAtt===0&&r.tlCall>0).length};
+    // ringkasan keterangan per agent (kalimat)
+    const ket=[];
+    if(sum.beda)ket.push(`<span class="flag f-beda">selisih call ${sum.beda}/${chk.length} hari${sum.over===sum.beda?' (semua TL lebih besar)':''}</span>`);
+    if(sum.qc0>=2)ket.push(`<span class="flag f-absen">QC 0 call di ${sum.qc0} hari tapi TL isi call — cek akun Microsip agent ini</span>`);
+    else if(sum.absen)ket.push(`<span class="flag f-absen">absensi tak sesuai ${sum.absen} hari</span>`);
+    if(copasVals.length)ket.push(`<span class="flag f-copas">angka sama dipakai berulang: ${copasVals.map(fmtNum).join(', ')}</span>`);
+    if(sum.asal)ket.push(`<span class="flag f-asal">panggilan asal ${sum.asal} hari</span>`);
+    if(sum.conn)ket.push(`<span class="flag f-conn">terhubung beda ${sum.conn} hari</span>`);
+    const score=sum.beda+sum.absen*2+(copasVals.length?3:0)+sum.asal;
+    return {ag,rs,bad,chk,sumTL,sumQC,ket,score};
+  }).filter(a=>a.bad.length).sort((a,b)=>b.score-a.score||Math.abs(b.sumTL-b.sumQC)-Math.abs(a.sumTL-a.sumQC));
+  const okCount=Object.keys(byAg).length-ags.length;
+  const spv=(rows.find(r=>r.spv)||{}).spv||'';
+  document.getElementById('tlModalTitle').textContent='👥 '+tl;
+  document.getElementById('tlModalSub').textContent=`${spv?'SPV '+spv+' · ':''}${ags.length} agent perlu dicek${okCount?' · '+okCount+' agent tidak ada masalah':''}`;
+  document.getElementById('tlModalBody').innerHTML=ags.length?ags.map((a,i)=>`
+    <div class="agcard ${i<3?'open':''}">
+      <div class="agcard-h" onclick="this.parentElement.classList.toggle('open')">
+        <div><div class="nm">${escH(a.ag)}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:2px">Call TL <b>${fmtNum(a.sumTL)}</b> vs QC <b>${fmtNum(a.sumQC)}</b> (${a.chk.length} hari dicek)${a.sumQC?` · <span class="${a.sumTL>a.sumQC?'bad':''}">${a.sumTL>=a.sumQC?'+':''}${((a.sumTL/a.sumQC-1)*100).toFixed(0)}%</span>`:''}</div></div>
+        <div style="display:flex;flex-wrap:wrap;gap:2px;justify-content:flex-end;max-width:60%">${a.ket.join('')}</div>
+      </div>
+      <div class="agcard-b">${a.bad.map(r=>`<div class="agline"><span class="d">${dLabel(r.tanggal)}</span><span class="n">TL ${fmtNum(r.tlCall)} · QC ${r.qcOff?'OFF':fmtNum(r.qcAtt)} · ${escH(r.absensi||'-')}</span><span>${rowNotes(r)}</span></div>`).join('')}</div>
+    </div>`).join(''):'<div class="issues ok">✅ Semua agent TL ini sesuai data QC.</div>';
+  document.getElementById('tlModalDetailBtn').onclick=()=>{closeTlModal();VIEW.tl=tl;renderDetail();document.getElementById('secDetail').scrollIntoView({behavior:'smooth'});};
+  document.getElementById('tlModal').classList.add('open');
+}
+function closeTlModal(){document.getElementById('tlModal').classList.remove('open');}
 
 /* ── LOCK ── */
 const PAGE_PASSWORD='Marki';
