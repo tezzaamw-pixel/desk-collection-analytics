@@ -312,7 +312,10 @@ function rotLabel(tl,agent){
   const ros=roster().filter(x=>x.tl===tl); if(!ros.length)return '';
   const nk=v=>String(v||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
   const me=ros.find(x=>nk(x.agent)===nk(agent)); if(!me)return '';
-  const minD=ros.reduce((m,x)=>x.first<m?x.first:m,ros[0].first), maxD=ros.reduce((m,x)=>x.last>m?x.last:m,ros[0].last);
+  // acuan = median tanggal awal/akhir semua agent TL ini, supaya hari berjalan
+  // yang baru sebagian diinput tidak membuat semua agent dianggap "diganti"
+  const med=arr=>{const v=arr.slice().sort();return v[Math.floor(v.length/2)];};
+  const minD=med(ros.map(x=>x.first)), maxD=med(ros.map(x=>x.last));
   const out=[];
   if(me.first>minD)out.push('pengganti mulai '+dLabel(me.first));
   if(me.last<maxD)out.push('diganti/terakhir '+dLabel(me.last));
