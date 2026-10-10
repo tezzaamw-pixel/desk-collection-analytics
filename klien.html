@@ -252,10 +252,11 @@ function normKey(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');
 function isDark(){return document.documentElement.getAttribute('data-theme')==='dark';}
 function vColor(c){return VENDOR_COLORS[c]||'#64748b';}
 
+let DATA=null;          // respons action=klien
 /* ── tema ── */
 function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('dca_theme',t);}catch(e){}
   document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');
-  if(DATA)render();}
+  if(typeof DATA!=='undefined'&&DATA)render();}
 (function(){let t='light';try{t=localStorage.getItem('dca_theme')||'light';}catch(e){}setTheme(t);})();
 
 /* ── filter awal ── */
@@ -275,7 +276,6 @@ function markBucket(){document.querySelectorAll('#segBucket button').forEach(b=>
 function setBucket(b){BUCKET=b;try{localStorage.setItem('tz_klien_bucket',b);}catch(e){}markBucket();loadData();}
 
 /* ══════════════ DATA ══════════════ */
-let DATA=null;          // respons action=klien
 let VIEW={tlMode:'daily', tlDate:'', redDate:'', recDate:''};
 let INTERNAL={};        // cache data internal per bulan|tahun|bucket
 let charts={};
