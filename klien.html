@@ -605,7 +605,8 @@ function normalizeParsed(d){
 function validate(u){
   const d=u.data, issues=[]; u.flags={};
   if(!d.tanggal)issues.push('Tanggal laporan tidak terbaca — isi manual di atas.');
-  const tolRate=d.jenis==='MONTHLY'?0.006:0.0011;
+  // rate di gambar dibulatkan 2–3 desimal → toleransi pembulatan 2 desimal
+  const tolRate=0.0051;
   d.agents.forEach((a,i)=>{
     if(a.outstanding>0){const calc=a.repay/a.outstanding*100;
       // laporan kadang menulis rate sbg desimal (0.004 = 0.4%) → terima juga
@@ -663,7 +664,7 @@ const UP_COLS={
 };
 function upTable(u,kind){
   const cols=UP_COLS[kind], rows=u.data[kind], fk=kind==='tl'?'t':'a';
-  return `<table class="t"><thead><tr><th>#</th>${cols.map(c=>`<th class="${c[2]}">${c[1]}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr class="${u.flags[fk+i]?'flag':''}"><td class="muted">${i+1}</td>${cols.map(c=>{
+  return `<table class="t"><thead><tr><th></th>${cols.map(c=>`<th class="${c[2]}">${c[1]}</th>`).join('')}</tr></thead><tbody>${rows.map((r,i)=>`<tr class="${u.flags[fk+i]?'flag':''}"><td class="muted">${i+1}</td>${cols.map(c=>{
     if(c[0]==='merah')return `<td><input type="checkbox" ${r.merah?'checked':''} onchange="upCell('${u.id}','${kind}',${i},'merah',this.checked)"></td>`;
     const v=r[c[0]], isNum=c[2]==='n';
     return `<td class="${c[2]}" contenteditable="true" onblur="upCell('${u.id}','${kind}',${i},'${c[0]}',this.textContent)">${isNum?(c[0]==='rate'?v:(v===0?'0':Math.round(v).toLocaleString('id-ID'))):escH(v)}</td>`;}).join('')}</tr>`).join('')}</tbody></table>`;
