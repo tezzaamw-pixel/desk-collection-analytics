@@ -422,6 +422,7 @@ function doGet(e) {
       case 'klien':     result = endpointKlien_(e);     break;
       case 'databayar': result = endpointDataBayar_(e); break;
       case 'qccheck':   result = endpointQcCheck_(e);   break;
+      case 'kelengkapan': result = endpointKelengkapan_(e); break;
       default: result = { success: false, message: 'Unknown action: ' + action };
     }
     return ContentService.createTextOutput(JSON.stringify(result))
@@ -1319,4 +1320,126 @@ function TEST_qccheck() {
   Logger.log('rows=' + r.rows.length + ' unmatched=' + r.unmatched.length);
   Logger.log(JSON.stringify(r.rows.slice(0, 5)));
   Logger.log(JSON.stringify(r.unmatched.slice(0, 10)));
+}
+
+
+/*** ============ CEK KELENGKAPAN DATA ============ ***
+ * GET ?action=kelengkapan&bulan=Oktober&tahun=2026
+ * Membaca sel MENTAH "All Data" (bukan hasil normalisasi, karena sel kosong
+ * dinormalisasi jadi 0) supaya bisa dibedakan "belum diisi" vs "diisi 0".
+ *  rows : [noBaris, tanggal, aplikasi, bucket, spv, tl, agent, absensi,
+ *          kosongMask, nilai[...KF], dibaca sbg teks/anomali mask]
+ *    kosongMask bit i = kolom KF[i] kosong
+ *  databayar : per tab → tanggal terisi, baris jumlah>0 tanpa sumber
+ *  rank      : per sheet RANK <SPV> → tanggal terakhir daily & monthly per bucket
+ *  klien     : tanggal laporan klien daily/monthly per bucket
+ ***********************************************************/
+const KF_ = [
+  ['Total Data', COL.TOTAL_DATA], ['Daily Payment', COL.DAILY_PAYMENT], ['Jml Data Bayar', COL.JML_DATA_BAYAR],
+  ['Call Manual', COL.CALL_MANUAL], ['Call Terhubung', COL.CALL_TERHUBUNG], ['Sentuh WA', COL.SENTUH_WA],
+  ['Sentuh Gojek', COL.SENTUH_GOJEK], ['Sentuh WABA', COL.SENTUH_WABA], ['SMS Manual', COL.SMS_MANUAL],
+  ['PTP', COL.PTP], ['PTP Bayar', COL.PTP_BAYAR], ['Autocall', COL.AUTOCALL], ['Data Baru', COL.DATA_BARU],
+  ['Respon WA', COL.RESPON_WA], ['Alat WA', COL.ALAT_WA], ['Nama Akun', COL.NAMA_AKUN]
+];
+function endpointKelengkapan_(e) {
+  const p = (e && e.parameter) || {};
+  const bulan = normBulan_(p.bulan || ''), tahun = normTahun_(p.tahun || '');
+  const bi = BULAN_LIST.indexOf(bulan);
+  if (bi < 0 || !tahun) throw new Error('Parameter bulan & tahun wajib.');
+  const periode = tahun + '-' + String(bi + 1).padStart(2, '0');
+  const tz = Session.getScriptTimeZone();
+  const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+  const out = { success: true, action: 'kelengkapan', periode, today: Utilities.formatDate(new Date(), tz, 'yyyy-MM-dd'),
+    fields: KF_.map(f => f[0]), rows: [], warn: [] };
+
+  // ── All Data ──
+  const sh = ss.getSheetByName(CFG.SHEET_ALL_DATA);
+  const last = sh.getLastRow();
+  if (last >= CFG.DATA_START_ROW) {
+    const n = last - CFG.DATA_START_ROW + 1;
+    const raw = sh.getRange(CFG.DATA_START_ROW, 1, n, TOTAL_COLS).getValues();
+    const disp = sh.getRange(CFG.DATA_START_ROW, COL.TANGGAL + 1, n, 1).getDisplayValues();
+    const shRef = ss.getSheetByName(CFG.SHEET_REFERENSI);
+    const supMap = shRef && shRef.getLastRow() >= 2
+      ? buildSupervisorMap_(shRef.getRange(2, 1, shRef.getLastRow() - 1, REF_TOTAL_COLS).getValues()) : {};
+    const blank = v => v === '' || v === null || v === undefined || (typeof v === 'string' && !v.trim());
+    raw.forEach((r, i) => {
+      const tgl = normTanggal_(r[COL.TANGGAL] instanceof Date ? r[COL.TANGGAL] : disp[i][0]);
+      let inMonth = tgl ? tgl.slice(0, 7) === periode : false;
+      if (!tgl) {
+        // tanggal kosong/tidak valid: ikut kalau kolom BULAN/TAHUN cocok & ada nama agent/TL
+        if (!(normBulan_(r[COL.BULAN]) === bulan && normTahun_(r[COL.TAHUN]) === tahun)) return;
+        if (blank(r[COL.AGENT]) && blank(r[COL.TEAM_LEADER])) return;
+        inMonth = true;
+      }
+      if (!inMonth) return;
+      if (blank(r[COL.AGENT]) && blank(r[COL.TEAM_LEADER]) && blank(r[COL.ABSENSI])) return;
+      let mask = 0;
+      const vals = KF_.map((f, k) => {
+        const v = r[f[1]];
+        if (blank(v)) { mask |= (1 << k); return null; }
+        if (k === KF_.length - 1) return 1; // Nama Akun: cukup terisi/tidak
+        if (typeof v === 'number') return v;
+        const nv = f[1] === COL.DAILY_PAYMENT ? normRupiah_(v) : normNumber_(v);
+        return /\d/.test(String(v)) ? nv : String(v).trim().slice(0, 20); // teks non-angka dikirim apa adanya
+      });
+      out.rows.push([CFG.DATA_START_ROW + i, tgl || '', normText_(r[COL.APLIKASI]), normText_(r[COL.BUCKET]),
+        lookupSupervisor_(supMap, r[COL.APLIKASI], r[COL.BUCKET], tahun), normText_(r[COL.TEAM_LEADER]),
+        normText_(r[COL.AGENT]), normAbsensi_(r[COL.ABSENSI]), mask].concat(vals));
+    });
+  }
+
+  // ── Data Bayar ──
+  try {
+    const db = endpointDataBayar_({ parameter: { bulan, tahun } });
+    const tabs = {};
+    (db.tabs || []).forEach(t => tabs[t] = { tab: t, tl: '', bucket: '', dates: {}, rows: 0, noSrc: [] });
+    db.rows.forEach(x => {
+      const t = tabs[x[0]] || (tabs[x[0]] = { tab: x[0], tl: '', bucket: '', dates: {}, rows: 0, noSrc: [] });
+      t.tl = t.tl || x[1]; t.bucket = t.bucket || x[2]; t.rows++;
+      t.dates[x[5]] = (t.dates[x[5]] || 0) + 1;
+      const src = x[6] + x[7] + x[8] + x[9] + x[10] + x[11];
+      if (x[4] > 0 && !src && t.noSrc.length < 30) t.noSrc.push([x[5], x[3], x[4]]);
+    });
+    out.databayar = { warn: db.warn || [], tabs: Object.keys(tabs).map(k => tabs[k]) };
+  } catch (err) { out.warn.push('Data Bayar tidak terbaca: ' + err.message); }
+
+  // ── Sheet RANK per SPV (RANK RIAN, RANK RIZKI, ...) & DATA RANK ──
+  try {
+    out.rank = [];
+    ss.getSheets().forEach(s => {
+      const nm = s.getName();
+      if (!/^(DATA )?RANK\b/i.test(nm) || s.getLastRow() < CFG.RANK_DATA_START_ROW) return;
+      const v = s.getRange(CFG.RANK_DATA_START_ROW, 1, s.getLastRow() - CFG.RANK_DATA_START_ROW + 1, Math.min(19, s.getMaxColumns())).getValues();
+      const info = { sheet: nm, daily: {}, monthly: {} };
+      const put = (obj, d, b) => { const t = normTanggal_(d); if (!t || t.slice(0, 7) !== periode) return; const k = normText_(b) || '-'; if (!obj[k] || t > obj[k]) obj[k] = t; };
+      v.forEach(r => {
+        if (normText_(r[RANKCOL.D_VENDOR])) put(info.daily, r[RANKCOL.D_TANGGAL], r[RANKCOL.D_BUCKET]);
+        if (r.length > RANKCOL.M_VENDOR && normText_(r[RANKCOL.M_VENDOR])) put(info.monthly, r[RANKCOL.M_TANGGAL], r[RANKCOL.M_BUCKET]);
+      });
+      out.rank.push(info);
+    });
+  } catch (err) { out.warn.push('Sheet RANK tidak terbaca: ' + err.message); }
+
+  // ── Laporan Klien (upload) ──
+  try {
+    const shA = ss.getSheetByName(KLIEN_SHEETS.AGENT.name);
+    const k = {};
+    if (shA) _klienReadAll_(shA, 4).forEach(r => {
+      const tgl = _klienTxt_(r[1]);
+      if (_klienTxt_(r[2]) !== periode && tgl.slice(0, 7) !== periode) return;
+      const key = _klienTxt_(r[3]) + '|' + _klienTxt_(r[0]);
+      (k[key] = k[key] || {})[tgl] = 1;
+    });
+    out.klien = Object.keys(k).map(x => ({ bucket: x.split('|')[0], jenis: x.split('|')[1], dates: Object.keys(k[x]).sort() }));
+  } catch (err) { out.warn.push('Laporan Klien tidak terbaca: ' + err.message); }
+
+  return out;
+}
+
+function TEST_kelengkapan() {
+  const r = endpointKelengkapan_({ parameter: { bulan: 'Oktober', tahun: '2026' } });
+  Logger.log('rows=' + r.rows.length + ' warn=' + JSON.stringify(r.warn));
+  Logger.log(JSON.stringify(r.rows.slice(0, 5)));
+  Logger.log(JSON.stringify({ databayar: r.databayar, rank: r.rank, klien: r.klien }).slice(0, 3000));
 }
