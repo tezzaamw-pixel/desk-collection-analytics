@@ -912,11 +912,13 @@ function anaRecs(R){
     const sh=i=>R.db.src[i]/R.db.attr*100, act=R.db.attr-R.db.src[5];
     out.push(`<b>Sumber bayar:</b> ${sh(5).toFixed(0)}% pembayaran datang sendiri (Sistem). Dari pembayaran hasil kerja agent, <b>WA ${act?(R.db.src[0]/act*100).toFixed(0):0}%</b>, Call ${act?(R.db.src[2]/act*100).toFixed(0):0}%.`);
     if(R.intOk&&R.tot.call&&R.yield.CALL!==null&&R.yield.WA!==null&&R.yield.WA>R.yield.CALL*2)
-      out.push(`<b>Fokus aktivitas:</b> setiap 100 sentuhan WA menghasilkan ${R.yield.WA.toFixed(2)} pembayaran, setiap 100 call hanya ${R.yield.CALL.toFixed(2)}. Pertimbangkan memindahkan sebagian waktu call ke follow-up WA, terutama untuk data yang sudah pernah merespon.`);
+      out.push(`<b>Fokus aktivitas:</b> WA menghasilkan 1 pembayaran tiap ±${fmtNum(100/R.yield.WA)} sentuhan, sedangkan call ${R.yield.CALL?'1 pembayaran tiap ±'+fmtNum(100/R.yield.CALL)+' call':'belum menghasilkan pembayaran dari '+fmtNum(R.tot.call)+' call'}. Pertimbangkan memindahkan sebagian waktu call ke follow-up WA, terutama untuk data yang sudah pernah merespon.`);
   }
   if(R.intOk&&R.tot.cover!==null&&R.tot.cover<80)out.push(`<b>Sentuhan:</b> baru ±${R.tot.cover.toFixed(0)}% dari total data yang tersentuh. Pastikan tiap data minimal tersentuh 1× per hari sebelum mengulang data yang sama.`);
   const lowConn=R.tls.filter(t=>t.connRate!==null&&R.tot.call&&t.connRate<(R.tot.conn/R.tot.call*100)*0.7);
-  if(lowConn.length)out.push(`<b>Kualitas call:</b> % terhubung rendah di ${lowConn.map(t=>`${escH(t.tl)} (${t.connRate.toFixed(0)}%)`).join(', ')} vs rata-rata ${(R.tot.conn/R.tot.call*100).toFixed(0)}% — cek kualitas nomor & jam telepon.`);
+  if(lowConn.length)out.push(`<b>Kualitas call:</b> % terhubung rendah di ${lowConn.map(t=>`${escH(t.tl)} (${t.connRate.toFixed(1)}%)`).join(', ')} vs rata-rata bucket ${(R.tot.conn/R.tot.call*100).toFixed(1)}% — cek kualitas nomor & jam telepon.`);
+  if(R.tot.call&&R.tot.conn/R.tot.call<0.05)out.push(`<b>Call hampir tidak tersambung:</b> hanya ${(R.tot.conn/R.tot.call*100).toFixed(1)}% dari ${fmtNum(R.tot.call)} call yang terhubung. Waktu call besar tapi hasilnya kecil — evaluasi apakah call perlu dikurangi untuk bucket ini.`);
+  if(R.tot.sms>1000&&R.db.attr&&!R.db.src[3])out.push(`<b>SMS:</b> ${fmtNum(R.tot.sms)} SMS terkirim bulan ini tanpa satu pun pembayaran yang tercatat dari SMS.`);
   const absent=R.tls.filter(t=>t.absenRate>=10);
   if(absent.length)out.push(`<b>Absensi:</b> ${absent.map(t=>`${escH(t.tl)} ${t.absenRate.toFixed(0)}% hari kerja izin/sakit/cuti`).join(', ')} (hari Off tidak dihitung).`);
   if(R.ptpBad)out.push(`<b>Cek input:</b> ${R.ptpBad} baris All Data punya angka PTP > 1.000 (kemungkinan diisi nominal rupiah) — tidak dihitung di analisa ini.`);
@@ -1032,10 +1034,10 @@ function renderAnalisa(){
         ${DB_SRC.map((s,i)=>`<div class="ana-bar"><span class="nm"><i style="background:${DB_SRC_COLOR[s]}"></i>${DB_SRC_LABEL[s]}</span><span class="track"><span style="width:${D.src[i]/D.attr*100}%;background:${DB_SRC_COLOR[s]}"></span></span><b>${D.src[i]} <span class="muted">(${pct(D.src[i]/D.attr*100)})</span></b></div>`).join('')}
         ${D.n>D.attr?`<div class="ana-note">${D.n-D.attr} data bayar belum ditandai sumbernya.</div>`:''}
         ${D.lunas+D.cicil?`<div class="ana-note">Pelunasan <b>${D.lunas}</b> · Cicilan <b>${D.cicil}</b> (hanya tab yang mengisi kolom ini).</div>`:''}</div>
-      <div><div class="ana-h3">Hasil per 100 aktivitas</div>
-        ${R.intOk?[['WA','WA + WABA',T.sWA+T.sWABA,D.src[0]],['CALL','Call manual',T.call,D.src[2]],['SMS','SMS manual',T.sms,D.src[3]],['GOJEK','Gojek',T.sGJ,D.src[1]]].map(([k,l,act,pay])=>`<div class="ana-yield"><div><b>${l}</b><div class="muted">${fmtNum(act)} aktivitas → ${pay} bayar</div></div><div class="v">${act?(pay/act*100).toFixed(2):'—'}<small> bayar / 100</small></div></div>`).join('')
+      <div><div class="ana-h3">Efektivitas: berapa aktivitas untuk 1 pembayaran</div>
+        ${R.intOk?[['WA','WA + WABA',T.sWA+T.sWABA,D.src[0]],['CALL','Call manual',T.call,D.src[2]],['SMS','SMS manual',T.sms,D.src[3]],['GOJEK','Gojek',T.sGJ,D.src[1]]].map(([k,l,act,pay])=>`<div class="ana-yield"><div><b>${l}</b><div class="muted">${fmtNum(act)} aktivitas → ${pay} bayar</div></div><div class="v">${pay?'1 : '+fmtNum(act/pay):(act?'0 bayar':'—')}<small>${pay?' aktivitas per bayar':''}</small></div></div>`).join('')
           :'<div class="muted">Butuh data All Data.</div>'}
-        <div class="ana-note">Makin besar angkanya, makin efektif aktivitas itu menghasilkan pembayaran. "Sistem" tidak dihitung karena nasabah bayar sendiri tanpa aktivitas.</div></div>
+        <div class="ana-note">Contoh "1 : 312" = butuh ±312 aktivitas untuk 1 pembayaran — makin kecil angkanya, makin efektif. "Sistem" tidak dihitung karena nasabah bayar sendiri tanpa aktivitas.</div></div>
     </div>`:'<div class="empty">Belum ada Data Bayar untuk bucket ini di bulan terpilih.</div>'}`});
   // 7. Rekomendasi
   S.push({t:'Rekomendasi',h:recs.length?`<ol class="ana-recs">${recs.map(r=>`<li>${r}</li>`).join('')}</ol><div class="ana-note">Rekomendasi dibuat otomatis dari angka di atas — sesuaikan dengan kondisi lapangan.</div>`:'<div class="issues ok">Tidak ada catatan khusus.</div>'});
