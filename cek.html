@@ -270,6 +270,7 @@ function dLabel(iso){const d=dObj(iso);return isNaN(d)?iso:`${HARI[d.getDay()]} 
 function dDay(iso){return String(Number(iso.slice(8,10)));}
 function isoOf(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
 function nameKey(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
+function agKey(s){return String(s||'').toUpperCase().replace(/[^A-Z]/g,'');} /* angka diabaikan: "ALIYA1" = "ALIYA" */
 function toast(t){const el=document.getElementById('toast');el.textContent=t;el.classList.add('show');clearTimeout(toast._t);toast._t=setTimeout(()=>el.classList.remove('show'),1800);}
 async function copyText(t){try{await navigator.clipboard.writeText(t);toast('✓ Tersalin');}catch(e){const ta=document.createElement('textarea');ta.value=t;document.body.appendChild(ta);ta.select();try{document.execCommand('copy');toast('✓ Tersalin');}catch(_){toast('Gagal menyalin');}ta.remove();}}
 /* daftar tanggal dipadatkan: 3,4,5,7 → "3–5, 7" */
@@ -346,13 +347,13 @@ function analyze(){
   const dupC={};rows.forEach(r=>{if(r.tgl&&r.agent){const k=r.tgl+'|'+r.app+'|'+nameKey(r.agent);dupC[k]=(dupC[k]||0)+1;}});
   const TL={}, issues=[];
   const tlOf=r=>{const k=nameKey(r.tl)||'_';return TL[k]||(TL[k]={key:k,tl:r.tl||'(TL kosong)',spv:{},apps:{},buckets:{},rows:[],dates:{},roster:{},today:0,iss:[]});};
-  const add=(t,type,d,agent,text,row)=>{const it={tl:t.tl,spv:Object.keys(t.spv)[0]||'',type,d,agent,text,row};t.iss.push(it);issues.push(it);};
+  const add=(t,type,d,agent,text,row,g)=>{const it={tl:t.tl,spv:Object.keys(t.spv)[0]||'',type,d,agent,text,row,g:g||text};t.iss.push(it);issues.push(it);};
   rows.forEach(r=>{
     const t=tlOf(r);t.spv[r.spv]=1;if(r.app)t.apps[r.app]=1;if(r.bucket)t.buckets[r.bucket]=1;
     if(r.tgl&&r.tgl>cut){if(r.tgl===today)t.today++;return;}
     t.rows.push(r);
     if(r.tgl){t.dates[r.tgl]=(t.dates[r.tgl]||0)+1;
-      const ak=nameKey(r.agent);if(ak){const a=t.roster[ak]||(t.roster[ak]={agent:r.agent,first:r.tgl,last:r.tgl,dates:{}});a.dates[r.tgl]=1;if(r.tgl<a.first)a.first=r.tgl;if(r.tgl>a.last)a.last=r.tgl;}}
+      const ak=agKey(r.agent);if(ak){const a=t.roster[ak]||(t.roster[ak]={agent:r.agent,first:r.tgl,last:r.tgl,dates:{},names:{}});a.dates[r.tgl]=1;a.names[r.agent]=a.names[r.agent]||r.tgl;if(r.tgl<a.first)a.first=r.tgl;if(r.tgl>a.last)a.last=r.tgl;}}
   });
   Object.values(TL).forEach(t=>{
     t.spvName=Object.keys(t.spv).join(', ');
@@ -364,6 +365,8 @@ function analyze(){
     const filledTl=ds.filter(d=>!hol(d));
     Object.values(t.roster).forEach(a=>{
       filledTl.forEach(d=>{if(d>=a.first&&d<=a.last&&!a.dates[d])add(t,'agent',d,a.agent,'Baris agent tidak ada (agent ini ada di tanggal sebelum & sesudahnya)',null);});
+      const nm=Object.keys(a.names);
+      if(nm.length>1){const sorted=nm.sort((x,y)=>a.names[x].localeCompare(a.names[y]));add(t,'anomali',a.names[sorted[1]],a.agent,'Penulisan nama agent beda: '+sorted.map(x=>`"${x}"`).join(' vs ')+' — samakan supaya tidak terhitung 2 orang',null,'Penulisan nama agent beda');}
       if(a.last<t.last){const after=filledTl.filter(d=>d>a.last);if(after.length)add(t,'info',after[0],a.agent,`Tidak muncul lagi sejak ${dLabel(after[0])} (terakhir ${dLabel(a.last)}) — resign/pindah TL, atau belum diinput?`,null);}
     });
     // 3) per baris
@@ -380,16 +383,16 @@ function analyze(){
         const kos=wajib.filter(f=>r.mask&(1<<fi[f]));
         if(kos.length)add(t,'kosong',d,ag,'Kosong: '+kos.join(', '),r.no);
         if(on('act0')&&!kos.length&&num(v['Total Data'])>0&&act===0)add(t,'anomali',d,ag,'Hadir tapi semua aktivitas 0 (call, WA, Gojek, WABA, SMS)',r.no);
-      }else if(on('offAct')&&r.abs&&act>0)add(t,'anomali',d,ag,`Absensi ${r.abs} tapi ada aktivitas (${fmtNum(act)})`,r.no);
+      }else if(on('offAct')&&r.abs&&act>0)add(t,'anomali',d,ag,`Absensi ${r.abs} tapi ada aktivitas (${fmtNum(act)})`,r.no,`Absensi ${r.abs} tapi ada aktivitas`);
       const txt=F.filter(f=>f!=='Nama Akun'&&typeof v[f]==='string');
       if(on('txt')&&txt.length)add(t,'anomali',d,ag,'Isi bukan angka: '+txt.map(f=>`${f} "${v[f]}"`).join(', '),r.no);
       const cm=num(v['Call Manual'])+num(v['Autocall']), ct=num(v['Call Terhubung']);
-      if(on('conn')&&ct>0&&ct>cm)add(t,'anomali',d,ag,`Call terhubung (${fmtNum(ct)}) lebih besar dari call (${fmtNum(cm)})`,r.no);
-      if(on('ptp')&&num(v['PTP'])>1000)add(t,'anomali',d,ag,`PTP ${fmtNum(v['PTP'])} — sepertinya nominal uang, bukan jumlah`,r.no);
+      if(on('conn')&&ct>0&&ct>cm)add(t,'anomali',d,ag,`Call terhubung (${fmtNum(ct)}) lebih besar dari call (${fmtNum(cm)})`,r.no,'Call terhubung lebih besar dari call');
+      if(on('ptp')&&num(v['PTP'])>1000)add(t,'anomali',d,ag,`PTP ${fmtNum(v['PTP'])} — sepertinya nominal uang, bukan jumlah`,r.no,'PTP diisi nominal uang (harusnya jumlah)');
       const jb=num(v['Jml Data Bayar']), dp=num(v['Daily Payment']), td=num(v['Total Data']);
-      if(on('payJml')&&jb>0&&dp===0&&!(r.mask&(1<<fi['Daily Payment'])))add(t,'anomali',d,ag,`Jml data bayar ${jb} tapi Daily Payment 0`,r.no);
-      if(on('payJml')&&dp>0&&jb===0&&!(r.mask&(1<<fi['Jml Data Bayar'])))add(t,'anomali',d,ag,`Daily Payment Rp ${fmtNum(dp)} tapi Jml Data Bayar 0`,r.no);
-      if(on('jmlTot')&&td>0&&jb>td)add(t,'anomali',d,ag,`Jml data bayar (${jb}) > total data (${td})`,r.no);
+      if(on('payJml')&&jb>0&&dp===0&&!(r.mask&(1<<fi['Daily Payment'])))add(t,'anomali',d,ag,`Jml data bayar ${jb} tapi Daily Payment 0`,r.no,'Jml Data Bayar terisi tapi Daily Payment 0');
+      if(on('payJml')&&dp>0&&jb===0&&!(r.mask&(1<<fi['Jml Data Bayar'])))add(t,'anomali',d,ag,`Daily Payment Rp ${fmtNum(dp)} tapi Jml Data Bayar 0`,r.no,'Daily Payment terisi tapi Jml Data Bayar 0');
+      if(on('jmlTot')&&td>0&&jb>td)add(t,'anomali',d,ag,`Jml data bayar (${jb}) > total data (${td})`,r.no,'Jml data bayar lebih besar dari total data');
       if(on('dobel')&&r.agent&&dupC[d+'|'+r.app+'|'+nameKey(r.agent)]>1)add(t,'anomali',d,ag,'Baris dobel (agent sama, tanggal sama — mis. ada baris Hadir & Off sekaligus)',r.no);
     });
     const c={};t.iss.forEach(i=>c[i.type]=(c[i.type]||0)+1);t.cnt=c;
@@ -502,7 +505,7 @@ function reminder(t){
   const ds=Object.keys(byD).sort();
   if(ds.length){L.push('\n📝 *Perlu dilengkapi/dicek:*');
     ds.forEach(d=>{L.push(`*${d==='?'?'Tanpa tanggal':dLabel(d)}*`);
-      const g={};byD[d].forEach(i=>{const k=i.type==='agent'?'Baris agent belum ada':i.text;(g[k]=g[k]||[]).push(i.agent);});
+      const g={};byD[d].forEach(i=>{const k=i.type==='agent'?'Baris agent belum ada':i.g;(g[k]=g[k]||[]).push(i.agent);});
       Object.keys(g).forEach(k=>L.push(`• ${k}: ${[...new Set(g[k])].join(', ')}`));});}
   const inf=t.iss.filter(i=>i.type==='info');
   if(inf.length)L.push(`\nℹ️ Agent tidak muncul lagi: ${inf.map(i=>`${i.agent} (sejak ${dLabel(i.d)})`).join(', ')} — kalau masih aktif mohon diinput, kalau resign/pindah mohon dikabari.`);
