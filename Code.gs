@@ -6,6 +6,8 @@
 /*** ============ CFG ============ ***/
 const CFG = {
   SPREADSHEET_ID: '1zcWzcEN_R1qClSKPsvp2Fica_j7iDwq_Qqcg3Mude3k',
+  // Spreadsheet rekap pembayaran per TL (1 tab per TL) — dipakai Analisa Bucket
+  DATABAYAR_ID: '17hlBKEJjh5UJJQQATcnr-nZl_n3zfjIxQaa7TCFx8wQ',
   SHEET_ALL_DATA: 'All Data',
   SHEET_REFERENSI: 'Referensi Akun',
   SHEET_VIOLATION: 'VIOLATION',
@@ -418,6 +420,7 @@ function doGet(e) {
       case 'rankdata':  result = endpointRankData_(e);  break;
       case 'paymenttrend': result = endpointPaymentTrend_(e); break;
       case 'klien':     result = endpointKlien_(e);     break;
+      case 'databayar': result = endpointDataBayar_(e); break;
       case 'qccheck':   result = endpointQcCheck_(e);   break;
       default: result = { success: false, message: 'Unknown action: ' + action };
     }
@@ -1086,6 +1089,75 @@ function endpointKlien_(e) {
         outstanding: Number(r[4]) || 0, repay: Number(r[5]) || 0, rate: Number(r[6]) || 0 }));
   }
   return { success: true, action: 'klien', bucket, periode, agents, tl: tls, vendor, kategori };
+}
+
+/*** ============ DATA BAYAR (rekap sumber pembayaran per agent) ============ ***
+ * Spreadsheet CFG.DATABAYAR_ID, 1 tab per TL. Kolom (mulai A):
+ *   NO | NAMA TL | BUCKET | NAMA AGENT | JUMLAH DATA BAYAR | TANGGAL |
+ *   WA | GOJEK | CALL | SMS | SOSIAL MEDIA | SISTEM | PELUNASAN | CICILAN | CATATAN
+ * Sel metode boleh angka (jumlah) atau teks penanda ("WA"/"SISTEM"/"1").
+ * Kalau hanya 1 metode ditandai teks → seluruh JUMLAH DATA BAYAR dihitung ke metode itu.
+ * GET ?action=databayar&bulan=Oktober&tahun=2026
+ *   → rows: [tab, tl, bucket(NPA/C03/''), agent, jumlah, 'yyyy-mm-dd', wa, gojek, call, sms, sosmed, sistem, lunas, cicil, catatan]
+ ***********************************************************************/
+function _dbBucket_(v) {
+  const s = String(v || '').toUpperCase().replace(/\s+/g, '');
+  if (/^NPA/.test(s)) return 'NPA';
+  if (/^C[O0]3/.test(s)) return 'C03';
+  return '';
+}
+function endpointDataBayar_(e) {
+  const p = (e && e.parameter) || {};
+  let tm = -1, ty = 0;
+  if (p.bulan && p.tahun) { tm = BULAN_LIST.indexOf(normBulan_(p.bulan)); ty = Number(normTahun_(p.tahun)); }
+  const ss = SpreadsheetApp.openById(p.id || CFG.DATABAYAR_ID);
+  const tz = Session.getScriptTimeZone();
+  const out = [], warn = [], tabs = [];
+  ss.getSheets().forEach(sh => {
+    const last = sh.getLastRow();
+    if (last < 3) return;
+    const width = Math.min(15, sh.getMaxColumns());
+    const vals = sh.getRange(1, 1, last, width).getValues().map(r => r.concat(new Array(15 - width).fill('')));
+    const head = vals.slice(0, 3).map(r => r.join('|').toUpperCase()).join('|');
+    if (head.indexOf('NAMA AGENT') < 0) return;
+    tabs.push(sh.getName());
+    const rows = [];
+    let swapped = 0, noDate = 0;
+    vals.forEach(r => {
+      const agent = String(r[3] || '').trim();
+      if (!agent || /NAMA AGENT/i.test(agent)) return;
+      let d = r[5];
+      if (!(d instanceof Date)) {
+        const m = String(d || '').trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
+        d = m ? new Date(Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+      }
+      if (d && tm >= 0 && (d.getMonth() !== tm || d.getFullYear() !== ty)) {
+        // tanggal terketik terbalik (bulan/hari), mis. 1 Okt tersimpan sbg 10 Jan
+        if (d.getDate() - 1 === tm && d.getMonth() <= 11 && d.getFullYear() === ty) {
+          d = new Date(ty, tm, d.getMonth() + 1); swapped++;
+        } else return; // bukan bulan ini
+      }
+      if (!d) { noDate++; return; }
+      const jml = Number(r[4]) || 0;
+      const marks = [6, 7, 8, 9, 10, 11].map(c => r[c]);
+      const src = marks.map(m => typeof m === 'number' ? m : 0);
+      const txt = marks.map((m, i) => (typeof m === 'string' && m.trim()) ? i : -1).filter(i => i >= 0);
+      const used = src.reduce((a, b) => a + b, 0);
+      if (!used && txt.length === 1) src[txt[0]] = jml;
+      else if (!used && txt.length > 1) txt.forEach(i => src[i] = 1);
+      const flag = v => typeof v === 'number' ? v : (String(v || '').trim() ? 1 : 0);
+      rows.push([sh.getName(), String(r[1] || '').trim(), _dbBucket_(r[2]), agent, jml,
+        Utilities.formatDate(d, tz, 'yyyy-MM-dd')].concat(src, [flag(r[12]), flag(r[13]), String(r[14] || '').trim()]));
+    });
+    // bucket kosong → ikut mayoritas tab
+    const cnt = {};
+    rows.forEach(x => { if (x[2]) cnt[x[2]] = (cnt[x[2]] || 0) + 1; });
+    const maj = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a])[0] || '';
+    rows.forEach(x => { if (!x[2]) x[2] = maj; out.push(x); });
+    if (swapped) warn.push(sh.getName() + ': ' + swapped + ' tanggal terbalik (hari/bulan) — sudah dikoreksi otomatis');
+    if (noDate) warn.push(sh.getName() + ': ' + noDate + ' baris tanpa tanggal — tidak dihitung');
+  });
+  return { success: true, action: 'databayar', tabs, warn, rows: out };
 }
 
 function doPost(e) {
