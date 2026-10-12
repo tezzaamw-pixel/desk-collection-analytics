@@ -495,17 +495,54 @@ function renderTl(){
 }
 
 /* ── 3. Agent merah EDN per TL ── */
+// Harian: status merah di laporan Daily tanggal terpilih (+ berapa hari berturut-turut).
+// Bulanan: status merah di laporan Monthly (akumulasi bulan) + berapa hari merah di laporan Daily.
+// "📋 Data internal" menambahkan ringkasan aktivitas dari All Data (Total Data, call, sentuh WA, PTP).
+// Klik nama agent → detail lengkap per hari (versi klien + versi internal).
+function intKey(){return `${document.getElementById('selBulan').value}|${document.getElementById('selTahun').value}|${BUCKET}`;}
+function intRowsFor(a){
+  const st=INTERNAL[intKey()]; if(!st||!st.rows)return null;
+  const ki=normKey(a.kufiId), kn=normKey(a.nama);
+  let rows=st.rows.filter(r=>ki&&normKey(r.namaAkun)===ki);
+  if(!rows.length)rows=st.rows.filter(r=>kn&&normKey(r.namaAkun)===kn);
+  if(!rows.length)rows=st.rows.filter(r=>kn&&normKey(r.agent)===kn);
+  return rows;
+}
+const INT_F=[
+  ['totalData','Total Data'],['dataBaru','Data Baru'],['callManual','Call Manual'],['callTerhubung','Call Terhubung'],['autocall','Autocall'],
+  ['sentuhWA','Sentuh WA'],['responWA','Respon WA'],['sentuhWABA','Sentuh WABA'],['smsManual','SMS Manual'],
+  ['ptp','PTP'],['ptpBayar','PTP Bayar'],['jmlDataBayar','Jml Data Bayar'],['dailyPayment','Payment (internal)']];
+function intSum(rows,upTo){
+  const rs=(rows||[]).filter(r=>!upTo||r.tanggal<=upTo);
+  const s={hari:new Set(rs.map(r=>r.tanggal)).size, absen:rs.filter(r=>r.absensi&&!/MASUK|HADIR/i.test(r.absensi)).length};
+  INT_F.forEach(([k])=>s[k]=rs.reduce((x,r)=>x+(Number(r[k])||0),0));
+  s.connRate=s.callManual?s.callTerhubung/s.callManual*100:null;
+  s.ptpConv=s.ptp?s.ptpBayar/s.ptp*100:null;
+  s.waResp=s.sentuhWA?s.responWA/s.sentuhWA*100:null;
+  return s;
+}
+function intLine(s){
+  if(!s||!s.hari)return '<span class="muted">tidak ketemu di All Data</span>';
+  const per=v=>fmtNum(v/s.hari);
+  return `Data ${per(s.totalData)}/hr · Call ${per(s.callManual)}/hr · Terhubung ${s.connRate===null?'—':s.connRate.toFixed(0)+'%'} · WA ${per(s.sentuhWA)}/hr · PTP ${fmtNum(s.ptp)}→${fmtNum(s.ptpBayar)} bayar`;
+}
 function renderRed(){
   const el=document.getElementById('secRed');
   const dates=dailyDates();
-  if(!dates.length){el.innerHTML='<div class="card-title">🚩 Agent Merah EDN</div><div class="empty">Butuh laporan Daily untuk melihat agent merah.</div>';return;}
-  if(!VIEW.redDate||!dates.includes(VIEW.redDate))VIEW.redDate=dates[dates.length-1];
-  const own=DATA.agents.filter(a=>a.jenis==='DAILY'&&a.company===OWN);
-  const today=own.filter(a=>a.tanggal===VIEW.redDate);
-  const upTo=dates.filter(d=>d<=VIEW.redDate);
-  // jumlah hari merah & streak berturut-turut s/d tanggal terpilih
+  const hasMonthly=DATA.agents.some(a=>a.jenis==='MONTHLY');
+  if(!dates.length&&!hasMonthly){el.innerHTML='<div class="card-title">🚩 Agent Merah EDN</div><div class="empty">Butuh laporan Daily/Monthly untuk melihat agent merah.</div>';return;}
+  VIEW.redMode=VIEW.redMode||'daily';
+  if(VIEW.redMode==='daily'&&!dates.length)VIEW.redMode='monthly';
+  if(VIEW.redMode==='monthly'&&!hasMonthly)VIEW.redMode='daily';
+  const monthly=VIEW.redMode==='monthly';
+  if(!VIEW.redDate||!dates.includes(VIEW.redDate))VIEW.redDate=dates[dates.length-1]||'';
+  const ownD=DATA.agents.filter(a=>a.jenis==='DAILY'&&a.company===OWN);
+  const ownM=DATA.agents.filter(a=>a.jenis==='MONTHLY'&&a.company===OWN);
+  const asOf=monthly?(ownM[0]||{}).tanggal:VIEW.redDate;
+  const today=monthly?ownM:ownD.filter(a=>a.tanggal===VIEW.redDate);
+  const upTo=dates.filter(d=>d<=(monthly?(asOf||'9999'):VIEW.redDate));
   const hist={};
-  own.forEach(a=>{const k=normKey(a.kufiId)||normKey(a.nama);(hist[k]=hist[k]||{})[a.tanggal]=a.merah;});
+  ownD.forEach(a=>{const k=normKey(a.kufiId)||normKey(a.nama);(hist[k]=hist[k]||{})[a.tanggal]=a.merah;});
   const stat=a=>{const h=hist[normKey(a.kufiId)||normKey(a.nama)]||{};let days=0,seen=0,streak=0;
     upTo.forEach(d=>{if(h[d]!==undefined){seen++;if(h[d])days++;}});
     for(let i=upTo.length-1;i>=0;i--){const v=h[upTo[i]];if(v===undefined)continue;if(v)streak++;else break;}
@@ -513,15 +550,106 @@ function renderRed(){
   const byTl={};today.forEach(a=>{(byTl[a.tl]=byTl[a.tl]||[]).push(a);});
   const tls=Object.keys(byTl).map(tl=>{const all=byTl[tl],red=all.filter(a=>a.merah);return {tl,all,red,pct:all.length?red.length/all.length:0};}).sort((a,b)=>b.pct-a.pct);
   const totRed=today.filter(a=>a.merah).length;
+  const st=INTERNAL[intKey()], showInt=!!VIEW.redInt;
+  if(showInt&&!st)loadInternal();
+  const intReady=st&&st.rows;
+  RED_LIST=today;
+  const intHtml=a=>{
+    if(!showInt)return '';
+    if(!intReady)return `<div class="muted" style="font-size:10.5px">${st&&st.error?escH(st.error):'memuat data internal…'}</div>`;
+    const s=intSum(intRowsFor(a), monthly?null:VIEW.redDate);
+    return `<div class="muted" style="font-size:10.5px;white-space:normal">${monthly?'s/d akhir data':'s/d '+dLabel(VIEW.redDate)}: ${intLine(s)}</div>`;
+  };
+  const row=(a,i)=>{const s=stat(a);
+    const badge=monthly
+      ?`<b class="${s.days>=Math.max(3,s.seen/2)?'bad':''}" title="hari merah di laporan Daily / hari ada data">${s.days}/${s.seen} hr merah</b>`
+      :`<b class="${s.streak>=3?'bad':''}" title="hari merah bulan ini / hari ada data">${s.streak>=2?s.streak+' hr berturut':s.days+'/'+s.seen+' hr'}</b>`;
+    return `<div class="tlbox-r" style="flex-direction:column;align-items:stretch;gap:2px;cursor:pointer" onclick="openAgentDetail(${i})" title="Klik untuk lihat detail">
+      <div style="display:flex;justify-content:space-between;gap:8px"><span class="nm">${escH(a.nama)} <span class="muted" style="font-size:10.5px">${escH(a.kufiId)}</span></span>
+      <span style="flex-shrink:0;text-align:right">${fmtPct(a.rate)} · ${badge}</span></div>${intHtml(a)}</div>`;};
   el.innerHTML=`
     <div class="card-head"><div><div class="card-title">🚩 Agent Merah EDN per TL</div>
-      <div class="card-sub">Agent yang ditandai merah oleh klien · ${totRed} dari ${today.length} agent EDN merah pada ${dLabel(VIEW.redDate)}</div></div>
-      <select onchange="VIEW.redDate=this.value;renderRed()">${dates.slice().reverse().map(d=>`<option value="${d}" ${d===VIEW.redDate?'selected':''}>${dLabel(d)}</option>`).join('')}</select></div>
-    ${gapBanner(agentGap('DAILY',VIEW.redDate),true)}
+      <div class="card-sub">${monthly?'Status merah di laporan Monthly (akumulasi s/d '+dLabel(asOf)+')':'Agent yang ditandai merah oleh klien pada '+dLabel(VIEW.redDate)} · ${totRed} dari ${today.length} agent EDN merah · klik nama agent untuk detail</div></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-ghost" style="${showInt?'background:var(--accent-bg);color:var(--accent);border-color:var(--accent)':''}" onclick="VIEW.redInt=!VIEW.redInt;renderRed()" title="Tampilkan ringkasan aktivitas dari All Data (perlu ±30 detik saat pertama dimuat)">📋 Data internal</button>
+        ${monthly?'':`<select onchange="VIEW.redDate=this.value;renderRed()">${dates.slice().reverse().map(d=>`<option value="${d}" ${d===VIEW.redDate?'selected':''}>${dLabel(d)}</option>`).join('')}</select>`}
+        <div class="seg"><button class="${!monthly?'on':''}" ${dates.length?'':'disabled'} onclick="VIEW.redMode='daily';renderRed()">Harian</button><button class="${monthly?'on':''}" ${hasMonthly?'':'disabled'} onclick="VIEW.redMode='monthly';renderRed()">Bulanan</button></div>
+      </div></div>
+    ${monthly?'':gapBanner(agentGap('DAILY',VIEW.redDate),true)}
     ${today.length?`<div class="tlgrid">${tls.map(t=>`<div class="tlbox">
       <div class="tlbox-h"><span>${escH(t.tl)}</span><span class="pill ${t.pct>=.7?'pill-red':t.pct>=.4?'pill-warn':'pill-ok'}">${t.red.length}/${t.all.length} merah</span></div>
-      ${t.red.sort((a,b)=>stat(b).streak-stat(a).streak||a.rate-b.rate).map(a=>{const s=stat(a);return `<div class="tlbox-r"><span class="nm" title="${escH(a.kufiId)}">${escH(a.nama)} <span class="muted" style="font-size:10.5px">${escH(a.kufiId)}</span></span><span style="flex-shrink:0;text-align:right">${fmtPct(a.rate)} · <b class="${s.streak>=3?'bad':''}" title="hari merah bulan ini / hari ada data">${s.streak>=2?s.streak+' hr berturut':s.days+'/'+s.seen+' hr'}</b></span></div>`;}).join('')||'<div class="tlbox-r muted">Tidak ada agent merah 👍</div>'}
-    </div>`).join('')}</div>`:'<div class="empty">Tidak ada agent EDN di laporan tanggal ini.</div>'}`;
+      ${t.red.sort((a,b)=>monthly?(stat(b).days-stat(a).days||a.rate-b.rate):(stat(b).streak-stat(a).streak||a.rate-b.rate)).map(a=>row(a,today.indexOf(a))).join('')||'<div class="tlbox-r muted">Tidak ada agent merah 👍</div>'}
+      ${t.all.length>t.red.length?`<details style="border-top:1px solid var(--border)"><summary style="padding:6px 12px;font-size:11.5px;cursor:pointer;color:var(--text2)">Agent tidak merah (${t.all.length-t.red.length})</summary>${t.all.filter(a=>!a.merah).sort((a,b)=>b.rate-a.rate).map(a=>row(a,today.indexOf(a))).join('')}</details>`:''}
+    </div>`).join('')}</div>`:'<div class="empty">Tidak ada agent EDN di laporan ini.</div>'}`;
+}
+let RED_LIST=[];
+
+// ── Detail 1 agent: versi klien per hari + versi internal per hari + perbandingan rata-rata tim ──
+function openAgentDetail(i){
+  const a=RED_LIST[i]; if(!a)return;
+  let m=document.getElementById('modalAgent');
+  if(!m){m=document.createElement('div');m.className='modal';m.id='modalAgent';m.onclick=e=>{if(e.target===m)m.classList.remove('open');};document.body.appendChild(m);}
+  m.classList.add('open');
+  VIEW.detailAgent=a; renderAgentDetail();
+  if(!INTERNAL[intKey()])loadInternal().then(()=>{if(m.classList.contains('open'))renderAgentDetail();});
+}
+function renderAgentDetail(){
+  const a=VIEW.detailAgent, m=document.getElementById('modalAgent'); if(!a||!m)return;
+  const k=normKey(a.kufiId)||normKey(a.nama);
+  const kl=DATA.agents.filter(x=>x.jenis==='DAILY'&&(normKey(x.kufiId)||normKey(x.nama))===k).sort((x,y)=>x.tanggal<y.tanggal?-1:1);
+  const mon=DATA.agents.find(x=>x.jenis==='MONTHLY'&&(normKey(x.kufiId)||normKey(x.nama))===k);
+  const st=INTERNAL[intKey()];
+  const ir=st&&st.rows?intRowsFor(a):null;
+  const s=ir?intSum(ir):null;
+  // pembanding: rata-rata per hari agent EDN lain di TL yg sama & semua EDN (dari All Data)
+  let cmp='';
+  if(st&&st.rows&&s&&s.hari){
+    const peers=DATA.agents.filter(x=>x.jenis===(mon?'MONTHLY':'DAILY')&&x.company===OWN);
+    const uniq={};peers.forEach(x=>{uniq[normKey(x.kufiId)||normKey(x.nama)]=x;});
+    const sums=Object.values(uniq).map(x=>({x,s:intSum(intRowsFor(x))})).filter(o=>o.s.hari);
+    const avgOf=(list,f)=>{const v=list.map(o=>o.s[f]/o.s.hari);return v.length?v.reduce((p,q)=>p+q,0)/v.length:null;};
+    const tlL=sums.filter(o=>o.x.tl===a.tl), wht=sums.filter(o=>!o.x.merah);
+    const F=[['totalData','Total Data'],['callManual','Call Manual'],['callTerhubung','Call Terhubung'],['sentuhWA','Sentuh WA'],['sentuhWABA','Sentuh WABA'],['ptp','PTP'],['ptpBayar','PTP Bayar'],['dailyPayment','Payment']];
+    cmp=`<div style="font-size:12px;font-weight:700;margin:14px 0 6px">Rata-rata per hari dibanding agent lain (All Data)</div>
+      <div class="tbl-wrap"><table class="t"><thead><tr><th>Metrik / hari</th><th class="n">Agent ini</th><th class="n">Rata² TL ${escH(a.tl)}</th><th class="n">Rata² agent EDN tidak merah</th></tr></thead><tbody>
+      ${F.map(([f,l])=>{const me=s[f]/s.hari,t=avgOf(tlL,f),w=avgOf(wht,f);const low=w!==null&&me<w*0.8;
+        const fm=v=>v===null?'—':(f==='dailyPayment'?fmtRpFull(v):fmtNum(v));
+        return `<tr><td>${l}</td><td class="n" style="font-weight:700;${low?'color:var(--danger)':''}">${fm(me)}${low?' ↓':''}</td><td class="n">${fm(t)}</td><td class="n">${fm(w)}</td></tr>`;}).join('')}
+      <tr><td>% Call terhubung</td><td class="n" style="font-weight:700">${s.connRate===null?'—':s.connRate.toFixed(1)+'%'}</td><td class="n" colspan="2"></td></tr>
+      <tr><td>% Respon WA</td><td class="n" style="font-weight:700">${s.waResp===null?'—':s.waResp.toFixed(1)+'%'}</td><td class="n" colspan="2"></td></tr>
+      <tr><td>% PTP jadi bayar</td><td class="n" style="font-weight:700">${s.ptpConv===null?'—':s.ptpConv.toFixed(1)+'%'}</td><td class="n" colspan="2"></td></tr>
+      </tbody></table></div>
+      <div class="muted" style="font-size:11px;margin-top:4px">↓ merah = lebih dari 20% di bawah rata-rata agent EDN yang tidak merah.</div>`;
+  }
+  const dates=[...new Set(kl.map(x=>x.tanggal).concat((ir||[]).map(r=>r.tanggal)))].sort();
+  const byD=d=>(ir||[]).filter(r=>r.tanggal===d);
+  const sumF=(rs,f)=>rs.reduce((x,r)=>x+(Number(r[f])||0),0);
+  const daily=`<div class="tbl-wrap" style="max-height:380px"><table class="t"><thead><tr><th>Tanggal</th><th class="n">Rate klien</th><th class="n">Repay klien</th><th>Status</th>
+      ${ir?'<th>Absensi</th><th>Dipegang</th>'+INT_F.map(([,l])=>`<th class="n">${l}</th>`).join('')+'<th>Catatan SPV</th>':''}</tr></thead><tbody>
+    ${dates.map(d=>{const c=kl.find(x=>x.tanggal===d), rs=byD(d);
+      return `<tr class="${c&&c.merah?'flag':''}"><td>${dLabel(d)}</td><td class="n">${c?fmtPct(c.rate):'—'}</td><td class="n">${c?fmtRpFull(c.repay):'—'}</td><td>${c?(c.merah?'<span class="pill pill-red">merah</span>':'<span class="pill pill-ok">putih</span>'):'—'}</td>
+        ${ir?`<td>${escH([...new Set(rs.map(r=>r.absensi).filter(Boolean))].join(', ')||'—')}</td><td>${escH([...new Set(rs.map(r=>r.agent).filter(Boolean))].join(', ')||'—')}</td>`+INT_F.map(([f])=>`<td class="n">${rs.length?(f==='dailyPayment'?fmtRpFull(sumF(rs,f)):fmtNum(sumF(rs,f))):'—'}</td>`).join('')+`<td style="white-space:normal;min-width:160px">${escH(rs.map(r=>r.catatanSPV).filter(Boolean).join(' · '))}</td>`:''}</tr>`;}).join('')}
+    </tbody></table></div>`;
+  const intState=!st?'<div class="empty" style="padding:14px">Data internal belum dimuat… <button class="btn btn-ghost" onclick="loadInternal().then(renderAgentDetail)">Muat</button></div>'
+    :st==='loading'?'<div class="empty" style="padding:14px"><div class="spinner"></div>Memuat data internal (±30 detik)…</div>'
+    :st.error?`<div class="empty" style="padding:14px">⚠️ ${escH(st.error)}</div>`
+    :(!ir||!ir.length)?'<div class="issues warn">Agent ini tidak ketemu di All Data (dicocokkan lewat NAMA AKUN = KUFI-ID / nama, atau nama agent).</div>':'';
+  m.innerHTML=`<div class="modal-box"><div class="modal-h"><div><div class="ttl">👤 ${escH(a.nama)} <span class="muted" style="font-size:12px">${escH(a.kufiId)}</span></div>
+      <div class="card-sub">TL ${escH(a.tl)} · ${a.merah?'<span class="pill pill-red">merah</span>':'<span class="pill pill-ok">putih</span>'}${mon?` · Bulanan: rate ${fmtPct(mon.rate)}, repay ${fmtRpFull(mon.repay)}, outstanding ${fmtRpFull(mon.outstanding)}`:''}</div></div>
+      <button class="btn btn-ghost" onclick="document.getElementById('modalAgent').classList.remove('open')">✕</button></div>
+    <div class="modal-b">
+      ${s&&s.hari?`<div class="kpis">
+        <div class="kpi"><div class="l">Hari kerja (All Data)</div><div class="v">${s.hari}</div><div class="s">${s.absen?s.absen+' baris tidak masuk':'semua masuk'}</div></div>
+        <div class="kpi"><div class="l">Call manual / hari</div><div class="v">${fmtNum(s.callManual/s.hari)}</div><div class="s">terhubung ${s.connRate===null?'—':s.connRate.toFixed(1)+'%'}</div></div>
+        <div class="kpi"><div class="l">Sentuh WA / hari</div><div class="v">${fmtNum(s.sentuhWA/s.hari)}</div><div class="s">respon ${s.waResp===null?'—':s.waResp.toFixed(1)+'%'}</div></div>
+        <div class="kpi"><div class="l">PTP → bayar</div><div class="v">${fmtNum(s.ptp)} → ${fmtNum(s.ptpBayar)}</div><div class="s">${s.ptpConv===null?'—':s.ptpConv.toFixed(0)+'% jadi bayar'}</div></div>
+        <div class="kpi"><div class="l">Total data / hari</div><div class="v">${fmtNum(s.totalData/s.hari)}</div><div class="s">data baru ${fmtNum(s.dataBaru)}</div></div>
+      </div>`:''}
+      ${intState}
+      <div style="font-size:12px;font-weight:700;margin:6px 0">Per hari: versi klien${ir&&ir.length?' + input internal (All Data)':''}</div>
+      ${daily}
+      ${cmp}
+    </div></div>`;
 }
 
 /* ── 4. Cocokkan payment klien vs input internal ── */
@@ -580,7 +708,11 @@ async function loadInternal(){
     if(!res.success)throw new Error(res.message||'gagal');
     INTERNAL[key]={rows:res.rows||[]};
   }catch(e){INTERNAL[key]={error:'Gagal memuat data internal: '+e.message};}
-  if(`${document.getElementById('selBulan').value}|${document.getElementById('selTahun').value}|${BUCKET}`===key)renderRec();
+  if(`${document.getElementById('selBulan').value}|${document.getElementById('selTahun').value}|${BUCKET}`===key){
+    renderRec();
+    if(VIEW.redInt&&document.getElementById('secRed'))renderRed();
+    const md=document.getElementById('modalAgent'); if(md&&md.classList.contains('open'))renderAgentDetail();
+  }
 }
 
 /* ══════════════ UPLOAD + GEMINI ══════════════ */
