@@ -924,7 +924,9 @@ function TEST_rankdata() {
 const KLIEN_SHEETS = {
   AGENT:  { name: 'KLIEN_AGENT',  head: ['JENIS','TANGGAL','PERIODE','BUCKET','KUFI_ID','NAMA','TL','COMPANY','OUTSTANDING','REPAY','RATE_PCT','HANDLE_TIME','LOAD','MERAH','DIUPLOAD'], textCols: 8 },
   TL:     { name: 'KLIEN_TL',     head: ['JENIS','TANGGAL','PERIODE','BUCKET','RANK','TL','COMPANY','OUTSTANDING','REPAY','RATE_PCT','AHT','DIUPLOAD'], textCols: 4 },
-  VENDOR: { name: 'KLIEN_VENDOR', head: ['TANGGAL','PERIODE','BUCKET','COMPANY','RATE_PCT','DIUPLOAD'], textCols: 4 }
+  VENDOR: { name: 'KLIEN_VENDOR', head: ['TANGGAL','PERIODE','BUCKET','COMPANY','RATE_PCT','DIUPLOAD'], textCols: 4 },
+  // Ringkasan per kategori tiket (COMPANY × M1-1/M1-2/M1-3/M30+), semua vendor
+  KATEGORI: { name: 'KLIEN_KATEGORI', head: ['TANGGAL','PERIODE','COMPANY','KATEGORI','OUTSTANDING','REPAY','RATE_PCT','DIUPLOAD'], textCols: 4 }
 };
 
 function _klienSheet_(ss, def) {
@@ -1020,6 +1022,29 @@ function klienSave_(body) {
   }
 }
 
+// POST {action:'klien_kategori_save', rows:[{tanggal,company,kategori,outstanding,repay,rate}]}
+// Upload ulang tanggal yang sama MENGGANTI data tanggal itu.
+function klienKategoriSave_(body) {
+  const num = v => { const n = Number(v); return isNaN(n) ? 0 : n; };
+  const rows = (body.rows || []).filter(r => /^\d{4}-\d{2}-\d{2}$/.test(String(r.tanggal || '')) && r.company && r.kategori);
+  if (!rows.length) throw new Error('Tidak ada baris kategori yang valid.');
+  const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+  const dates = {};
+  rows.forEach(r => { dates[String(r.tanggal).slice(0, 10)] = true; });
+  const lock = LockService.getScriptLock();
+  lock.waitLock(30000);
+  try {
+    const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+    const sh = _klienSheet_(ss, KLIEN_SHEETS.KATEGORI);
+    const res = _klienReplace_(sh, KLIEN_SHEETS.KATEGORI, r => !!dates[_klienTxt_(r[0])],
+      rows.map(r => [String(r.tanggal).slice(0, 10), String(r.tanggal).slice(0, 7), String(r.company).toUpperCase().trim(),
+        String(r.kategori).toUpperCase().trim(), num(r.outstanding), num(r.repay), num(r.rate), now]));
+    return { success: true, action: 'klien_kategori_save', tanggal: Object.keys(dates), result: res };
+  } finally {
+    lock.releaseLock();
+  }
+}
+
 // GET ?action=klien&bucket=C03&bulan=Oktober&tahun=2026
 function endpointKlien_(e) {
   const p = (e && e.parameter) || {};
@@ -1051,7 +1076,16 @@ function endpointKlien_(e) {
   const vendor = pick(KLIEN_SHEETS.VENDOR, r => ({
     tanggal: _klienTxt_(r[0]), bucket: _klienTxt_(r[2]), company: _klienTxt_(r[3]), rate: Number(r[4]) || 0
   }), 2, 1);
-  return { success: true, action: 'klien', bucket, periode, agents, tl: tls, vendor };
+  // Kategori tiket: semua vendor & semua bucket (tidak difilter bucket)
+  let kategori = [];
+  const shK = ss.getSheetByName(KLIEN_SHEETS.KATEGORI.name);
+  if (shK) {
+    kategori = _klienReadAll_(shK, KLIEN_SHEETS.KATEGORI.head.length)
+      .filter(r => !periode || _klienTxt_(r[1]) === periode)
+      .map(r => ({ tanggal: _klienTxt_(r[0]), company: _klienTxt_(r[2]), kategori: _klienTxt_(r[3]),
+        outstanding: Number(r[4]) || 0, repay: Number(r[5]) || 0, rate: Number(r[6]) || 0 }));
+  }
+  return { success: true, action: 'klien', bucket, periode, agents, tl: tls, vendor, kategori };
 }
 
 function doPost(e) {
@@ -1060,6 +1094,7 @@ function doPost(e) {
     const body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
     switch (String(body.action || '').toLowerCase()) {
       case 'klien_save': result = klienSave_(body); break;
+      case 'klien_kategori_save': result = klienKategoriSave_(body); break;
       default: result = { success: false, message: 'Unknown action: ' + body.action };
     }
   } catch (err) {

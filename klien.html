@@ -367,6 +367,11 @@ function render(){
   Object.values(charts).forEach(c=>c&&c.destroy()); charts={};
   const box=document.getElementById('content');
   const hasAny=DATA.agents.length||DATA.tl.length||DATA.vendor.length;
+  const hasKat=(DATA.kategori||[]).length>0;
+  if(!hasAny&&hasKat){
+    box.innerHTML=`<div class="card"><div class="empty" style="padding:18px">📭 Belum ada laporan ${BUCKET==='C03'?'CO3':BUCKET} di bulan ini — ringkasan kategori tiket tetap ditampilkan di bawah.</div></div><div class="card" id="secKat"></div>`;
+    renderKategori();return;
+  }
   if(!hasAny){
     box.innerHTML=`<div class="card"><div class="empty">📭 Belum ada laporan klien untuk <b>${BUCKET==='C03'?'CO3':BUCKET}</b> di ${escH(document.getElementById('selBulan').value)} ${escH(document.getElementById('selTahun').value)}.<br>Klik <b>⬆ Upload Laporan</b> lalu masukkan gambar dari grup.</div></div>`;
     return;
@@ -375,8 +380,52 @@ function render(){
     <div class="card" id="secVendor"></div>
     <div class="card" id="secTl"></div>
     <div class="card" id="secRed"></div>
-    <div class="card" id="secRec"></div>`;
+    <div class="card" id="secRec"></div>
+    ${hasKat?'<div class="card" id="secKat"></div>':''}`;
   renderVendor(); renderTl(); renderRed(); renderRec();
+  if(hasKat)renderKategori();
+}
+
+/* ── 5. Ringkasan per kategori tiket (semua vendor) ── */
+const KAT_BUCKET={'M1-3':'CO3','M30+':'NPA'};
+function katOrder(a,b){const n=x=>{const m=String(x).match(/M(\d+)(?:-(\d+))?(\+)?/);return m?(+m[1])*100+(m[2]?+m[2]:99)+(m[3]?50:0):999;};return n(a)-n(b)||String(a).localeCompare(String(b));}
+function renderKategori(){
+  const el=document.getElementById('secKat'); if(!el)return;
+  const K=DATA.kategori||[];
+  const dates=[...new Set(K.map(x=>x.tanggal))].sort();
+  if(!VIEW.katDate||!dates.includes(VIEW.katDate))VIEW.katDate=dates[dates.length-1];
+  const di=dates.indexOf(VIEW.katDate), prevD=di>0?dates[di-1]:null;
+  const cur=K.filter(x=>x.tanggal===VIEW.katDate), prev=prevD?K.filter(x=>x.tanggal===prevD):[];
+  const cats=[...new Set(cur.map(x=>x.kategori))].sort(katOrder);
+  const rank=(rows)=>rows.slice().sort((a,b)=>b.rate-a.rate);
+  // ringkasan EDN
+  const own=cats.map(c=>{
+    const rows=rank(cur.filter(x=>x.kategori===c)), i=rows.findIndex(x=>x.company===OWN);
+    if(i<0)return null;
+    const o=rows[i], top=rows[0], tot=rows.reduce((a,x)=>a+x.outstanding,0);
+    const need=top.company!==OWN?Math.max(0,(top.rate-o.rate)/100*o.outstanding):0;
+    const p=prev.find(x=>x.kategori===c&&x.company===OWN);
+    return {c,o,rank:i+1,n:rows.length,top,need,share:tot?o.outstanding/tot*100:0,d:p?o.rate-p.rate:null};
+  }).filter(Boolean);
+  const kpis=own.map(x=>`<div class="kpi"><div class="l">${escH(x.c)}${KAT_BUCKET[x.c]?' · '+KAT_BUCKET[x.c]:''}</div>
+      <div class="v">#${x.rank} <span style="font-size:13px;color:var(--text3)">dari ${x.n}</span></div>
+      <div class="s">EDN ${fmtPct(x.o.rate)}${x.d!==null?` <span style="color:${x.d>=0?'var(--success)':'var(--danger)'}">${x.d>=0?'▲':'▼'}${fmtPct(Math.abs(x.d))}</span>`:''}${x.rank>1?` · #1 ${escH(x.top.company)} ${fmtPct(x.top.rate)}<br>Kurang ±${fmtRp(x.need)} repay untuk menyamai #1`:' · peringkat 1'}<br>Porsi outstanding EDN ${x.share.toFixed(0)}%</div></div>`).join('');
+  const cards=cats.map(c=>{
+    const rows=rank(cur.filter(x=>x.kategori===c)), tot=rows.reduce((a,x)=>a+x.outstanding,0);
+    const has=rows.some(x=>x.company===OWN);
+    return `<div style="border:1px solid var(--border);border-radius:8px;overflow:hidden">
+      <div style="padding:8px 10px;background:var(--surface2);font-weight:700;font-size:12px;display:flex;justify-content:space-between;gap:8px"><span>${escH(c)}${KAT_BUCKET[c]?` <span class="muted" style="font-weight:600">· ${KAT_BUCKET[c]}</span>`:''}</span><span class="muted" style="font-weight:600">${rows.length} vendor${has?'':' · EDN tidak pegang'}</span></div>
+      <table class="t"><thead><tr><th>#</th><th>Company</th><th class="n">Outstanding</th><th class="n">Porsi</th><th class="n">Repay</th><th class="n">Rate</th>${prevD?'<th class="n">vs '+dShort(prevD)+'</th>':''}</tr></thead><tbody>
+      ${rows.map((x,i)=>{const p=prev.find(y=>y.kategori===c&&y.company===x.company);const d=p?x.rate-p.rate:null;
+        return `<tr class="${x.company===OWN?'edn':''}"><td class="muted">${i+1}</td><td><b>${escH(x.company)}</b></td><td class="n">${fmtRp(x.outstanding)}</td><td class="n">${tot?(x.outstanding/tot*100).toFixed(0)+'%':'—'}</td><td class="n">${fmtRp(x.repay)}</td><td class="n"><b>${fmtPct(x.rate)}</b></td>${prevD?`<td class="n" style="color:${d===null?'var(--text3)':d>=0?'var(--success)':'var(--danger)'}">${d===null?'—':(d>=0?'▲':'▼')+fmtPct(Math.abs(d))}</td>`:''}</tr>`;}).join('')}
+      </tbody></table></div>`;
+  }).join('');
+  el.innerHTML=`<div class="card-head"><div><div class="card-title">🧩 Ringkasan per Kategori Tiket</div>
+      <div class="card-sub">Semua vendor & semua bucket · rate = angka dari laporan klien · M1-3 = CO3, M30+ = NPA (total outstanding-nya sama dengan laporan Monthly)</div></div>
+      <select onchange="VIEW.katDate=this.value;renderKategori()">${dates.map(d=>`<option value="${d}" ${d===VIEW.katDate?'selected':''}>${dShort(d)}</option>`).join('')}</select></div>
+    ${own.length?`<div class="kpis">${kpis}</div>`:''}
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(330px,1fr));gap:12px">${cards}</div>
+    <div class="muted" style="font-size:11px;margin-top:8px">Porsi = bagian outstanding vendor itu di kategori tsb. "Kurang ±Rp…" = tambahan repay yang dibutuhkan EDN (dengan outstanding sekarang) supaya rate-nya sama dengan peringkat 1.${prevD?' Kolom "vs" = perubahan rate dibanding data tanggal '+dShort(prevD)+'.':''}</div>`;
 }
 
 /* ── 1. Posisi EDN vs vendor ── */
@@ -588,14 +637,15 @@ const HDR={
   nama:['NAME','NAMA','AGENT','AGENTNAME','NAMAAGENT','AGENTNAMA'],
   tl:['TLNAME','TL','NAMATL','TEAMLEADER','TEAMLEADERNAME','LEADER'],
   company:['COMPANY','VENDOR','PERUSAHAAN','AGENCY'],
-  outstanding:['LEFTUNPAIDPRINCIPAL','TOTALLEFTUNPAIDPRINCIPAL','UNPAIDPRINCIPAL','OUTSTANDING','OS','SISAPOKOK','TOTALOUTSTANDING'],
-  repay:['REPAYAMOUNT','REPAY','TOTALREPAY','REPAYMENT','PAYMENT','BAYAR'],
-  rate:['REPAYRATE','RATE','RATEPERSEN','PERSEN'],
+  outstanding:['LEFTUNPAIDPRINCIPAL','TOTALLEFTUNPAIDPRINCIPAL','UNPAIDPRINCIPAL','OUTSTANDING','OS','SISAPOKOK','TOTALOUTSTANDING','SUMOFTOTALLEFTUNPAIDPRINCIPAL','SUMOFLEFTUNPAIDPRINCIPAL'],
+  repay:['REPAYAMOUNT','REPAY','TOTALREPAY','REPAYMENT','PAYMENT','BAYAR','SUMOFTOTALREPAYAMOUNT','SUMOFREPAYAMOUNT'],
+  rate:['REPAYRATE','RATE','RATEPERSEN','PERSEN','RATEKLIEN'],
+  kategori:['TICKETCATEGORY','KATEGORI','KATEGORITIKET','CATEGORY','TICKET'],
   handleTime:['HANDLETIME','AVERAGEHANDLETIME','AVGHANDLETIME','AHT','HANDLE'],
   load:['LOADNUMBER','LOAD','JUMLAHLOAD'],
   merah:['MERAH','RED','M','STATUSMERAH'],
   rank:['RANK','RANKING','NO','NOMOR'],
-  tanggal:['DATE','TANGGAL','TGL']
+  tanggal:['DATE','TANGGAL','TGL','TANGGALDATA']
 };
 const HDR_IDX={};Object.entries(HDR).forEach(([f,arr])=>arr.forEach(a=>HDR_IDX[a]=f));
 function hdrKey(v){return String(v??'').toUpperCase().replace(/%/g,'PERSEN').replace(/[^A-Z0-9]/g,'');}
@@ -640,7 +690,7 @@ function metaFromFilename(name,meta){
 
 // Baca semua baris semua sheet → {meta, tl, agents, vendor, tlAvg, agentAvg}
 function parseWorkbookRows(sheets,fileName){
-  const meta={jenis:'',bucket:'',tanggal:''}, out={tl:[],agents:[],vendor:[],tlAvg:null,agentAvg:null};
+  const meta={jenis:'',bucket:'',tanggal:''}, out={tl:[],agents:[],vendor:[],kategori:[],tlAvg:null,agentAvg:null};
   const INFO_KEYS={JENIS:'jenis',TIPE:'jenis',BUCKET:'bucket',TANGGAL:'tanggal',DATE:'tanggal',TGL:'tanggal',
     AVGOUTSTANDING:'avgOs',AVGREPAY:'avgRepay',AVGRATE:'avgRate',AVGREPAYAMOUNT:'avgRepay',AVGREPAYRATE:'avgRate'};
   const avgInfo={};
@@ -656,7 +706,7 @@ function parseWorkbookRows(sheets,fileName){
       const map={};let hits=0;
       cells.forEach((c,i)=>{const f=HDR_IDX[hdrKey(c)];if(f&&map[f]===undefined){map[f]=i;hits++;}});
       if(hits>=3||(hits>=2&&map.tanggal!==undefined&&map.rate!==undefined)){
-        let kind=map.nama!==undefined||map.kufiId!==undefined?'agent':(map.tanggal!==undefined&&map.repay===undefined&&map.outstanding===undefined)?'vendor':map.tl!==undefined?'tl':null;
+        let kind=map.kategori!==undefined&&map.company!==undefined?'kategori':map.nama!==undefined||map.kufiId!==undefined?'agent':(map.tanggal!==undefined&&map.repay===undefined&&map.outstanding===undefined)?'vendor':map.tl!==undefined?'tl':null;
         if(kind){blk={kind,map};return;}
       }
       // header matriks rate vendor: DATE | EDN | B | C ...
@@ -678,6 +728,12 @@ function parseWorkbookRows(sheets,fileName){
       if(blk.kind==='matrix'){
         const d=sheetDate(row[0]);if(!d)return;
         blk.matrix.forEach(({col,company})=>{if(cellStr(row[col])!=='')out.vendor.push({tanggal:d,company,rate:sheetNum(row[col],true),_pct:/%/.test(cellStr(row[col]))});});
+        return;
+      }
+      if(blk.kind==='kategori'){
+        const comp=cellStr(g('company')).toUpperCase(), kat=cellStr(g('kategori')).toUpperCase().replace(/\s+/g,'');
+        if(!comp||!kat||/^(GRAND)?TOTAL$/.test(comp))return;
+        out.kategori.push({tanggal:sheetDate(g('tanggal')),company:comp,kategori:kat,outstanding:sheetNum(g('outstanding')),repay:sheetNum(g('repay')),rate:sheetNum(g('rate'),true),_pct:/%/.test(cellStr(g('rate')))});
         return;
       }
       if(blk.kind==='vendor'){
@@ -703,6 +759,8 @@ function parseWorkbookRows(sheets,fileName){
   const fixRate=r=>{if(r.outstanding>0&&r.rate>0){const c=r.repay/r.outstanding*100;if(Math.abs(r.rate*100-c)<Math.abs(r.rate-c))r.rate=r.rate*100;}};
   out.agents.forEach(fixRate);out.tl.forEach(fixRate);
   [out.agentAvg,out.tlAvg].forEach(a=>{if(a)fixRate(a);});
+  if(out.kategori.length&&!out.kategori.some(v=>v._pct)&&Math.max(...out.kategori.map(v=>v.rate))<0.2)out.kategori.forEach(v=>v.rate*=100);
+  out.kategori.forEach(v=>{delete v._pct;if(!v.tanggal)v.tanggal=meta.tanggal||'';});
   if(out.vendor.length&&!out.vendor.some(v=>v._pct)&&Math.max(...out.vendor.map(v=>v.rate))<0.05)out.vendor.forEach(v=>v.rate*=100);
   out.vendor.forEach(v=>delete v._pct);
   if(!meta.jenis)meta.jenis=out.vendor.length?'MONTHLY':'DAILY';
@@ -726,6 +784,14 @@ async function processSheetFile(u){
     }
     const sheets=wb.SheetNames.map(n=>({name:n,rows:X.utils.sheet_to_json(wb.Sheets[n],{header:1,raw:true,defval:''})}));
     const r=parseWorkbookRows(sheets,u.file.name);
+    if(r.kategori.length&&!r.agents.length&&!r.tl.length){
+      u.kind='kategori';
+      u.data={kategori:r.kategori};
+      katValidate(u);
+      u.secs=Math.max(1,Math.round((Date.now()-t0)/1000));
+      u.status='done';
+      renderUp();return;
+    }
     if(!r.agents.length&&!r.tl.length)throw new Error('tidak ada tabel agent/TL yang dikenali. Pastikan baris judul kolom memuat mis. NAME, TL NAME, REPAY AMOUNT, REPAY RATE (lihat ⬇ Template Excel).');
     u.data=normalizeParsed(r);
     if(r.bucket)u.data.bucket=r.bucket;
@@ -1100,14 +1166,15 @@ function num0(v){const n=Number(v);return isNaN(n)?0:n;}
 
 function renderUp(){
   document.getElementById('fileList').innerHTML=UP.map(u=>{
-    const d=u.data, lbl=d?`${d.bucket==='C03'?'CO3':d.bucket} ${d.jenis==='DAILY'?'Daily':'Monthly'}${d.tanggal?' '+dShort(d.tanggal):''}`:(u.file.name||'gambar');
+    const d=u.data, lbl=d&&u.kind==='kategori'?`Kategori tiket ${[...new Set(d.kategori.map(x=>x.tanggal).filter(Boolean))].map(dShort).join(', ')}`:d?`${d.bucket==='C03'?'CO3':d.bucket} ${d.jenis==='DAILY'?'Daily':'Monthly'}${d.tanggal?' '+dShort(d.tanggal):''}`:(u.file.name||'gambar');
     const ic=u.status==='busy'?'⏳':u.status==='error'?'❌':u.status==='saved'?'💾':u.status==='done'?(u.issues&&u.issues.length?'⚠️':'✅'):u.status==='nokey'?'🔑':'…';
     return `<div class="fchip ${u.id===UPSEL?'sel':''}" onclick="UPSEL='${u.id}';renderUp()">${u.isFile?'<span style="width:34px;height:44px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">📊</span>':`<img src="${u.url}" alt="">`}<div style="min-width:0"><div class="fn">${ic} ${escH(lbl)}</div><div class="st">${escH(u.msg)}</div></div>
       <span title="Hapus" onclick="event.stopPropagation();UP=UP.filter(x=>x.id!=='${u.id}');if(UPSEL==='${u.id}')UPSEL=UP[0]?UP[0].id:null;renderUp()" style="margin-left:4px;color:var(--text3)">✕</span></div>`;
   }).join('');
   const u=UP.find(x=>x.id===UPSEL);
   const rb=document.getElementById('resultBox');
-  if(!u||!u.data){rb.innerHTML=u&&u.status==='error'?`<div class="issues warn" style="margin-top:14px">${escH(u.msg)} ${u.isFile?'':`<button class="btn btn-ghost" style="margin-left:8px" onclick="processFile(UP.find(x=>x.id==='${u.id}'))">Coba lagi</button>`}
+  if(u&&u.data&&u.kind==='kategori'){rb.innerHTML=katUpHtml(u);}
+  else if(!u||!u.data){rb.innerHTML=u&&u.status==='error'?`<div class="issues warn" style="margin-top:14px">${escH(u.msg)} ${u.isFile?'':`<button class="btn btn-ghost" style="margin-left:8px" onclick="processFile(UP.find(x=>x.id==='${u.id}'))">Coba lagi</button>`}
       ${u.errDetail?`<button class="btn btn-ghost" style="margin-left:6px" onclick="navigator.clipboard&&navigator.clipboard.writeText(UP.find(x=>x.id==='${u.id}').errDetail).then(()=>this.textContent='✓ Disalin')">📋 Salin detail</button>
       <details style="margin-top:8px"><summary style="font-size:12px">Detail teknis</summary><pre style="white-space:pre-wrap;font-size:11px;margin-top:6px">${escH(u.errDetail)}</pre></details>`:''}
       ${u.isFile?'':`<div style="font-size:12px;margin-top:6px;color:var(--text2)">Alternatif: upload versi Excel/CSV dari laporan ini (lihat tombol ⬇ Template Excel).</div>`}</div>`:'';}
@@ -1175,6 +1242,26 @@ function upAddRow(id){
 }
 function upSet(id,k,v){const u=UP.find(x=>x.id===id);if(!u)return;u.data[k]=v;validate(u);renderUp();}
 
+// ── Upload ringkasan kategori tiket ──
+function katValidate(u){
+  const k=u.data.kategori, iss=[];
+  const noDate=k.filter(x=>!/^\d{4}-\d{2}-\d{2}$/.test(x.tanggal||'')).length;
+  if(noDate)iss.push({text:`${noDate} baris belum ada tanggalnya — isi tanggal data di atas.`});
+  u.issues=iss;
+  const dates=[...new Set(k.map(x=>x.tanggal).filter(Boolean))].sort();
+  u.data.tanggal=noDate?'':dates[dates.length-1]||'';
+  u.msg=iss.length?`${iss.length} perlu dicek`:`✓ ${k.length} baris · ${dates.length} tanggal`;
+}
+function katSetDate(id,v){const u=UP.find(x=>x.id===id);if(!u)return;u.data.kategori.forEach(x=>{if(!x.tanggal||u.data._allDate)x.tanggal=v;});katValidate(u);renderUp();}
+function katUpHtml(u){
+  const k=u.data.kategori, noDate=k.some(x=>!x.tanggal);
+  const rows=k.map(x=>`<tr class="${x.company===OWN?'edn':''}"><td>${escH(x.tanggal||'—')}</td><td>${escH(x.kategori)}</td><td><b>${escH(x.company)}</b></td><td class="n">${fmtRpFull(x.outstanding)}</td><td class="n">${fmtRpFull(x.repay)}</td><td class="n">${fmtPct(x.rate)}</td></tr>`).join('');
+  return `<div class="issues ${u.issues.length?'warn':'ok'}" style="margin-top:12px">🧩 <b>Ringkasan kategori tiket</b> (semua vendor, semua bucket) · ${k.length} baris.
+      ${noDate?`<br>Tanggal data: <input type="date" onchange="katSetDate('${u.id}',this.value)"> <span class="muted">(tanggal data, biasanya H-1 dari tanggal kirim)</span>`:''}
+      ${u.issues.length?'<br>'+u.issues.map(i=>escH(i.text)).join('<br>'):''}</div>
+    <div class="tbl-wrap" style="max-height:420px;margin-top:8px"><table class="t"><thead><tr><th>Tanggal</th><th>Kategori</th><th>Company</th><th class="n">Outstanding</th><th class="n">Repay</th><th class="n">Rate klien</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
 async function saveAll(){
   const ready=UP.filter(x=>x.status==='done'&&x.data&&x.data.tanggal);
   const withIssue=ready.filter(x=>x.issues.length);
@@ -1184,7 +1271,8 @@ async function saveAll(){
   for(const u of ready){
     try{
       const d=u.data;
-      const res=await fetch(API_URL,{method:'POST',body:JSON.stringify({action:'klien_save',jenis:d.jenis,bucket:d.bucket,tanggal:d.tanggal,tl:d.tl,agents:d.agents,vendor:d.vendor})}).then(r=>r.json());
+      const payload=u.kind==='kategori'?{action:'klien_kategori_save',rows:d.kategori}:{action:'klien_save',jenis:d.jenis,bucket:d.bucket,tanggal:d.tanggal,tl:d.tl,agents:d.agents,vendor:d.vendor};
+      const res=await fetch(API_URL,{method:'POST',body:JSON.stringify(payload)}).then(r=>r.json());
       if(!res.success)throw new Error(res.message);
       u.status='saved';u.msg='tersimpan';ok++;
     }catch(e){fail.push(e.message);u.msg='gagal simpan: '+e.message;}
@@ -1192,8 +1280,8 @@ async function saveAll(){
   }
   document.getElementById('uploadStatus').textContent=`${ok} laporan tersimpan${fail.length?' · '+fail.length+' gagal':''}.`;
   if(ok){
-    const first=ready.find(x=>x.status==='saved').data, dt=new Date(first.tanggal+'T00:00:00');
-    BUCKET=first.bucket;markBucket();
+    const first=(ready.find(x=>x.status==='saved'&&x.kind!=='kategori')||ready.find(x=>x.status==='saved')).data, dt=new Date(first.tanggal+'T00:00:00');
+    if(first.bucket){BUCKET=first.bucket;markBucket();}
     document.getElementById('selBulan').value=BULAN[dt.getMonth()];
     document.getElementById('selTahun').value=String(dt.getFullYear());
     loadData();
