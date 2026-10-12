@@ -105,6 +105,14 @@ table.t tr.edn td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
 .lock-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
 @media(max-width:768px){:root{--sidebar-w:0px;}.sidebar{display:none;}.navbar{padding-left:16px;}.main{margin-left:0;padding:18px 16px;}.nav-page-title{display:none;}h1{font-size:22px;}.chart-wrap{height:260px;}}
 
+/* popup */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;align-items:flex-start;justify-content:center;padding:30px 12px;overflow-y:auto;}
+.modal.open{display:flex;}
+.modal-box{background:var(--surface);border-radius:var(--radius);width:100%;max-width:900px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:calc(100vh - 60px);}
+.modal-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);}
+.modal-b{padding:14px 18px;overflow:auto;}
+details.setbox>summary{font-size:12.5px;color:var(--text);}
+details summary{cursor:pointer;font-weight:700;font-size:13px;}
 /* ── halaman cek kelengkapan ── */
 .chips{display:flex;flex-wrap:wrap;gap:6px;}
 .chip{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border:1px solid var(--border);border-radius:999px;font-size:12px;background:var(--surface);color:var(--text2);cursor:pointer;user-select:none;}
@@ -229,14 +237,15 @@ textarea.rem{width:100%;min-height:180px;font-family:inherit;font-size:12.5px;pa
     <button class="btn btn-ghost" id="btnRefresh" onclick="loadData()">↻ Refresh</button>
   </div>
 
-  <div class="setbox">
+  <details class="setbox" id="setBox">
+    <summary>⚙️ Pengaturan cek <span class="muted" style="font-weight:500" id="setSum"></span></summary>
     <div class="row"><b>Kolom wajib diisi saat agent Hadir:</b> <span class="chips" id="wajibChips"></span></div>
     <div class="row"><b>Cek isian tidak wajar:</b> <span class="chips" id="ruleChips"></span></div>
     <div class="row"><b>Hari libur:</b>
       <label class="chip" id="chipSun"><input type="checkbox" id="cbSun" onchange="setSun(this.checked)"> Minggu libur (tidak dicek)</label>
       <span class="muted">Tanggal yang sama sekali tidak diisi oleh semua TL (tapi tanggal sesudahnya ada) otomatis dianggap libur.</span>
     </div>
-  </div>
+  </details>
 
   <div id="content"><div class="empty"><div class="spinner"></div>Memuat & mengecek data (±30 detik)…</div></div>
 </main>
@@ -293,12 +302,13 @@ function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{l
   document.getElementById('cbSun').checked=VIEW.sun;document.getElementById('chipSun').classList.toggle('on',VIEW.sun);
 })();
 function saveSet(){try{localStorage.setItem('tz_cek_set',JSON.stringify({wajib:VIEW.wajib,sun:VIEW.sun,off:VIEW.off}));}catch(e){}}
-function setSun(v){VIEW.sun=v;document.getElementById('chipSun').classList.toggle('on',v);saveSet();run();}
+function setSun(v){VIEW.sun=v;document.getElementById('chipSun').classList.toggle('on',v);saveSet();renderChips();run();}
 function toggleWajib(f){const i=VIEW.wajib.indexOf(f);if(i>=0)VIEW.wajib.splice(i,1);else VIEW.wajib.push(f);saveSet();renderChips();run();}
 function toggleRule(k){const i=VIEW.off.indexOf(k);if(i>=0)VIEW.off.splice(i,1);else VIEW.off.push(k);saveSet();renderChips();run();}
 function on(k){return !VIEW.off.includes(k);}
 function renderChips(){
   document.getElementById('ruleChips').innerHTML=Object.keys(RULES).map(k=>`<label class="chip ${on(k)?'on':''}"><input type="checkbox" ${on(k)?'checked':''} onchange="toggleRule('${k}')"> ${RULES[k]}</label>`).join('');
+  document.getElementById('setSum').textContent=`· ${VIEW.wajib.length} kolom wajib · ${Object.keys(RULES).length-VIEW.off.length} cek aktif${VIEW.sun?' · Minggu libur':''}`;
   const fs=(DATA&&DATA.fields)||DEF_WAJIB;
   document.getElementById('wajibChips').innerHTML=fs.map(f=>{const on=VIEW.wajib.includes(f);return `<label class="chip ${on?'on':''}"><input type="checkbox" ${on?'checked':''} onchange="toggleWajib('${escH(f)}')"> ${escH(f)}</label>`;}).join('');
 }
