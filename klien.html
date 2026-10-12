@@ -560,10 +560,13 @@ const INT_F=[
   ['totalData','Total Data'],['dataBaru','Data Baru'],['callManual','Call Manual'],['callTerhubung','Call Terhubung'],['autocall','Autocall'],
   ['sentuhWA','Sentuh WA'],['responWA','Respon WA'],['sentuhWABA','Sentuh WABA'],['smsManual','SMS Manual'],
   ['ptp','PTP'],['ptpBayar','PTP Bayar'],['jmlDataBayar','Jml Data Bayar'],['dailyPayment','Payment (internal)']];
+const ABSEN_RE=/IZIN|SAKIT|CUTI|ALPA|ALFA|MANGKIR|TANPA|BOLOS/i, OFF_RE=/OFF|LIBUR/i;
+const ptpOk=v=>(+v||0)<=1000?(+v||0):0; // nilai PTP > 1000 per baris = salah input (mis. nominal Rp)
 function intSum(rows,upTo){
   const rs=(rows||[]).filter(r=>!upTo||r.tanggal<=upTo);
-  const s={hari:new Set(rs.map(r=>r.tanggal)).size, absen:rs.filter(r=>r.absensi&&!/MASUK|HADIR/i.test(r.absensi)).length};
-  INT_F.forEach(([k])=>s[k]=rs.reduce((x,r)=>x+(Number(r[k])||0),0));
+  const work=rs.filter(r=>!OFF_RE.test(r.absensi||'')&&!ABSEN_RE.test(r.absensi||''));
+  const s={hari:new Set(work.map(r=>r.tanggal)).size||new Set(rs.map(r=>r.tanggal)).size, absen:rs.filter(r=>ABSEN_RE.test(r.absensi||'')).length, off:rs.filter(r=>OFF_RE.test(r.absensi||'')).length};
+  INT_F.forEach(([k])=>s[k]=rs.reduce((x,r)=>x+(k==='ptp'||k==='ptpBayar'?ptpOk(r[k]):(Number(r[k])||0)),0));
   s.connRate=s.callManual?s.callTerhubung/s.callManual*100:null;
   s.ptpConv=s.ptp?s.ptpBayar/s.ptp*100:null;
   s.waResp=s.sentuhWA?s.responWA/s.sentuhWA*100:null;
@@ -687,7 +690,7 @@ function renderAgentDetail(){
       <button class="btn btn-ghost" onclick="document.getElementById('modalAgent').classList.remove('open')">✕</button></div>
     <div class="modal-b">
       ${s&&s.hari?`<div class="kpis">
-        <div class="kpi"><div class="l">Hari kerja (All Data)</div><div class="v">${s.hari}</div><div class="s">${s.absen?s.absen+' baris tidak masuk':'semua masuk'}</div></div>
+        <div class="kpi"><div class="l">Hari kerja (All Data)</div><div class="v">${s.hari}</div><div class="s">${s.absen?s.absen+' hari izin/sakit/cuti':'tidak ada izin/sakit'}${s.off?' · '+s.off+' hari off':''}</div></div>
         <div class="kpi"><div class="l">Call manual / hari</div><div class="v">${fmtNum(s.callManual/s.hari)}</div><div class="s">terhubung ${s.connRate===null?'—':s.connRate.toFixed(1)+'%'}</div></div>
         <div class="kpi"><div class="l">Sentuh WA / hari</div><div class="v">${fmtNum(s.sentuhWA/s.hari)}</div><div class="s">respon ${s.waResp===null?'—':s.waResp.toFixed(1)+'%'}</div></div>
         <div class="kpi"><div class="l">PTP → bayar</div><div class="v">${fmtNum(s.ptp)} → ${fmtNum(s.ptpBayar)}</div><div class="s">${s.ptpConv===null?'—':s.ptpConv.toFixed(0)+'% jadi bayar'}</div></div>
@@ -864,12 +867,16 @@ function anaCompute(){
       tlInt:modeOf(ir.map(r=>r.teamLeader))||'',holder:modeOf(ir.map(r=>r.agent))||'',ir};});
   // ── 3. Tim internal (TL di All Data) ──
   const TL={};
-  const T=name=>TL[name]=TL[name]||{tl:name,agents:new Set(),days:new Set(),rows:0,absen:0,totalData:0,sWA:0,sGJ:0,sWABA:0,sms:0,call:0,conn:0,auto:0,ptp:0,ptpB:0,pay:0,
+  const T=name=>TL[name]=TL[name]||{tl:name,agents:new Set(),days:new Set(),rows:0,absen:0,off:0,sched:0,totalData:0,sWA:0,sGJ:0,sWABA:0,sms:0,call:0,conn:0,auto:0,ptp:0,ptpB:0,pay:0,
     acc:0,accRed:0,accChronic:0,os:0,repay:0,db:{n:0,src:DB_SRC.map(()=>0),lunas:0,cicil:0}};
-  IR.forEach(r=>{const t=T(r.teamLeader||'(tanpa TL)');t.agents.add(r.agent);t.days.add(r.tanggal);t.rows++;
-    if(r.absensi&&!/MASUK|HADIR/i.test(r.absensi))t.absen++;
+  R.ptpBad=0;
+  IR.forEach(r=>{const t=T(r.teamLeader||'(tanpa TL)');t.agents.add(r.agent);t.days.add(r.tanggal);
+    if(OFF_RE.test(r.absensi||'')){t.off++;return;}
+    t.sched++; if(ABSEN_RE.test(r.absensi||'')){t.absen++;return;}
+    t.rows++;
+    if((+r.ptp||0)>1000||(+r.ptpBayar||0)>1000)R.ptpBad++;
     t.totalData+=+r.totalData||0;t.sWA+=+r.sentuhWA||0;t.sGJ+=+r.sentuhGojek||0;t.sWABA+=+r.sentuhWABA||0;t.sms+=+r.smsManual||0;
-    t.call+=+r.callManual||0;t.conn+=+r.callTerhubung||0;t.auto+=+r.autocall||0;t.ptp+=+r.ptp||0;t.ptpB+=+r.ptpBayar||0;t.pay+=+r.dailyPayment||0;});
+    t.call+=+r.callManual||0;t.conn+=+r.callTerhubung||0;t.auto+=+r.autocall||0;t.ptp+=ptpOk(r.ptp);t.ptpB+=ptpOk(r.ptpBayar);t.pay+=+r.dailyPayment||0;});
   R.accounts.forEach(x=>{if(!x.tlInt)return;const t=T(x.tlInt);t.acc++;if(x.red)t.accRed++;if(x.chronic)t.accChronic++;t.os+=x.a.outstanding;t.repay+=x.a.repay;});
   const tlNames=Object.keys(TL);
   DB.forEach(r=>{const name=bestName(r[1],tlNames)||bestName(r[0],tlNames);if(!name)return;const d=TL[name].db;d.n+=r[4];DB_SRC.forEach((s,i)=>d.src[i]+=+r[6+i]||0);d.lunas+=+r[12]||0;d.cicil+=+r[13]||0;});
@@ -878,11 +885,11 @@ function anaCompute(){
     return {...t,agentsN:t.agents.size,daysN:t.days.size,rate:t.os?t.repay/t.os*100:null,
       cover:t.totalData?Math.min(100,touch/t.totalData*100):null,touch,
       callPer:t.rows?t.call/t.rows:0,waPer:t.rows?(t.sWA+t.sWABA)/t.rows:0,dataPer:t.rows?t.totalData/t.rows:0,
-      connRate:t.call?t.conn/t.call*100:null,ptpConv:t.ptp?t.ptpB/t.ptp*100:null,absenRate:t.rows?t.absen/t.rows*100:0};
+      connRate:t.call?t.conn/t.call*100:null,ptpConv:t.ptp?t.ptpB/t.ptp*100:null,absenRate:t.sched?t.absen/t.sched*100:0};
   }).sort((a,b)=>(a.rate??99)-(b.rate??99));
   // ── 4. Total bucket ──
   const sum=f=>R.tls.reduce((s,t)=>s+(t[f]||0),0);
-  R.tot={totalData:sum('totalData'),sWA:sum('sWA'),sGJ:sum('sGJ'),sWABA:sum('sWABA'),sms:sum('sms'),call:sum('call'),conn:sum('conn'),ptp:sum('ptp'),ptpB:sum('ptpB'),rows:sum('rows'),absen:sum('absen')};
+  R.tot={totalData:sum('totalData'),sWA:sum('sWA'),sGJ:sum('sGJ'),sWABA:sum('sWABA'),sms:sum('sms'),call:sum('call'),conn:sum('conn'),ptp:sum('ptp'),ptpB:sum('ptpB'),rows:sum('rows'),absen:sum('absen'),sched:sum('sched'),off:sum('off')};
   R.tot.touch=R.tot.sWA+R.tot.sGJ+R.tot.sWABA+R.tot.sms+R.tot.conn;
   R.tot.cover=R.tot.totalData?Math.min(100,R.tot.touch/R.tot.totalData*100):null;
   R.db={n:DB.reduce((s,r)=>s+r[4],0),src:DB_SRC.map((s,i)=>DB.reduce((x,r)=>x+(+r[6+i]||0),0)),lunas:DB.reduce((s,r)=>s+(+r[12]||0),0),cicil:DB.reduce((s,r)=>s+(+r[13]||0),0),rows:DB.length};
@@ -911,7 +918,8 @@ function anaRecs(R){
   const lowConn=R.tls.filter(t=>t.connRate!==null&&R.tot.call&&t.connRate<(R.tot.conn/R.tot.call*100)*0.7);
   if(lowConn.length)out.push(`<b>Kualitas call:</b> % terhubung rendah di ${lowConn.map(t=>`${escH(t.tl)} (${t.connRate.toFixed(0)}%)`).join(', ')} vs rata-rata ${(R.tot.conn/R.tot.call*100).toFixed(0)}% — cek kualitas nomor & jam telepon.`);
   const absent=R.tls.filter(t=>t.absenRate>=10);
-  if(absent.length)out.push(`<b>Absensi:</b> ${absent.map(t=>`${escH(t.tl)} ${t.absenRate.toFixed(0)}% hari-agent tidak masuk`).join(', ')}.`);
+  if(absent.length)out.push(`<b>Absensi:</b> ${absent.map(t=>`${escH(t.tl)} ${t.absenRate.toFixed(0)}% hari kerja izin/sakit/cuti`).join(', ')} (hari Off tidak dihitung).`);
+  if(R.ptpBad)out.push(`<b>Cek input:</b> ${R.ptpBad} baris All Data punya angka PTP > 1.000 (kemungkinan diisi nominal rupiah) — tidak dihitung di analisa ini.`);
   if(R.intOk&&R.tot.ptp&&R.tot.ptpB/R.tot.ptp<0.5)out.push(`<b>PTP:</b> hanya ${(R.tot.ptpB/R.tot.ptp*100).toFixed(0)}% janji bayar yang benar-benar bayar — follow-up H-1 dan hari-H janji bayar.`);
   return out;
 }
@@ -940,13 +948,13 @@ function renderAnalisa(){
   ANA.charts.forEach(c=>c.destroy()); ANA.charts=[];
   const R=anaCompute(); ANA.R=R;
   const big=(v,l,s,cls='')=>`<div class="ana-kpi ${cls}"><div class="l">${l}</div><div class="v">${v}</div>${s?`<div class="s">${s}</div>`:''}</div>`;
-  const pct=v=>v===null||v===undefined||isNaN(v)?'—':v.toFixed(0)+'%';
+  const pct=v=>v===null||v===undefined||isNaN(v)?'—':(v<10&&v>0?v.toFixed(1):v.toFixed(0))+'%';
   const per=v=>fmtNum(v);
   const warnInt=!R.intOk?`<div class="issues warn">Data All Data belum termuat${R.intErr?': '+escH(R.intErr):''} — bagian aktivitas tidak lengkap.</div>`:'';
   const recs=anaRecs(R);
   const story=[
     R.ednRank?`Bucket <b>${R.bucket}</b> ${R.isMonthly?'bulan ini (s/d '+dLabel(R.asOf)+')':''}: EDN <b>peringkat ${R.ednRank} dari ${R.comp.length}</b> vendor dengan rate <b>${fmtPct(R.edn.rate)}</b>${R.ednRank>1?`, tertinggal ${fmtPct(R.best.rate-R.edn.rate)} dari ${escH(R.best.c)} (≈ ${fmtRpFull(R.need)} repay).`:' — terbaik.'}`:'',
-    R.accounts.length?`<b>${R.redN} dari ${R.accounts.length}</b> akun EDN berstatus merah${R.chronic.length?`, ${R.chronic.length} di antaranya merah hampir setiap hari`:''}.`:'',
+    R.accounts.length?`<b>${R.redN} dari ${R.accounts.length}</b> akun EDN berstatus merah${R.chronic.length?`; ${R.chronic.length} akun merah di ≥60% hari laporan Daily`:''}.`:'',
     R.badTls.length?`<b>${R.badTls.length} TL</b> di bawah rata-rata EDN: ${R.badTls.map(t=>escH(t.tl)).join(', ')}.`:'',
     R.intOk&&R.tot.cover!==null?`Dari total data, ±<b>${R.tot.cover.toFixed(0)}%</b> tersentuh.`:'',
     R.db.attr?`Pembayaran terbanyak dari <b>${DB_SRC_LABEL[DB_SRC[R.db.src.indexOf(Math.max(...R.db.src))]]}</b> (${(Math.max(...R.db.src)/R.db.attr*100).toFixed(0)}%), lalu ${(()=>{const o=DB_SRC.map((s,i)=>({s,v:R.db.src[i]})).sort((a,b)=>b.v-a.v);return o[1]?`${DB_SRC_LABEL[o[1].s]} (${(o[1].v/R.db.attr*100).toFixed(0)}%)`:'';})()}.`:''
@@ -959,7 +967,7 @@ function renderAnalisa(){
     <div class="ana-kpis">
       ${big(R.ednRank?'#'+R.ednRank+'<small> / '+R.comp.length+'</small>':'—','Peringkat EDN',R.edn?'rate '+fmtPct(R.edn.rate):'',R.ednRank===1?'good':R.ednRank===R.comp.length?'bad':'')}
       ${big(R.need?fmtRpFull(R.need):'Rp 0','Kurang repay vs #1',R.best?escH(R.best.c)+' '+fmtPct(R.best.rate):'',R.need?'bad':'good')}
-      ${big(R.redN+'<small> / '+R.accounts.length+'</small>','Akun merah',R.chronic.length+' kronis (≥60% hari)',R.redN>R.accounts.length/2?'bad':'')}
+      ${big(R.redN+'<small> / '+R.accounts.length+'</small>','Akun merah'+(R.isMonthly?' (Monthly)':''),R.chronic.length+' akun merah di ≥60% hari Daily',R.redN>R.accounts.length/2?'bad':'')}
       ${big(R.badTls.length+'<small> / '+R.tls.filter(t=>t.rate!==null).length+'</small>','TL di bawah rata-rata','rata-rata EDN '+fmtPct(R.ednAvgRate),R.badTls.length?'bad':'good')}
       ${big(R.intOk?pct(R.tot.cover):'—','Data tersentuh',R.intOk?fmtNum(R.tot.touch)+' sentuhan / '+fmtNum(R.tot.totalData)+' data':'',R.tot.cover!==null&&R.tot.cover<80?'bad':'')}
       ${big(R.db.attr?pct(R.db.src[0]/R.db.attr*100):'—','Bayar via WA',R.db.attr?R.db.src[0]+' dari '+R.db.attr+' pembayaran':'Data Bayar kosong')}
@@ -982,7 +990,7 @@ function renderAnalisa(){
   S.push({t:'Tim (TL)',h:`
     ${warnInt}
     <div class="ana-note" style="margin-top:0">TL diurutkan dari rate klien terendah. TL = TL internal di All Data; akun dihubungkan lewat NAMA AKUN = nama/KUFI-ID di laporan klien.</div>
-    <div class="tbl-wrap"><table class="t"><thead><tr><th>TL</th><th class="n">Akun</th><th class="n">Merah</th><th class="n">Kronis</th><th class="n">Rate klien</th><th class="n">Agent</th><th class="n">Tidak masuk</th><th class="n">Data/agent/hr</th><th class="n">Tersentuh</th><th class="n">Call/agent/hr</th><th class="n">% Terhubung</th><th class="n">WA/agent/hr</th><th class="n">PTP→Bayar</th><th class="n">Data bayar</th><th>Sumber bayar</th></tr></thead><tbody>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>TL</th><th class="n">Akun</th><th class="n">Merah</th><th class="n">Kronis</th><th class="n">Rate klien</th><th class="n">Agent</th><th class="n" title="Izin/sakit/cuti dibanding hari kerja terjadwal (Off tidak dihitung)">Izin/sakit</th><th class="n">Data/agent/hr</th><th class="n">Tersentuh</th><th class="n">Call/agent/hr</th><th class="n">% Terhubung</th><th class="n">WA/agent/hr</th><th class="n">PTP→Bayar</th><th class="n">Data bayar</th><th>Sumber bayar</th></tr></thead><tbody>
     ${R.tls.map(t=>{const bad=t.rate!==null&&t.rate<R.ednAvgRate;const d=t.db, at=d.src.reduce((a,b)=>a+b,0);
       return `<tr class="${bad?'flag':''}"><td><b>${escH(t.tl)}</b>${bad?' <span class="pill pill-red">di bawah rata²</span>':''}</td><td class="n">${t.acc||'—'}</td><td class="n">${t.acc?`${t.accRed} <span class="muted">(${pct(t.accRed/t.acc*100)})</span>`:'—'}</td><td class="n">${t.accChronic||''}</td>
         <td class="n"><b>${t.rate===null?'—':fmtPct(t.rate)}</b></td><td class="n">${t.agentsN||'—'}</td><td class="n ${t.absenRate>=10?'bad':''}">${t.rows?pct(t.absenRate):'—'}</td>
@@ -993,8 +1001,8 @@ function renderAnalisa(){
   // 4. Agent zona merah
   S.push({t:'Zona Merah',h:`
     ${R.chronic.length?`<div class="ana-note" style="margin-top:0">${R.chronic.length} akun merah di ≥60% hari laporan Daily. Angka aktivitas = rata-rata per hari dari All Data (dicocokkan lewat nama akun).</div>
-    <div class="tbl-wrap" style="max-height:60vh"><table class="t"><thead><tr><th>Akun (klien)</th><th>Dipegang</th><th>TL</th><th class="n">Hari merah</th><th class="n">Rate</th><th class="n">Tidak masuk</th><th class="n">Data/hr</th><th class="n">Call/hr</th><th class="n">% Terhubung</th><th class="n">WA/hr</th><th class="n">PTP→Bayar</th></tr></thead><tbody>
-    ${R.chronic.map(x=>{const s=x.ir&&x.ir.length?intSum(x.ir):null;const ab=x.ir?x.ir.filter(r=>r.absensi&&!/MASUK|HADIR/i.test(r.absensi)).length:0;
+    <div class="tbl-wrap" style="max-height:60vh"><table class="t"><thead><tr><th>Akun (klien)</th><th>Dipegang</th><th>TL</th><th class="n">Hari merah</th><th class="n">Rate</th><th class="n">Izin/sakit</th><th class="n">Data/hr</th><th class="n">Call/hr</th><th class="n">% Terhubung</th><th class="n">WA/hr</th><th class="n">PTP→Bayar</th></tr></thead><tbody>
+    ${R.chronic.map(x=>{const s=x.ir&&x.ir.length?intSum(x.ir):null;const ab=x.ir?x.ir.filter(r=>ABSEN_RE.test(r.absensi||'')).length:0;
       return `<tr style="cursor:pointer" onclick="anaAgent('${escH(x.a.kufiId||x.a.nama).replace(/'/g,'')}')"><td><b>${escH(x.a.nama)}</b> <span class="muted">${escH(x.a.kufiId)}</span></td><td>${escH(x.holder||'—')}</td><td>${escH(x.tlInt||x.a.tl)}</td><td class="n bad">${x.redDays}/${x.days}</td><td class="n">${fmtPct(x.a.rate)}</td>
       <td class="n ${ab?'bad':''}">${s?ab+' hr':'—'}</td><td class="n">${s?per(s.totalData/s.hari):'—'}</td><td class="n">${s?per(s.callManual/s.hari):'—'}</td><td class="n">${s&&s.connRate!==null?s.connRate.toFixed(0)+'%':'—'}</td><td class="n">${s?per((s.sentuhWA+s.sentuhWABA)/s.hari):'—'}</td><td class="n">${s?`${fmtNum(s.ptp)}→${fmtNum(s.ptpBayar)}`:'—'}</td></tr>`;}).join('')}
     </tbody></table></div>`:'<div class="issues ok">Tidak ada akun yang merah kronis 👍</div>'}`});
@@ -1008,7 +1016,7 @@ function renderAnalisa(){
       ${big(per(T.call/ag),'Call / agent / hari','terhubung '+pct(T.call?T.conn/T.call*100:null))}
       ${big(per((T.sWA+T.sWABA)/ag),'WA / agent / hari','WA + WABA')}
       ${big(T.ptp?fmtNum(T.ptp)+' → '+fmtNum(T.ptpB):'—','PTP → bayar',T.ptp?pct(T.ptpB/T.ptp*100)+' janji ditepati':'')}
-      ${big(pct(T.rows?T.absen/T.rows*100:null),'Tidak masuk','dari '+fmtNum(T.rows)+' hari-agent',T.rows&&T.absen/T.rows>=.1?'bad':'')}
+      ${big(pct(T.sched?T.absen/T.sched*100:null),'Izin / sakit / cuti','dari '+fmtNum(T.sched)+' hari kerja terjadwal (Off tidak dihitung)',T.sched&&T.absen/T.sched>=.1?'bad':'')}
     </div>
     <div class="ana-h3">Sentuhan per kanal (dibanding total data)</div>
     ${chan.map(([l,v])=>`<div class="ana-bar"><span class="nm">${l}</span><span class="track"><span style="width:${T.totalData?Math.min(100,v/T.totalData*100):0}%"></span></span><b>${fmtNum(v)} <span class="muted">(${pct(T.totalData?v/T.totalData*100:null)})</span></b></div>`).join('')}
