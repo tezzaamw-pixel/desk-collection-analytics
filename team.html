@@ -329,6 +329,9 @@ select:focus{border-color:var(--accent);}
 .agent-new-badge:hover{background:#a7f3d0;}
 .label-nonaktif{display:inline-block;padding:1px 7px;border-radius:20px;font-size:10px;font-weight:600;background:#f3f4f6;color:#6b7280;margin-left:6px;vertical-align:middle;white-space:nowrap;}
 .agent-row.rotasi-lama td{opacity:0.5;}
+tr.bsm-moved td{opacity:0.5;}
+tr.bsm-moved td:nth-child(3),tr.bsm-moved td:nth-child(2){opacity:1;}
+tr.bsm-moved .agent-link{color:var(--text3)!important;}
 .agent-row.rotasi-lama td:first-child{opacity:1;}
 
 /* BUCKET ANALYSIS PANEL */
@@ -3457,6 +3460,8 @@ function _bsmRotasiBadge(agentName, bsmRotasiInfo) {
   if (!rotasi) return '';
   if (rotasi.status === 'baru') {
     return formatRotasiLabel('pengganti', rotasi.lawanFirstName || (rotasi.lawan||'').split(' ')[0], rotasi.changeDate);
+  } else if (rotasi.tlPindah) {
+    return formatRotasiLabel('pindahTL', rotasi.tlPindah, rotasi.tlPindahDate || rotasi.changeDate);
   } else if (rotasi.bucketAktif) {
     return formatRotasiLabel('pindah', '', rotasi.changeDate, rotasi.bucketAktif);
   }
@@ -3607,15 +3612,19 @@ function _renderBucketSummary() {
       byAgent[k].days[day] = { payment: r.dailyPayment||0, absensi: r.absensi||'' };
     }
   });
-  // Agent yg tercatat di >1 TL bulan ini → badge "pindah TL"
+  // [PINDAH TL] agent yg tercatat di >1 TL bulan ini: entri TL lama → "Pindah ke TL X tgl"
+  // (abu-abu, data diredupkan, ditaruh di bawah); entri TL terakhir → "Pindahan dari TL Y tgl".
   const _agTls = {};
-  Object.values(byAgent).forEach(a => { (_agTls[a.ag] = _agTls[a.ag] || []).push(a); });
+  Object.values(byAgent).forEach(a => {
+    a._first = a._rows.map(r=>r.tanggal).filter(Boolean).sort()[0] || '';
+    (_agTls[a.ag] = _agTls[a.ag] || []).push(a);
+  });
   Object.values(_agTls).forEach(list => {
     if (list.length < 2) return;
-    list.forEach(a => {
-      const tgl = a._rows.map(r=>r.tanggal).filter(Boolean).sort();
-      const others = list.filter(x=>x!==a).map(x=>x.tl.split(' ')[0]).join(', ');
-      a._pindah = `<span class="label-nonaktif" title="Agent ini juga tercatat di TL ${escH(list.filter(x=>x!==a).map(x=>x.tl).join(', '))} bulan ini" style="background:#fef3c7;color:#92400e">TL ini ${tgl.length?parseInt(tgl[0].slice(8))+'–'+parseInt(tgl[tgl.length-1].slice(8)):''} · juga di ${escH(others)}</span>`;
+    list.sort((x,y)=>x._first.localeCompare(y._first));
+    list.forEach((a,i) => {
+      if (i < list.length-1) { a._movedOut = true; a._pindah = formatRotasiLabel('pindahTL', list[i+1].tl, list[i+1]._first); }
+      else a._pindah = formatRotasiLabel('dariTL', list[i-1].tl, a._first);
     });
   });
 
@@ -3624,8 +3633,8 @@ function _renderBucketSummary() {
   // supaya rank/urutan di modal ini konsisten dgn Tim page, bukan cuma ranking payment
   // murni yang bisa naruh agent nonaktif di tengah/atas kalau payment historisnya besar.
   const agents = Object.values(byAgent).sort((a,b)=>{
-    const aLama = bsmRotasiInfo[a.ag]&&bsmRotasiInfo[a.ag].status==='lama' ? 1 : 0;
-    const bLama = bsmRotasiInfo[b.ag]&&bsmRotasiInfo[b.ag].status==='lama' ? 1 : 0;
+    const aLama = a._movedOut || (!a._pindah && bsmRotasiInfo[a.ag]&&bsmRotasiInfo[a.ag].status==='lama') ? 1 : 0;
+    const bLama = b._movedOut || (!b._pindah && bsmRotasiInfo[b.ag]&&bsmRotasiInfo[b.ag].status==='lama') ? 1 : 0;
     if (aLama !== bLama) return aLama - bLama;
     return b.total-a.total;
   });
@@ -3675,7 +3684,7 @@ function _renderBucketSummary() {
     const tableRows = agents.map((a,i) => {
       const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
       const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
-      const rotasiBadge = _bsmRotasiBadge(a.ag, bsmRotasiInfo);
+      const rotasiBadge = a._pindah ? ((bsmRotasiInfo[a.ag]&&bsmRotasiInfo[a.ag].status==='baru'&&!a._movedOut) ? _bsmRotasiBadge(a.ag, bsmRotasiInfo) : '') : _bsmRotasiBadge(a.ag, bsmRotasiInfo);
       const _abs = calcAbsensi(a._rows);
       const totalDisplay = fmtView(a.total, a, 'rp');
       const dayCells = allDates.map(d => {
@@ -3691,7 +3700,7 @@ function _renderBucketSummary() {
           : info.absensi==='Sakit'?'<span style="color:#6b7280">Sakit</span>':'0';
         return `<td class="${cls}" style="text-align:center">${display}</td>`;
       }).join('');
-      return `<tr>
+      return `<tr class="${a._movedOut?'bsm-moved':''}">
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
         <td style="font-weight:600;color:var(--accent)">${escH(a.tl)}</td>
         <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}${a._pindah||''}</td>
@@ -3735,7 +3744,7 @@ function _renderBucketSummary() {
           const _abs = calcAbsensi(a._rows);
           const totalDisplay = fmtView(a.total, a, 'rp');
           const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
-      const rotasiBadge = _bsmRotasiBadge(a.ag, bsmRotasiInfo);
+      const rotasiBadge = a._pindah ? ((bsmRotasiInfo[a.ag]&&bsmRotasiInfo[a.ag].status==='baru'&&!a._movedOut) ? _bsmRotasiBadge(a.ag, bsmRotasiInfo) : '') : _bsmRotasiBadge(a.ag, bsmRotasiInfo);
           const dayCells = allDates.map(d => {
             const day = parseInt(d.split('-')[2]);
             const info = a.days[day];
@@ -3749,7 +3758,7 @@ function _renderBucketSummary() {
               : info.absensi==='Sakit'?'<span style="color:#6b7280">Sakit</span>':'0';
             return `<td class="${cls}" style="text-align:center">${display}</td>`;
           }).join('');
-          return `<tr>
+          return `<tr class="${a._movedOut?'bsm-moved':''}">
             <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
             <td style="font-weight:600;color:var(--accent);padding-left:16px">${escH(g.tl)}</td>
             <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}${a._pindah||''}</td>
@@ -3793,7 +3802,7 @@ function _renderBucketSummary() {
     const bsmColspanIndividual = 5 + setupCols.length;
     const tableRows = agents.map((a,i) => {
       const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
-      const rotasiBadge = _bsmRotasiBadge(a.ag, bsmRotasiInfo);
+      const rotasiBadge = a._pindah ? ((bsmRotasiInfo[a.ag]&&bsmRotasiInfo[a.ag].status==='baru'&&!a._movedOut) ? _bsmRotasiBadge(a.ag, bsmRotasiInfo) : '') : _bsmRotasiBadge(a.ag, bsmRotasiInfo);
       const _abs = calcAbsensi(a._rows);
       const s = summarizeRows(a._rows);
       const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
@@ -3819,7 +3828,7 @@ function _renderBucketSummary() {
         </div>
       </td>`;
 
-      return `<tr>
+      return `<tr class="${a._movedOut?'bsm-moved':''}">
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
         ${tlAgentCell}
         <td style="text-align:center;width:52px">${_abs.hadir}/${_abs.hariKerja}</td>
@@ -3855,7 +3864,7 @@ function _renderBucketSummary() {
 
         const agentRowsInd = g.agts.map((a, ai) => {
           const moveBadge = getAgentMoveBadge(a.ag, a.aplikasi);
-      const rotasiBadge = _bsmRotasiBadge(a.ag, bsmRotasiInfo);
+      const rotasiBadge = a._pindah ? ((bsmRotasiInfo[a.ag]&&bsmRotasiInfo[a.ag].status==='baru'&&!a._movedOut) ? _bsmRotasiBadge(a.ag, bsmRotasiInfo) : '') : _bsmRotasiBadge(a.ag, bsmRotasiInfo);
           const _abs = calcAbsensi(a._rows);
           const s = summarizeRows(a._rows);
           const agId = 'bsm-ag-' + (_bsmAgIdCounter++);
@@ -3873,7 +3882,7 @@ function _renderBucketSummary() {
               <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}${a._pindah||''}
             </div>
           </td>`;
-          return `<tr>
+          return `<tr class="${a._movedOut?'bsm-moved':''}">
             <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
             ${tlAgentCellInd}
             <td style="text-align:center;width:52px">${_abs.hadir}/${_abs.hariKerja}</td>
@@ -4518,6 +4527,12 @@ function formatRotasiLabel(type, prevFirstName, dateStr, bucketAktif) {
         dayStr=' '+day+' '+BULAN_SHORT[monthIdx];
       }
     }
+  }
+  if(type==='pindahTL'){
+    return `<span class="label-nonaktif" title="Agent pindah ke tim TL ${escH(prevFirstName)} — angka di baris ini adalah periode saat masih di TL ini">Pindah ke TL ${escH(String(prevFirstName||'').split(' ')[0])}${escH(dayStr)}</span>`;
+  }
+  if(type==='dariTL'){
+    return `<span class="label-nonaktif" title="Sebelumnya di tim TL ${escH(prevFirstName)}">Pindahan dari TL ${escH(String(prevFirstName||'').split(' ')[0])}${escH(dayStr)}</span>`;
   }
   if(type==='pengganti'){
     return `<span class="label-pengganti">Pengganti (${escH(prevFirstName)})${escH(dayStr)}</span>`;
@@ -6142,8 +6157,18 @@ function detectRotasiInfo(rows, bucket){
     const bucketAktifLama=bucketLainLama.length?[...new Set(bucketLainLama)][0]:null;
     // Tanggal nonaktif = tanggal terakhir agent lama
     const lamaLastDate=agLastDate[agLama]||'';
-    agentRotasiInfo[agLama]={status:'lama',lawan:agBaru,lawanFirstName:agBaru.split(' ')[0],bucketAktif:bucketAktifLama,akun,changeDate:lamaLastDate};
-    agentRotasiInfo[agBaru]={status:'baru',lawan:agLama,lawanFirstName:firstNameLama,akun,changeDate:baruFirstDate};
+    // [PINDAH TL] agent lama masih aktif di bucket yg sama tapi di TL lain sesudah tanggal ini
+    // → bukan nonaktif, tapi pindah TL. Agent baru yg sebelumnya di TL lain → "Pindahan dari TL".
+    const _tlOf=(ag)=>{const x=(byAgent.get(ag)||[]).find(r=>r.namaAkun===akun);return x?(x.teamLeader||''):'';};
+    const _src=(typeof allRows!=='undefined'&&Array.isArray(allRows))?allRows:rows;
+    const tlLama=_tlOf(agLama), tlBaru=_tlOf(agBaru);
+    const pindahRows=_src.filter(r=>r.agent===agLama&&r.bucket===bucket&&r.teamLeader&&r.teamLeader!==tlLama&&r.tanggal>lamaLastDate).sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+    const asalRows=_src.filter(r=>r.agent===agBaru&&r.bucket===bucket&&r.teamLeader&&r.teamLeader!==tlBaru&&r.tanggal&&r.tanggal<baruFirstDate).sort((a,b)=>a.tanggal.localeCompare(b.tanggal));
+    const tlPindah=pindahRows.length?pindahRows[0].teamLeader:null, tlPindahDate=pindahRows.length?pindahRows[0].tanggal:'';
+    const tlAsal=asalRows.length?asalRows[asalRows.length-1].teamLeader:null;
+    if(!(agentRotasiInfo[agLama]&&agentRotasiInfo[agLama].status==='baru'&&agentRotasiInfo[agLama].changeDate>lamaLastDate))
+      agentRotasiInfo[agLama]={status:'lama',lawan:agBaru,lawanFirstName:agBaru.split(' ')[0],bucketAktif:tlPindah?null:bucketAktifLama,tlPindah,tlPindahDate,akun,changeDate:lamaLastDate};
+    agentRotasiInfo[agBaru]={status:'baru',lawan:agLama,lawanFirstName:firstNameLama,tlAsal,akun,changeDate:baruFirstDate};
   });
   return agentRotasiInfo;
 }
@@ -6245,10 +6270,14 @@ function buildTLRow(t,rank,spv,bulan,tahun,activeSetup,bucket,tlId){
     if(a.rotasi){
       if(a.rotasi.status==='baru'){
         // "Pengganti (NamaDepan) 7 Jul"
-        rotasiLabel=formatRotasiLabel('pengganti', a.rotasi.lawanFirstName, a.rotasi.changeDate);
+        rotasiLabel=formatRotasiLabel('pengganti', a.rotasi.lawanFirstName, a.rotasi.changeDate)
+          +(a.rotasi.tlAsal?formatRotasiLabel('dariTL', a.rotasi.tlAsal, ''):'');
       } else {
         rotasiClass='rotasi-lama';
-        if(a.rotasi.bucketAktif){
+        if(a.rotasi.tlPindah){
+          // "Pindah ke TL Ridwan 6 Okt" (abu-abu, data tetap redup)
+          rotasiLabel=formatRotasiLabel('pindahTL', a.rotasi.tlPindah, a.rotasi.tlPindahDate||a.rotasi.changeDate);
+        } else if(a.rotasi.bucketAktif){
           // "Pindah ke S1-1 HC 7 Jul"
           rotasiLabel=formatRotasiLabel('pindah', '', a.rotasi.changeDate, a.rotasi.bucketAktif);
         } else {
