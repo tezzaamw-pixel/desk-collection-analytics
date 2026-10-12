@@ -3023,11 +3023,13 @@ function _getBsmExportData() {
   // Build per-agent data
   const byAgent = {};
   rows.forEach(r => {
-    const ag = r.agent||'?';
-    if (!byAgent[ag]) byAgent[ag] = {ag, tl:r.teamLeader||'—', total:0, _rows:[], days:{}, aplikasi:r.aplikasi||''};
-    byAgent[ag].total += (r.dailyPayment||0);
-    byAgent[ag]._rows.push(r);
-    if (r.tanggal) byAgent[ag].days[parseInt(r.tanggal.split('-')[2])] = {payment:r.dailyPayment||0, absensi:r.absensi||''};
+    // [FIX] key = agent + TL: agent yg pindah TL di tengah bulan dihitung ke TL masing-masing
+    // (dulu semua payment-nya masuk ke TL baris pertama → total TL lain jadi kurang).
+    const ag = r.agent||'?', k = ag+'||'+(r.teamLeader||'—');
+    if (!byAgent[k]) byAgent[k] = {ag, tl:r.teamLeader||'—', total:0, _rows:[], days:{}, aplikasi:r.aplikasi||''};
+    byAgent[k].total += (r.dailyPayment||0);
+    byAgent[k]._rows.push(r);
+    if (r.tanggal) byAgent[k].days[parseInt(r.tanggal.split('-')[2])] = {payment:r.dailyPayment||0, absensi:r.absensi||''};
   });
   // Sama seperti _renderBucketSummary: agent 'lama' (nonaktif/digantikan) didorong ke
   // paling bawah, supaya urutan Excel/PDF export konsisten dgn yang tampil di layar.
@@ -3589,18 +3591,32 @@ function _renderBucketSummary() {
   // Build per-agent aggregated data from filtered rows
   const byAgent = {};
   rows.forEach(r => {
+    // [FIX] key = agent + TL (agent yg pindah TL tampil di TL masing-masing, payment
+    // tiap tanggal ikut TL yg tercatat di baris itu).
     const ag = r.agent||'?';
     const tl = r.teamLeader||'—';
-    if (!byAgent[ag]) byAgent[ag] = {ag, tl, total:0, days:{}, s:{}, _rows:[], aplikasi:r.aplikasi||''};
-    byAgent[ag].total += (r.dailyPayment||0);
-    byAgent[ag]._rows.push(r);
+    const k = ag+'||'+tl;
+    if (!byAgent[k]) byAgent[k] = {ag, tl, total:0, days:{}, s:{}, _rows:[], aplikasi:r.aplikasi||''};
+    byAgent[k].total += (r.dailyPayment||0);
+    byAgent[k]._rows.push(r);
     ALL_METRICS.forEach(m => {
-      byAgent[ag].s[m.key] = (byAgent[ag].s[m.key]||0) + (r[m.key]||0);
+      byAgent[k].s[m.key] = (byAgent[k].s[m.key]||0) + (r[m.key]||0);
     });
     if (r.tanggal) {
       const day = parseInt(r.tanggal.split('-')[2]);
-      byAgent[ag].days[day] = { payment: r.dailyPayment||0, absensi: r.absensi||'' };
+      byAgent[k].days[day] = { payment: r.dailyPayment||0, absensi: r.absensi||'' };
     }
+  });
+  // Agent yg tercatat di >1 TL bulan ini → badge "pindah TL"
+  const _agTls = {};
+  Object.values(byAgent).forEach(a => { (_agTls[a.ag] = _agTls[a.ag] || []).push(a); });
+  Object.values(_agTls).forEach(list => {
+    if (list.length < 2) return;
+    list.forEach(a => {
+      const tgl = a._rows.map(r=>r.tanggal).filter(Boolean).sort();
+      const others = list.filter(x=>x!==a).map(x=>x.tl.split(' ')[0]).join(', ');
+      a._pindah = `<span class="label-nonaktif" title="Agent ini juga tercatat di TL ${escH(list.filter(x=>x!==a).map(x=>x.tl).join(', '))} bulan ini" style="background:#fef3c7;color:#92400e">TL ini ${tgl.length?parseInt(tgl[0].slice(8))+'–'+parseInt(tgl[tgl.length-1].slice(8)):''} · juga di ${escH(others)}</span>`;
+    });
   });
 
   // Agent berstatus 'lama' (sudah digantikan/nonaktif — lihat bsmRotasiInfo di atas)
@@ -3678,7 +3694,7 @@ function _renderBucketSummary() {
       return `<tr>
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
         <td style="font-weight:600;color:var(--accent)">${escH(a.tl)}</td>
-        <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}</td>
+        <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}${a._pindah||''}</td>
         <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
         <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
         ${dayCells}
@@ -3736,7 +3752,7 @@ function _renderBucketSummary() {
           return `<tr>
             <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
             <td style="font-weight:600;color:var(--accent);padding-left:16px">${escH(g.tl)}</td>
-            <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}</td>
+            <td><span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" style="font-weight:500" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}${a._pindah||''}</td>
             <td style="text-align:center">${_abs.hadir}/${_abs.hariKerja}</td>
             <td class="${payClass(a.total,'')}" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">${totalDisplay}</td>
             ${dayCells}
@@ -3799,7 +3815,7 @@ function _renderBucketSummary() {
           <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(a.tl)}
         </div>
         <div style="font-weight:600;color:var(--text)">
-          <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}
+          <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}${a._pindah||''}
         </div>
       </td>`;
 
@@ -3854,7 +3870,7 @@ function _renderBucketSummary() {
               <span style="font-size:9px;background:var(--surface2);border:1px solid var(--border);padding:0 4px;border-radius:3px;margin-right:3px">TL</span>${escH(g.tl)}
             </div>
             <div style="font-weight:600;color:var(--text)">
-              <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}
+              <span class="agent-link" data-agent-name="${escH(a.ag)}" data-agent-app="${escH(a.aplikasi)}" onclick="toggleAgentPreview('${agId}')">${escH(_bsmDisplayName(a))}</span>${moveBadge}${rotasiBadge}${a._pindah||''}
             </div>
           </td>`;
           return `<tr>
