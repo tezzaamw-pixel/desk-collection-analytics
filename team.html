@@ -7926,7 +7926,7 @@ function openAppSummary(aplikasi, spv, safeSpvId) {
   if (ww) ww.style.display = 'none';
   const tlw = document.getElementById('appsTlWrap');
   if (tlw) tlw.style.display = 'none';
-  _appsTlState = { metric:'dailyPayment', basis:'total', view:'table', bucket:'all', cumul:false };
+  _appsTlState = { metric:'dailyPayment', basis:'total', view:'table', bucket:'all', cumul:false, wkOff:[] };
   const tlCum = document.getElementById('appsTlCumul'); if (tlCum) tlCum.checked = false;
   _appsTlInitBucket(rows);
   if (_appsTlChart) { _appsTlChart.destroy(); _appsTlChart = null; }
@@ -8185,7 +8185,7 @@ function _appsKpiCard(label, val) {
 // Basis "Per agent" = nilai dibagi jumlah agent yg punya data hari itu,
 // supaya TL dgn tim besar & kecil bisa dibandingkan adil.
 // ══════════════════════════════════════════════════════════════
-let _appsTlState = { metric:'dailyPayment', basis:'total', view:'table', bucket:'all', cumul:false };
+let _appsTlState = { metric:'dailyPayment', basis:'total', view:'table', bucket:'all', cumul:false, wkOff:[] };
 let _appsTlChart = null;
 const APPS_TL_METRICS = {
   dailyPayment:  { label:'💰 Payment',        fmt:v=>fmtRp(v),  full:v=>fmtRpFull(v), sum:true },
@@ -8447,63 +8447,83 @@ function renderAppsTl() {
 }
 
 // ── Ringkasan MINGGUAN per TL (di bawah tabel harian Kompare TL) ──
+// Tampilan kartu per minggu (seperti tab Weekly agent). TL bisa dicentang
+// untuk memilih siapa saja yang dibandingkan; peringkat dihitung ulang
+// hanya di antara TL yang dicentang.
+let _appsTlWkNames = [];
+function setAppsTlWk(i, on) {
+  const tl = _appsTlWkNames[i]; if (tl === undefined) return;
+  const off = new Set(_appsTlState.wkOff || []);
+  if (on) off.delete(tl); else off.add(tl);
+  _appsTlState.wkOff = [...off];
+  renderAppsTl();
+}
+function setAppsTlWkAll(on) {
+  _appsTlState.wkOff = on ? [] : _appsTlWkNames.slice();
+  renderAppsTl();
+}
 function _appsTlWeeklyHtml(c) {
   const W = c.weekStat || [];
   if (!W.length) return '';
   const fmt = c.m.fmt, full = c.m.full, isSum = c.m.sum;
-  const thBase = 'padding:6px 8px;font-size:10.5px;font-weight:700;color:var(--text2);background:var(--surface2);white-space:nowrap';
-  const stickyTd = 'position:sticky;left:0;z-index:1;background:var(--surface);padding:6px 8px;text-align:left;border-bottom:1px solid var(--border);min-width:170px';
-  const td = 'padding:6px 9px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap';
-  const rankOf = (t,i) => { const v=t.weekly[i]; if (v===null) return null; return 1 + c.tls.filter(x=>x.weekly[i]!==null && x.weekly[i]>v).length; };
-  const delta = (t,i) => {
-    if (i===0) return '';
+  _appsTlWkNames = c.tls.map(t=>t.tl);
+  const off = new Set(_appsTlState.wkOff || []);
+  const sel = c.tls.filter(t=>!off.has(t.tl));
+  const medal = i => i===0?'🥇':i===1?'🥈':i===2?'🥉':`<span style="font-size:11px;color:var(--text3)">${i+1}.</span>`;
+  const chg = (t,i) => {
+    if (i===0 || W[i].running) return '';
     const v=t.weekly[i], p=t.weekly[i-1];
-    if (v===null || p===null || W[i].running) return '';
-    if (!isSum) { const d=(v-p)*100; return Math.abs(d)<0.005?'':`<div style="font-size:9.5px;font-weight:600;color:${d>0?'#16a34a':'#dc2626'}">${d>0?'▲':'▼'} ${Math.abs(d).toFixed(2)} poin</div>`; }
+    if (v===null || p===null) return '';
+    if (!isSum) { const d=(v-p)*100; if (Math.abs(d)<0.005) return ''; return `<span style="font-size:10px;font-weight:700;color:${d>0?'#16a34a':'#dc2626'}">${d>0?'▲':'▼'}${Math.abs(d).toFixed(2)}</span>`; }
     if (!p) return '';
     const d=(v-p)/p*100; if (Math.abs(d)<0.5) return '';
-    return `<div style="font-size:9.5px;font-weight:600;color:${d>0?'#16a34a':'#dc2626'}">${d>0?'▲':'▼'} ${Math.abs(d).toFixed(0)}%</div>`;
+    return `<span style="font-size:10px;font-weight:700;color:${d>0?'#16a34a':'#dc2626'}" title="dibanding minggu ${W[i-1].w}">${d>0?'▲':'▼'}${Math.abs(d).toFixed(0)}%</span>`;
   };
-  // urut: total bulan (sama dgn tabel harian)
-  const head = `<tr>
-      <th style="position:sticky;left:0;z-index:2;${thBase};text-align:left;min-width:170px">Team Leader</th>
-      ${W.map(w=>`<th style="${thBase};text-align:center;min-width:110px" title="Tanggal ${w.from}–${w.to} · ${w.days} hari berdata">Minggu ${w.w}<div style="font-weight:500;color:var(--text3)">tgl ${w.from}–${w.to}${w.running?' · berjalan':''}</div></th>`).join('')}
-      <th style="${thBase};text-align:center" title="Berapa minggu jadi #1 / terendah">🥇 / 🔻</th>
-    </tr>`;
-  const body = c.tls.map((t,ri)=>`<tr>
-      <td style="${stickyTd}"><div style="font-weight:700;font-size:11.5px;color:var(--text)">${ri+1}. ${escH(t.tl)}</div></td>
-      ${W.map((w,i)=>{
-        const v=t.weekly[i], s={max:w.max,min:w.min}, r=rankOf(t,i);
-        const isWorst = w.n>=2 && v!==null && v===w.min && w.max!==w.min;
-        const isBest = w.n>=2 && v!==null && v===w.max && w.max!==w.min;
-        return `<td style="${td};${_appsTlCellBg(v,s)}" title="${escH(t.tl)} · Minggu ${w.w}: ${v===null?'tidak ada data':escH(full(v))}${r?` · peringkat ${r} dari ${w.n}`:''}">
-          ${v===null?'<span style="color:var(--text3)">·</span>':`<div style="font-weight:${isBest||isWorst?800:600}">${isWorst?'🔻 ':isBest?'🥇 ':''}${fmt(v)}</div><div style="font-size:9.5px;color:var(--text3)">#${r}</div>${delta(t,i)}`}
-        </td>`;}).join('')}
-      <td style="${td};text-align:center"><b style="color:#16a34a">${t.wkWins||0}</b> / <b style="color:#dc2626">${t.wkLasts||0}</b></td>
-    </tr>`).join('');
-  const pick = (i,fn) => { const w=W[i]; if (w.n<2||w.max===w.min) return null; return c.tls.filter(t=>t.weekly[i]===(fn==='min'?w.min:w.max)).map(t=>t.tl); };
-  const sumRow = (label,fn,color) => `<tr style="background:var(--surface2)">
-      <td style="${stickyTd};background:var(--surface2);font-weight:800;font-size:11px;color:${color}">${label}</td>
-      ${W.map((w,i)=>{const n=pick(i,fn);return `<td style="${td};text-align:center;font-weight:700;font-size:10.5px;color:${color};white-space:normal">${n?n.map(escH).join('<br>'):'—'}</td>`;}).join('')}
-      <td style="${td}"></td></tr>`;
-  let totRow = '';
-  if (isSum && !c.perAgent) {
-    const tot = W.map((w,i)=>c.tls.reduce((a,t)=>a+(t.weekly[i]||0),0));
-    totRow = `<tr style="background:var(--surface2)"><td style="${stickyTd};background:var(--surface2);font-weight:800;font-size:11.5px">Total Aplikasi</td>
-      ${tot.map((v,i)=>`<td style="${td};font-weight:700">${fmt(v)}${i&&tot[i-1]&&!W[i].running?`<div style="font-size:9.5px;font-weight:600;color:${v>=tot[i-1]?'#16a34a':'#dc2626'}">${v>=tot[i-1]?'▲':'▼'} ${Math.abs((v-tot[i-1])/tot[i-1]*100).toFixed(0)}%</div>`:''}</td>`).join('')}<td style="${td}"></td></tr>`;
-  }
+  // kartu Minggu 1–4 selalu tampil (Minggu 5 kalau ada data), seperti tab Weekly
+  const cols = [1,2,3,4,5].map(w=>{ const i=W.findIndex(x=>x.w===w); return {w, i, ws: i>=0?W[i]:null}; })
+    .filter(x=>x.w<5 || x.ws);
+  const label = w => `Minggu ${w} (${(w-1)*7+1}-${w===5?31:w*7})`;
+  const cards = cols.map(({w,i,ws})=>{
+    const list = i<0 ? [] : sel.filter(t=>t.weekly[i]!==null).map(t=>({t,v:t.weekly[i]})).sort((a,b)=>b.v-a.v);
+    const n = list.length, worstV = n>=2 ? list[n-1].v : null, bestV = n ? list[0].v : null;
+    const rowsHtml = n ? list.map((e,idx)=>{
+      const worst = n>=2 && e.v===worstV && worstV!==bestV;
+      return `<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--border);font-size:11.5px;${worst?'background:rgba(220,38,38,.10)':''}">
+        <span style="width:22px;flex-shrink:0;text-align:center">${worst?'🔻':medal(idx)}</span>
+        <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;${worst?'color:#dc2626;font-weight:700':''}" title="${escH(e.t.tl)}">${escH(e.t.tl)}</span>
+        ${chg(e.t,i)}
+        <span style="font-weight:700;color:${worst?'#dc2626':'var(--accent)'};flex-shrink:0" title="${escH(full(e.v))}">${fmt(e.v)}</span>
+      </div>`;}).join('')
+      : `<div style="padding:14px;text-align:center;color:var(--text3);font-size:11px">${i<0?'Tidak ada data':'Tidak ada TL yang dipilih'}</div>`;
+    const tot = isSum && !c.perAgent && n ? list.reduce((a,e)=>a+e.v,0) : null;
+    return `<div style="background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;display:flex;flex-direction:column">
+      <div style="padding:8px 10px;background:var(--surface2);font-weight:700;font-size:12px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;gap:8px">
+        <span>📅 ${label(w)}${ws&&ws.running?' <span style="font-weight:600;font-size:10px;color:#d97706">· berjalan</span>':''}</span>
+        <span style="color:var(--text3);font-weight:600">${n} TL</span>
+      </div>
+      <div>${rowsHtml}</div>
+      ${tot!==null?`<div style="padding:6px 8px;font-size:11px;display:flex;justify-content:space-between;background:var(--surface2)"><span style="color:var(--text2);font-weight:600">Total TL dipilih</span><b>${fmt(tot)}</b></div>`:''}
+    </div>`;
+  }).join('');
+  const chips = c.tls.map((t,i)=>{
+    const on = !off.has(t.tl);
+    return `<label style="display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:11px;font-weight:600;cursor:pointer;border:1px solid ${on?'var(--accent)':'var(--border)'};background:${on?'var(--accent-bg, rgba(29,96,200,.08))':'var(--surface)'};color:${on?'var(--accent)':'var(--text3)'};white-space:nowrap">
+      <input type="checkbox" ${on?'checked':''} onchange="setAppsTlWk(${i},this.checked)" style="margin:0;accent-color:var(--accent)"> ${escH(t.tl)}</label>`;
+  }).join('');
   return `
     <div style="margin-top:22px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
-      <div style="font-size:13px;font-weight:800;color:var(--text)">📅 Ringkasan Mingguan per TL</div>
-      <div style="font-size:11px;color:var(--text3)">${escH(c.m.label.replace(/^\S+\s/,''))}${c.perAgent?' per agent':''} · Minggu 1 = tgl 1–7, Minggu 2 = 8–14, Minggu 3 = 15–21, Minggu 4 = 22–28, Minggu 5 = 29–31</div>
+      <div style="font-size:13px;font-weight:800;color:var(--text)">📅 Ranking Mingguan TL</div>
+      <div style="font-size:11px;color:var(--text3)">${escH(c.m.label.replace(/^\S+\s/,''))}${c.perAgent?' per agent':''} · centang TL yang mau dibandingkan; peringkat dihitung ulang di antara TL yang dicentang</div>
     </div>
-    <div style="overflow:auto;border:1px solid var(--border);border-radius:10px;margin-top:8px">
-      <table style="border-collapse:separate;border-spacing:0;font-size:11px;width:max-content;min-width:100%">
-        <thead>${head}</thead>
-        <tbody>${body}${totRow}${sumRow('🔻 Terendah minggu ini','min','#dc2626')}${sumRow('🥇 Terbaik minggu ini','max','#16a34a')}</tbody>
-      </table>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:8px 0 10px">
+      ${chips}
+      <span style="margin-left:4px;font-size:11px">
+        <a href="javascript:void 0" onclick="setAppsTlWkAll(true)" style="color:var(--accent)">Pilih semua</a> ·
+        <a href="javascript:void 0" onclick="setAppsTlWkAll(false)" style="color:var(--accent)">Kosongkan</a>
+      </span>
     </div>
-    <div style="font-size:10.5px;color:var(--text3);margin:6px 0 2px">#angka = peringkat TL di minggu itu · ▲/▼ = naik/turun dibanding minggu sebelumnya${W.some(w=>w.running)?' · minggu "berjalan" belum lengkap, jadi tidak dibandingkan':''}</div>`;
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px;align-items:start">${cards}</div>
+    <div style="font-size:10.5px;color:var(--text3);margin:8px 0 2px">🥇🥈🥉 = 3 teratas · 🔻 = terendah di minggu itu · ▲/▼ = naik/turun dibanding minggu sebelumnya${W.some(w=>w.running)?' · minggu "berjalan" belum lengkap, jadi tidak dibandingkan':''}. Pembagian minggu sama dgn tab Weekly (1-7 / 8-14 / 15-21 / 22-28 / 29-31).</div>`;
 }
 
 async function openAppCmpBulan() {
