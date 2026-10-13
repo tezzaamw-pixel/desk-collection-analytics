@@ -154,6 +154,14 @@ table.t td.flagcell{background:rgba(220,38,38,.18)!important;font-weight:700;}
 .ana-kpi .s{font-size:12px;color:var(--text2);}
 .ana-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:22px;}
 .ana-h3{font-size:13px;font-weight:700;margin:4px 0 10px;}
+.ana-tlpick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:12px;}
+.ana-tlpick b{margin-right:4px;}
+.ana-tlpick label{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface);cursor:pointer;color:var(--text3);}
+.ana-tlpick label.on{border-color:var(--accent);color:var(--accent);background:var(--accent-bg);font-weight:600;}
+.ana-tlpick input{margin:0;}
+.ana-tlpick .lnk{border:none;background:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0 4px;}
+.ana-cmp td.stack{min-width:160px;}
+@media print{.ana-tlpick input,.ana-tlpick .lnk{display:none;}.ana-tlpick label:not(.on){display:none;}}
 .ana-bar{display:grid;grid-template-columns:170px 1fr 150px;align-items:center;gap:10px;font-size:12.5px;margin-bottom:7px;}
 .ana-bar .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px;}
 .ana-bar .nm i{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0;}
@@ -784,7 +792,7 @@ const DB_ID='17hlBKEJjh5UJJQQATcnr-nZl_n3zfjIxQaa7TCFx8wQ';
 const SYS_T=['WA','GOJEK','CALL','SMS','SOSMED','EMAIL'];
 const SYS_LABEL={WA:'WA',GOJEK:'Gojek',CALL:'Call',SMS:'SMS',SOSMED:'Sosial Media',EMAIL:'Email'};
 const SYS_COLOR={WA:'#16a34a',GOJEK:'#0891b2',CALL:'#d97706',SMS:'#7c3aed',SOSMED:'#db2777',EMAIL:'#0f766e'};
-let DATABAYAR={}, ANA={mode:'scroll',slide:0,charts:[]};
+let DATABAYAR={}, ANA={mode:'scroll',slide:0,charts:[],tlOff:{}};
 
 function dbKey(){return `${document.getElementById('selBulan').value}|${document.getElementById('selTahun').value}`;}
 async function loadDataBayar(){
@@ -861,6 +869,30 @@ function nameSim(a,b){a=normKey(a);b=normKey(b);if(!a||!b)return 0;if(a===b)retu
 function bestName(name,list,min=.55){let best=null,sc=0;list.forEach(x=>{const s=nameSim(name,x);if(s>sc){sc=s;best=x;}});return sc>=min?best:null;}
 const modeOf=arr=>{const c={};arr.forEach(x=>{if(x)c[x]=(c[x]||0)+1;});return Object.keys(c).sort((a,b)=>c[b]-c[a])[0]||'';};
 
+// Pembayaran Sistem: sebelumnya disentuh lewat apa? (rows = baris Data Bayar)
+function anaSysOf(DB){
+  const SR=DB.filter(r=>(+r[11]||0)>0), withCol=SR.filter(r=>r[16]===1);
+   const tools=m=>SYS_T.filter((t,k)=>m&(1<<k));
+   const sy={rows:SR.length,acc:SR.reduce((a,r)=>a+(+r[11]||0),0),hasCol:withCol.length,filled:0,filledAcc:0,by:SYS_T.map(()=>0),combo:{},nTools:[0,0,0],perTl:{}};
+   withCol.forEach(r=>{const m=+r[15]||0, tl=r[0]||r[1];const p=sy.perTl[tl]=sy.perTl[tl]||{tl,rows:0,acc:0,filled:0,by:SYS_T.map(()=>0),dates:{},lastFilled:''};
+     p.rows++;p.acc+=+r[11]||0;(p.dates[r[5]]=p.dates[r[5]]||[0,0])[0]++;
+     if(!m)return; sy.filled++;sy.filledAcc+=+r[11]||0;p.filled++;p.dates[r[5]][1]++;if(r[5]>p.lastFilled)p.lastFilled=r[5];
+     const ts=tools(m);ts.forEach(t=>{sy.by[SYS_T.indexOf(t)]++;p.by[SYS_T.indexOf(t)]++;});
+     const c=ts.map(t=>SYS_LABEL[t]).join(' + ');sy.combo[c]=(sy.combo[c]||0)+1;sy.nTools[Math.min(3,ts.length)-1]++;});
+   sy.perTl=Object.values(sy.perTl).map(p=>{const ds=Object.keys(p.dates).sort();
+     // tanggal di akhir yg seluruh barisnya belum dicentang → kemungkinan belum diisi
+     const tail=[];for(let i=ds.length-1;i>=0&&!p.dates[ds[i]][1];i--)tail.unshift(ds[i]);
+     return {...p,emptyTail:p.filled?tail:ds,none:!p.filled};}).sort((a,b)=>(a.filled/a.rows)-(b.filled/b.rows));
+   sy.noCol=[...new Set(SR.filter(r=>r[16]!==1).map(r=>r[0]))];
+   return sy;
+}
+function anaDbOf(DB){const d={n:DB.reduce((s,r)=>s+r[4],0),src:DB_SRC.map((s,i)=>DB.reduce((x,r)=>x+(+r[6+i]||0),0)),lunas:DB.reduce((s,r)=>s+(+r[12]||0),0),cicil:DB.reduce((s,r)=>s+(+r[13]||0),0),email:DB.reduce((s,r)=>s+(+r[17]||0),0),rows:DB.length};d.attr=d.src.reduce((a,b)=>a+b,0);return d;}
+// pilihan TL (tab Data Bayar) utk bagian Sumber Pembayaran & Bayar via Sistem
+function anaTl(t){const o=ANA.tlOff[ANA.R.bucket]=ANA.tlOff[ANA.R.bucket]||new Set();o.has(t)?o.delete(t):o.add(t);anaRerenderKeep();}
+function anaTlAll(on){const o=ANA.tlOff[ANA.R.bucket]=new Set();if(!on)[...new Set(ANA.R.DBrows.map(r=>r[0]))].forEach(t=>o.add(t));anaRerenderKeep();}
+function anaTlOnly(t){const o=ANA.tlOff[ANA.R.bucket]=new Set();[...new Set(ANA.R.DBrows.map(r=>r[0]))].forEach(x=>{if(x!==t)o.add(x);});anaRerenderKeep();}
+function anaRerenderKeep(){const b=document.querySelector('#modalAna .ana-body'),y=b?b.scrollTop:0;renderAnalisa();const b2=document.querySelector('#modalAna .ana-body');if(b2)b2.scrollTop=y;}
+
 function anaCompute(){
   const st=INTERNAL[intKey()], IR=(st&&st.rows)||[];
   const dbs=DATABAYAR[dbKey()], DB=((dbs&&dbs.rows)||[]).filter(r=>r[2]===BUCKET);
@@ -921,21 +953,7 @@ function anaCompute(){
   // hasil per 100 aktivitas
   const yieldOf=(pay,act)=>act?pay/act*100:null;
   R.yield={WA:yieldOf(R.db.src[0],R.tot.sWA+R.tot.sWABA),CALL:yieldOf(R.db.src[2],R.tot.call),SMS:yieldOf(R.db.src[3],R.tot.sms),GOJEK:yieldOf(R.db.src[1],R.tot.sGJ)};
-  // ── 5. Pembayaran Sistem: sebelumnya disentuh lewat apa? ──
-  {const SR=DB.filter(r=>(+r[11]||0)>0), withCol=SR.filter(r=>r[16]===1);
-   const tools=m=>SYS_T.filter((t,k)=>m&(1<<k));
-   const sy={rows:SR.length,acc:SR.reduce((a,r)=>a+(+r[11]||0),0),hasCol:withCol.length,filled:0,filledAcc:0,by:SYS_T.map(()=>0),combo:{},nTools:[0,0,0],perTl:{}};
-   withCol.forEach(r=>{const m=+r[15]||0, tl=r[0]||r[1];const p=sy.perTl[tl]=sy.perTl[tl]||{tl,rows:0,acc:0,filled:0,by:SYS_T.map(()=>0),dates:{},lastFilled:''};
-     p.rows++;p.acc+=+r[11]||0;(p.dates[r[5]]=p.dates[r[5]]||[0,0])[0]++;
-     if(!m)return; sy.filled++;sy.filledAcc+=+r[11]||0;p.filled++;p.dates[r[5]][1]++;if(r[5]>p.lastFilled)p.lastFilled=r[5];
-     const ts=tools(m);ts.forEach(t=>{sy.by[SYS_T.indexOf(t)]++;p.by[SYS_T.indexOf(t)]++;});
-     const c=ts.map(t=>SYS_LABEL[t]).join(' + ');sy.combo[c]=(sy.combo[c]||0)+1;sy.nTools[Math.min(3,ts.length)-1]++;});
-   sy.perTl=Object.values(sy.perTl).map(p=>{const ds=Object.keys(p.dates).sort();
-     // tanggal di akhir yg seluruh barisnya belum dicentang → kemungkinan belum diisi
-     const tail=[];for(let i=ds.length-1;i>=0&&!p.dates[ds[i]][1];i--)tail.unshift(ds[i]);
-     return {...p,emptyTail:p.filled?tail:ds,none:!p.filled};}).sort((a,b)=>(a.filled/a.rows)-(b.filled/b.rows));
-   sy.noCol=[...new Set(SR.filter(r=>r[16]!==1).map(r=>r[0]))];
-   R.sys=sy;}
+  R.DBrows=DB; R.sys=anaSysOf(DB);
   R.chronic=R.accounts.filter(x=>x.chronic).sort((a,b)=>b.redDays-a.redDays||a.a.rate-b.a.rate);
   R.redN=R.accounts.filter(x=>x.red).length;
   R.badTls=R.tls.filter(t=>t.rate!==null&&t.rate<avgRate);
@@ -1067,28 +1085,48 @@ function renderAnalisa(){
     <div class="ana-h3">Sentuhan per kanal (dibanding total data)</div>
     ${chan.map(([l,v])=>`<div class="ana-bar"><span class="nm">${l}</span><span class="track"><span style="width:${T.totalData?Math.min(100,v/T.totalData*100):0}%"></span></span><b>${fmtNum(v)} <span class="muted">(${pct(T.totalData?v/T.totalData*100:null)})</span></b></div>`).join('')}
     <div class="ana-note">"Data tersentuh" = jumlah sentuhan (WA + WABA + Gojek + SMS + call terhubung) ÷ total data, maksimal 100%. Satu data bisa tersentuh lebih dari sekali, jadi angka ini batas atas.</div>`});
-  // 6. Sumber pembayaran
-  const D=R.db;
-  S.push({t:'Sumber Pembayaran',h:`
+  // 6. Sumber pembayaran — bisa difilter per TL (tab Data Bayar)
+  const tabsAll=[...new Set(R.DBrows.map(r=>r[0]))].sort();
+  const off=ANA.tlOff[R.bucket]||new Set(), selTabs=tabsAll.filter(t=>!off.has(t)), filtered=selTabs.length<tabsAll.length;
+  const DBf=R.DBrows.filter(r=>!off.has(r[0]));
+  const D=anaDbOf(DBf);
+  const tabTl=tab=>{const nm=(R.DBrows.find(r=>r[0]===tab)||[])[1]||tab;const names=R.tls.map(t=>t.tl);return R.tls.find(t=>t.tl===(bestName(nm,names)||bestName(tab,names)))||null;};
+  const actOf=tabs=>{const ts=[...new Set(tabs.map(tabTl).filter(Boolean))];const k=f=>ts.reduce((a,t)=>a+(t[f]||0),0);return {sWA:k('sWA'),sWABA:k('sWABA'),call:k('call'),sms:k('sms'),sGJ:k('sGJ'),n:ts.length};};
+  const TA=filtered?actOf(selTabs):{sWA:T.sWA,sWABA:T.sWABA,call:T.call,sms:T.sms,sGJ:T.sGJ};
+  const tlPick=tabsAll.length>1?`<div class="ana-tlpick"><b>TL ditampilkan:</b>${tabsAll.map(t=>`<label class="${off.has(t)?'':'on'}" title="Klik dua kali = hanya TL ini" ondblclick="anaTlOnly(this.dataset.t)" data-t="${escH(t)}"><input type="checkbox" ${off.has(t)?'':'checked'} data-t="${escH(t)}" onchange="anaTl(this.dataset.t)">${escH(t)}</label>`).join('')}
+    <button class="lnk" onclick="anaTlAll(1)">Semua</button><button class="lnk" onclick="anaTlAll(0)">Kosongkan</button>${filtered?`<span class="muted">· ${selTabs.length} dari ${tabsAll.length} TL</span>`:''}</div>`:'';
+  // tabel perbandingan per TL
+  const perTab=selTabs.map(tab=>{const rows=DBf.filter(r=>r[0]===tab), d=anaDbOf(rows), y=anaSysOf(rows), t=tabTl(tab);
+    return {tab,d,y,t,touched:y.hasCol?y.filled/y.hasCol*100:null};}).filter(x=>x.d.n).sort((a,b)=>b.d.n-a.d.n);
+  const cmpTbl=perTab.length>1?`<div class="ana-h3" style="margin-top:16px">Perbandingan per TL — sumber bayar terbanyak</div>
+    <div class="tbl-wrap"><table class="t ana-cmp"><thead><tr><th>TL</th><th class="n">Data bayar</th>${DB_SRC.map(s=>`<th class="n">${DB_SRC_LABEL[s]}</th>`).join('')}<th>Komposisi</th><th class="n" title="Baris Sistem yang dicentang pernah disentuh">Sistem disentuh</th><th class="n" title="Sentuhan WA+WABA per 1 pembayaran WA (All Data TL ini)">WA 1:N</th><th class="n" title="Call manual per 1 pembayaran Call">Call 1:N</th></tr></thead><tbody>
+    ${perTab.map(x=>{const at=x.d.attr||1, top=DB_SRC.map((s,i)=>({s,v:x.d.src[i]})).sort((a,b)=>b.v-a.v)[0];
+      const yWA=x.t&&x.d.src[0]?fmtNum((x.t.sWA+x.t.sWABA)/x.d.src[0]):(x.t&&(x.t.sWA+x.t.sWABA)?'0 bayar':'—'), yC=x.t&&x.d.src[2]?fmtNum(x.t.call/x.d.src[2]):(x.t&&x.t.call?'0 bayar':'—');
+      return `<tr><td><b>${escH(x.tab)}</b>${x.t?`<div class="muted" style="font-size:10.5px">${escH(x.t.tl)}</div>`:''}</td><td class="n"><b>${x.d.n}</b></td>
+      ${DB_SRC.map((s,i)=>`<td class="n" style="${top.s===s&&x.d.src[i]?'font-weight:800;color:'+DB_SRC_COLOR[s]:''}">${x.d.src[i]?`${x.d.src[i]} <span class="muted">${pct(x.d.src[i]/at*100)}</span>`:'<span class="muted">·</span>'}</td>`).join('')}
+      <td class="stack"><div class="ana-stack">${DB_SRC.map((s,i)=>x.d.src[i]?`<span style="width:${x.d.src[i]/at*100}%;background:${DB_SRC_COLOR[s]}" title="${DB_SRC_LABEL[s]}: ${x.d.src[i]}"></span>`:'').join('')}</div></td>
+      <td class="n">${x.touched===null?'—':pct(x.touched)}</td><td class="n">${yWA}</td><td class="n">${yC}</td></tr>`;}).join('')}
+    </tbody></table></div><div class="ana-note">Angka tebal berwarna = sumber terbesar di TL itu. "1:N" = aktivitas All Data TL tsb per 1 pembayaran dari kanal itu (TL dicocokkan lewat nama).</div>`:'';
+  S.push({t:'Sumber Pembayaran',h:`${tlPick}
     ${R.dbErr?`<div class="issues warn">${escH(R.dbErr)}</div>`:''}
     ${R.dbWarn.length?`<div class="issues warn" style="font-size:12px">${R.dbWarn.map(escH).join('<br>')}</div>`:''}
     ${D.attr?`<div class="ana-grid2">
-      <div><div class="ana-h3">Pembayaran per sumber · ${D.n} data bayar</div>
+      <div><div class="ana-h3">Pembayaran per sumber · ${D.n} data bayar${filtered?` <span class="muted">(${selTabs.length} TL dipilih)</span>`:''}</div>
         <div class="ana-stack big">${DB_SRC.map((s,i)=>D.src[i]?`<span style="width:${D.src[i]/D.attr*100}%;background:${DB_SRC_COLOR[s]}" title="${DB_SRC_LABEL[s]}"></span>`:'').join('')}</div>
         ${DB_SRC.map((s,i)=>`<div class="ana-bar"><span class="nm"><i style="background:${DB_SRC_COLOR[s]}"></i>${DB_SRC_LABEL[s]}</span><span class="track"><span style="width:${D.src[i]/D.attr*100}%;background:${DB_SRC_COLOR[s]}"></span></span><b>${D.src[i]} <span class="muted">(${pct(D.src[i]/D.attr*100)})</span></b></div>`).join('')}
         ${D.n>D.attr?`<div class="ana-note">${D.n-D.attr} data bayar belum ditandai sumbernya.</div>`:''}
         ${D.lunas+D.cicil?`<div class="ana-note">Pelunasan <b>${D.lunas}</b> · Cicilan <b>${D.cicil}</b> (hanya tab yang mengisi kolom ini).</div>`:''}</div>
       <div><div class="ana-h3">Efektivitas: berapa aktivitas untuk 1 pembayaran</div>
-        ${R.intOk?[['WA','WA + WABA',T.sWA+T.sWABA,D.src[0]],['CALL','Call manual',T.call,D.src[2]],['SMS','SMS manual',T.sms,D.src[3]],['GOJEK','Gojek',T.sGJ,D.src[1]]].map(([k,l,act,pay])=>`<div class="ana-yield"><div><b>${l}</b><div class="muted">${fmtNum(act)} aktivitas → ${pay} bayar</div></div><div class="v">${pay?'1 : '+fmtNum(act/pay):(act?'0 bayar':'—')}<small>${pay?' aktivitas per bayar':''}</small></div></div>`).join('')
+        ${R.intOk?[['WA','WA + WABA',TA.sWA+TA.sWABA,D.src[0]],['CALL','Call manual',TA.call,D.src[2]],['SMS','SMS manual',TA.sms,D.src[3]],['GOJEK','Gojek',TA.sGJ,D.src[1]]].map(([k,l,act,pay])=>`<div class="ana-yield"><div><b>${l}</b><div class="muted">${fmtNum(act)} aktivitas → ${pay} bayar</div></div><div class="v">${pay?'1 : '+fmtNum(act/pay):(act?'0 bayar':'—')}<small>${pay?' aktivitas per bayar':''}</small></div></div>`).join('')
           :'<div class="muted">Butuh data All Data.</div>'}
         <div class="ana-note">Contoh "1 : 312" = butuh ±312 aktivitas untuk 1 pembayaran — makin kecil angkanya, makin efektif. "Sistem" tidak dihitung di sini; perannya kanal pengingat dibahas di bagian "Bayar via Sistem".</div></div>
-    </div>`:'<div class="empty">Belum ada Data Bayar untuk bucket ini di bulan terpilih.</div>'}`});
-  // 7. Bayar via Sistem
-  const Y=R.sys;
-  if(Y&&Y.rows){
+    </div>${cmpTbl}`:`<div class="empty">${filtered?'Tidak ada data bayar untuk TL yang dipilih.':'Belum ada Data Bayar untuk bucket ini di bulan terpilih.'}</div>`}`});
+  // 7. Bayar via Sistem (ikut pilihan TL di atas)
+  const Y=anaSysOf(DBf);
+  if(R.sys&&R.sys.rows){
     const fp=Y.hasCol?Y.filled/Y.hasCol*100:0, attrAll=D.attr||0, agentPay=attrAll-(D.src[5]||0);
     const combos=Object.entries(Y.combo).sort((a,b)=>b[1]-a[1]).slice(0,6);
-    S.push({t:'Bayar via Sistem',h:`
+    S.push({t:'Bayar via Sistem',h:!Y.rows?`${tlPick}<div class="empty">Tidak ada pembayaran Sistem untuk TL yang dipilih.</div>`:`${tlPick}
       <div class="ana-note" style="margin-top:0">Pembayaran "Sistem" = nasabah bayar sendiri tanpa bukti dari agent. Checklist di Data Bayar mencatat apakah nasabah itu <b>sebelumnya pernah disentuh</b> agent dan lewat apa. Baris yang tidak dicentang sama sekali dihitung "belum diisi / tidak disentuh".</div>
       <div class="ana-kpis">
         ${big(fmtNum(Y.acc),'Data bayar via Sistem',Y.rows+' baris agent-hari'+(attrAll?' · '+pct(D.src[5]/attrAll*100)+' dari semua pembayaran':''))}
