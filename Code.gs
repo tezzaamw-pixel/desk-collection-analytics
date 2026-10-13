@@ -1098,8 +1098,12 @@ function endpointKlien_(e) {
  *   WA | GOJEK | CALL | SMS | SOSIAL MEDIA | SISTEM | PELUNASAN | CICILAN | CATATAN
  * Sel metode boleh angka (jumlah) atau teks penanda ("WA"/"SISTEM"/"1").
  * Kalau hanya 1 metode ditandai teks → seluruh JUMLAH DATA BAYAR dihitung ke metode itu.
+ * Kolom dicari dari JUDUL header (bukan posisi), jadi tab dgn susunan berbeda tetap terbaca.
+ * Grup "PEMBAYARAN SISTEM PERNAH DISENTUH DARIMANA AJA" (checkbox WA/GOJEK/CALL/SMS/SOSMED/EMAIL)
+ * dibaca jadi sentuhMask (bit WA1 GOJEK2 CALL4 SMS8 SOSMED16 EMAIL32).
  * GET ?action=databayar&bulan=Oktober&tahun=2026
- *   → rows: [tab, tl, bucket(NPA/C03/''), agent, jumlah, 'yyyy-mm-dd', wa, gojek, call, sms, sosmed, sistem, lunas, cicil, catatan]
+ *   → rows: [tab, tl, bucket(NPA/C03/''), agent, jumlah, 'yyyy-mm-dd', wa, gojek, call, sms, sosmed, sistem,
+ *            lunas, cicil, catatan, sentuhMask, adaKolomSentuh(1/0), email]
  ***********************************************************************/
 function _dbBucket_(v) {
   const s = String(v || '').toUpperCase().replace(/\s+/g, '');
@@ -1114,23 +1118,44 @@ function endpointDataBayar_(e) {
   const ss = SpreadsheetApp.openById(p.id || CFG.DATABAYAR_ID);
   const tz = Session.getScriptTimeZone();
   const out = [], warn = [], tabs = [];
+  const U = v => String(v === null || v === undefined ? '' : v).toUpperCase().replace(/\s+/g, ' ').trim();
   ss.getSheets().forEach(sh => {
     const last = sh.getLastRow();
     if (last < 3) return;
-    const width = Math.min(15, sh.getMaxColumns());
-    const vals = sh.getRange(1, 1, last, width).getValues().map(r => r.concat(new Array(15 - width).fill('')));
-    const head = vals.slice(0, 3).map(r => r.join('|').toUpperCase()).join('|');
-    if (head.indexOf('NAMA AGENT') < 0) return;
+    const width = Math.min(40, sh.getLastColumn());
+    const vals = sh.getRange(1, 1, last, width).getValues();
+    // ── cari baris header (yg berisi "NAMA AGENT") lalu petakan kolom dari judulnya ──
+    // Baris header 1: judul utama / grup (METODE PEMBAYARAN, PEMBAYARAN SISTEM PERNAH DISENTUH…)
+    // Baris header 2: sub-judul (WA, GOJEK, CALL, SMS, SOSIAL MEDIA, SISTEM, EMAIL)
+    let hr = -1;
+    for (let i = 0; i < Math.min(6, vals.length); i++) if (vals[i].some(v => U(v) === 'NAMA AGENT')) { hr = i; break; }
+    if (hr < 0) return;
+    const h1 = vals[hr], h2 = vals[hr + 1] || [];
+    const map = {}; let grp = '';
+    h1.forEach((x, i) => {
+      if (U(x)) grp = U(x);
+      const lab = U(h2[i]) || U(x);
+      const g = /METODE/.test(grp) ? 'm:' : /DISENTUH/.test(grp) ? 's:' : '';
+      if (lab && map[g + lab] === undefined) map[g + lab] = i;
+    });
+    const col = k => map[k] === undefined ? -1 : map[k];
+    const C = { tl: col('NAMA TL'), bk: col('BUCKET'), ag: col('NAMA AGENT'), jml: col('JUMLAH DATA BAYAR'), tgl: col('TANGGAL'),
+      lunas: col('PELUNASAN'), cicil: col('CICILAN'), cat: col('CATATAN'), email: col('m:EMAIL') >= 0 ? col('m:EMAIL') : col('EMAIL') };
+    if (C.ag < 0 || C.tgl < 0) return;
+    const M = ['WA', 'GOJEK', 'CALL', 'SMS', 'SOSIAL MEDIA', 'SISTEM'].map(k => col('m:' + k));
+    const S = ['WA', 'GOJEK', 'CALL', 'SMS', 'SOSIAL MEDIA', 'EMAIL'].map(k => col('s:' + k));
+    const hasS = S.some(i => i >= 0) ? 1 : 0;
     tabs.push(sh.getName());
     const rows = [];
     let swapped = 0, noDate = 0;
-    vals.forEach(r => {
-      const agent = String(r[3] || '').trim();
+    const at = (r, i) => i >= 0 ? r[i] : '';
+    vals.slice(hr + 2).forEach(r => {
+      const agent = String(at(r, C.ag) || '').trim();
       if (!agent || /NAMA AGENT/i.test(agent)) return;
-      let d = r[5];
+      let d = at(r, C.tgl);
       if (!(d instanceof Date)) {
-        const m = String(d || '').trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);
-        d = m ? new Date(Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3]), Number(m[2]) - 1, Number(m[1])) : null;
+        const m = String(d || '').trim().match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.]?(\d{2,4})?$/);
+        d = m ? new Date(m[3] ? (Number(m[3]) < 100 ? 2000 + Number(m[3]) : Number(m[3])) : (ty || new Date().getFullYear()), Number(m[2]) - 1, Number(m[1])) : null;
       }
       if (d && tm >= 0 && (d.getMonth() !== tm || d.getFullYear() !== ty)) {
         // tanggal terketik terbalik (bulan/hari), mis. 1 Okt tersimpan sbg 10 Jan
@@ -1139,16 +1164,20 @@ function endpointDataBayar_(e) {
         } else return; // bukan bulan ini
       }
       if (!d) { noDate++; return; }
-      const jml = Number(r[4]) || 0;
-      const marks = [6, 7, 8, 9, 10, 11].map(c => r[c]);
+      const jml = Number(at(r, C.jml)) || 0;
+      const marks = M.map(i => at(r, i));
       const src = marks.map(m => typeof m === 'number' ? m : 0);
       const txt = marks.map((m, i) => (typeof m === 'string' && m.trim()) ? i : -1).filter(i => i >= 0);
       const used = src.reduce((a, b) => a + b, 0);
       if (!used && txt.length === 1) src[txt[0]] = jml;
       else if (!used && txt.length > 1) txt.forEach(i => src[i] = 1);
       const flag = v => typeof v === 'number' ? v : (String(v || '').trim() ? 1 : 0);
-      rows.push([sh.getName(), String(r[1] || '').trim(), _dbBucket_(r[2]), agent, jml,
-        Utilities.formatDate(d, tz, 'yyyy-MM-dd')].concat(src, [flag(r[12]), flag(r[13]), String(r[14] || '').trim()]));
+      // checklist "pembayaran sistem pernah disentuh dari mana": bit WA1 GOJEK2 CALL4 SMS8 SOSMED16 EMAIL32
+      let mask = 0;
+      S.forEach((i, k) => { const v = at(r, i); if (v === true || /^(TRUE|YA|V|✓|1)$/i.test(String(v).trim())) mask |= (1 << k); });
+      rows.push([sh.getName(), String(at(r, C.tl) || '').trim(), _dbBucket_(at(r, C.bk)), agent, jml,
+        Utilities.formatDate(d, tz, 'yyyy-MM-dd')].concat(src, [flag(at(r, C.lunas)), flag(at(r, C.cicil)), String(at(r, C.cat) || '').trim(),
+        mask, hasS, flag(at(r, C.email))]));
     });
     // bucket kosong → ikut mayoritas tab
     const cnt = {};
@@ -1158,7 +1187,9 @@ function endpointDataBayar_(e) {
     if (swapped) warn.push(sh.getName() + ': ' + swapped + ' tanggal terbalik (hari/bulan) — sudah dikoreksi otomatis');
     if (noDate) warn.push(sh.getName() + ': ' + noDate + ' baris tanpa tanggal — tidak dihitung');
   });
-  return { success: true, action: 'databayar', tabs, warn, rows: out };
+  return { success: true, action: 'databayar', version: 2, tabs, warn,
+    cols: ['tab','tl','bucket','agent','jumlah','tanggal','wa','gojek','call','sms','sosmed','sistem','lunas','cicil','catatan','sentuhMask','adaKolomSentuh','email'],
+    rows: out };
 }
 
 function doPost(e) {

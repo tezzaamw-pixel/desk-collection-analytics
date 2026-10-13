@@ -780,6 +780,10 @@ const DB_SRC_LABEL={WA:'WA',GOJEK:'Gojek',CALL:'Call',SMS:'SMS',SOSMED:'Sosial M
 const DB_SRC_COLOR={WA:'#16a34a',GOJEK:'#0891b2',CALL:'#d97706',SMS:'#7c3aed',SOSMED:'#db2777',SISTEM:'#94a3b8'};
 const DB_TABS=['ADI HIDAYAT','SATYA SANJAYA','EVIPAH','MIRNA OKTAVIA','SAFITRI DEWI','TONI','DWI','YUNI','RIDWAN','RIZAL'];
 const DB_ID='17hlBKEJjh5UJJQQATcnr-nZl_n3zfjIxQaa7TCFx8wQ';
+// checklist "pembayaran sistem pernah disentuh dari mana" (bit di kolom 15 baris Data Bayar)
+const SYS_T=['WA','GOJEK','CALL','SMS','SOSMED','EMAIL'];
+const SYS_LABEL={WA:'WA',GOJEK:'Gojek',CALL:'Call',SMS:'SMS',SOSMED:'Sosial Media',EMAIL:'Email'};
+const SYS_COLOR={WA:'#16a34a',GOJEK:'#0891b2',CALL:'#d97706',SMS:'#7c3aed',SOSMED:'#db2777',EMAIL:'#0f766e'};
 let DATABAYAR={}, ANA={mode:'scroll',slide:0,charts:[]};
 
 function dbKey(){return `${document.getElementById('selBulan').value}|${document.getElementById('selTahun').value}`;}
@@ -790,38 +794,56 @@ async function loadDataBayar(){
   try{
     const res=await fetch(`${API_URL}?action=databayar&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}&_=${Date.now()}`).then(r=>r.json());
     if(!res.success)throw new Error(res.message||'gagal');
+    if(!res.version)throw new Error('versi lama (belum membaca checklist sentuhan)');
     DATABAYAR[k]={rows:res.rows||[],warn:res.warn||[]};
   }catch(e){
     try{
       DATABAYAR[k]=await loadDataBayarGviz(BULAN.indexOf(bulan),Number(tahun));
-      DATABAYAR[k].warn.unshift('Data Bayar dibaca langsung dari Google Sheets (Code.gs belum punya fitur ini: '+e.message+'). Tab baru di spreadsheet baru ikut terbaca setelah Code.gs diperbarui.');
+      DATABAYAR[k].warn.unshift('Data Bayar dibaca langsung dari Google Sheets karena Code.gs belum diperbarui ('+e.message+') — tetap lengkap, hanya lebih lambat.');
     }catch(e2){DATABAYAR[k]={rows:[],warn:[],error:'Data Bayar gagal dimuat: '+e2.message};}
   }
   return DATABAYAR[k];
 }
-// Cadangan: baca tiap tab lewat Google Visualization API (spreadsheet harus "siapa saja yang punya link")
+// Cadangan (Code.gs lama): baca tiap tab langsung dari tampilan HTML Google Sheets
+// (spreadsheet harus "siapa saja yang punya link"). Kolom dicari dari judul header,
+// checkbox "pembayaran sistem pernah disentuh" ikut terbaca. Format baris = endpoint databayar v2.
 async function loadDataBayarGviz(tm,ty){
-  const rows=[],warn=[];
-  const pad=n=>String(n).padStart(2,'0');
-  for(const tab of DB_TABS){
-    let j;
-    try{const txt=await fetch(`https://docs.google.com/spreadsheets/d/${DB_ID}/gviz/tq?tqx=out:json&headers=0&sheet=${encodeURIComponent(tab)}`).then(r=>r.text());
-      j=JSON.parse(txt.slice(txt.indexOf('{'),txt.lastIndexOf('}')+1));}catch(e){warn.push(tab+': gagal dibaca');continue;}
-    const vals=j.table.rows.map(r=>r.c.map(c=>c?(c.v??null):null));
+  const rows=[],warn=[];const pad=n=>String(n).padStart(2,'0');
+  let tabs=DB_TABS.map(t=>[t,null]);
+  try{const h=await fetch(`https://docs.google.com/spreadsheets/d/${DB_ID}/htmlview`).then(r=>r.text());
+    const m=[...h.matchAll(/name: "([^"]+)", pageUrl: "[^"]*gid=(\d+)/g)].map(x=>[x[1],x[2]]);if(m.length)tabs=m;}catch(e){}
+  const U=v=>String(v||'').toUpperCase().replace(/\s+/g,' ').trim();
+  for(const [tab,gid] of tabs){
+    let grid=[];
+    try{
+      const h=await fetch(`https://docs.google.com/spreadsheets/d/${DB_ID}/htmlview/sheet?headers=true&${gid?'gid='+gid:'sheet='+encodeURIComponent(tab)}`).then(r=>r.text());
+      const d=new DOMParser().parseFromString(h,'text/html');let ri=0;
+      d.querySelectorAll('table tbody tr').forEach(tr=>{const tds=[...tr.children].filter(x=>x.tagName==='TD'&&!x.classList.contains('freezebar-cell'));if(!tds.length)return;grid[ri]=grid[ri]||[];let ci=0;
+        tds.forEach(td=>{while(grid[ri][ci]!==undefined)ci++;const u=td.querySelector('use');const v=u?(/unchecked/.test(u.getAttribute('href')||'')?false:true):td.textContent.trim();
+          for(let a=0;a<(td.rowSpan||1);a++)for(let b=0;b<(td.colSpan||1);b++){grid[ri+a]=grid[ri+a]||[];grid[ri+a][ci+b]=(a===0&&b===0)?v:'';}ci+=td.colSpan||1;});ri++;});
+    }catch(e){warn.push(tab+': gagal dibaca');continue;}
+    const hr=grid.findIndex(r=>r&&r.some(v=>U(v)==='NAMA AGENT'));if(hr<0)continue;
+    const h1=grid[hr],h2=grid[hr+1]||[];const map={};let grp='';
+    h1.forEach((x,i)=>{if(U(x))grp=U(x);const lab=U(h2[i])||U(x);const g=/METODE/.test(grp)?'m:':/DISENTUH/.test(grp)?'s:':'';if(lab&&map[g+lab]===undefined)map[g+lab]=i;});
+    const col=k=>map[k]===undefined?-1:map[k], at=(r,i)=>i>=0?r[i]:'';
+    const M=['WA','GOJEK','CALL','SMS','SOSIAL MEDIA','SISTEM'].map(k=>col('m:'+k)), S=['WA','GOJEK','CALL','SMS','SOSIAL MEDIA','EMAIL'].map(k=>col('s:'+k));
+    const hasS=S.some(i=>i>=0)?1:0, emailC=col('m:EMAIL')>=0?col('m:EMAIL'):col('EMAIL');
+    const num=v=>{const t=String(v??'').trim();if(!t)return null;const n=Number(t.replace(/\./g,'').replace(',','.'));return isNaN(n)?t:n;};
+    const flag=v=>{const n=num(v);return typeof n==='number'?n:(n?1:0);};
     const tabRows=[];let swapped=0;
-    vals.forEach(r=>{
-      const agent=String(r[3]||'').trim(); if(!agent||/NAMA AGENT/i.test(agent))return;
-      let m=String(r[5]||'').match(/Date\((\d+),(\d+),(\d+)/), y,mo,d;
-      if(m){y=+m[1];mo=+m[2];d=+m[3];}
-      else{const t=String(r[5]||'').match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2,4})$/);if(!t)return;y=+t[3]<100?2000+ +t[3]:+t[3];mo=+t[2]-1;d=+t[1];}
+    grid.slice(hr+2).forEach(r=>{
+      const agent=String(at(r,col('NAMA AGENT'))||'').trim();if(!agent||/NAMA AGENT/i.test(agent))return;
+      const t=String(at(r,col('TANGGAL'))||'').match(/^(\d{1,2})[\/\-.](\d{1,2})[\/\-.]?(\d{2,4})?$/);if(!t)return;
+      let y=t[3]?(+t[3]<100?2000+ +t[3]:+t[3]):ty, mo=+t[2]-1, d=+t[1];
       if(tm>=0&&(mo!==tm||y!==ty)){if(d-1===tm&&y===ty){const x=mo+1;mo=tm;d=x;swapped++;}else return;}
-      const jml=Number(r[4])||0, marks=[6,7,8,9,10,11].map(c=>r[c]);
-      const src=marks.map(v=>typeof v==='number'?v:0), txt=marks.map((v,i)=>(typeof v==='string'&&v.trim())?i:-1).filter(i=>i>=0);
+      const jml=Number(num(at(r,col('JUMLAH DATA BAYAR'))))||0, marks=M.map(i=>num(at(r,i)));
+      const src=marks.map(v=>typeof v==='number'?v:0), txt=marks.map((v,i)=>(typeof v==='string'&&v)?i:-1).filter(i=>i>=0);
       const used=src.reduce((a,b)=>a+b,0);
       if(!used&&txt.length===1)src[txt[0]]=jml; else if(!used&&txt.length>1)txt.forEach(i=>src[i]=1);
-      const flag=v=>typeof v==='number'?v:(String(v||'').trim()?1:0);
-      const bk=String(r[2]||'').toUpperCase().replace(/\s+/g,'');
-      tabRows.push([tab,String(r[1]||'').trim(),/^NPA/.test(bk)?'NPA':/^C[O0]3/.test(bk)?'C03':'',agent,jml,`${y}-${pad(mo+1)}-${pad(d)}`].concat(src,[flag(r[12]),flag(r[13]),String(r[14]||'').trim()]));
+      let mask=0;S.forEach((i,k)=>{if(at(r,i)===true)mask|=1<<k;});
+      const bk=U(at(r,col('BUCKET'))).replace(/\s+/g,'');
+      tabRows.push([tab,String(at(r,col('NAMA TL'))||'').trim(),/^NPA/.test(bk)?'NPA':/^C[O0]3/.test(bk)?'C03':'',agent,jml,`${y}-${pad(mo+1)}-${pad(d)}`]
+        .concat(src,[flag(at(r,col('PELUNASAN'))),flag(at(r,col('CICILAN'))),String(at(r,col('CATATAN'))||'').trim(),mask,hasS,flag(at(r,emailC))]));
     });
     const cnt={};tabRows.forEach(x=>{if(x[2])cnt[x[2]]=(cnt[x[2]]||0)+1;});
     const maj=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0]||'';
@@ -899,6 +921,21 @@ function anaCompute(){
   // hasil per 100 aktivitas
   const yieldOf=(pay,act)=>act?pay/act*100:null;
   R.yield={WA:yieldOf(R.db.src[0],R.tot.sWA+R.tot.sWABA),CALL:yieldOf(R.db.src[2],R.tot.call),SMS:yieldOf(R.db.src[3],R.tot.sms),GOJEK:yieldOf(R.db.src[1],R.tot.sGJ)};
+  // ── 5. Pembayaran Sistem: sebelumnya disentuh lewat apa? ──
+  {const SR=DB.filter(r=>(+r[11]||0)>0), withCol=SR.filter(r=>r[16]===1);
+   const tools=m=>SYS_T.filter((t,k)=>m&(1<<k));
+   const sy={rows:SR.length,acc:SR.reduce((a,r)=>a+(+r[11]||0),0),hasCol:withCol.length,filled:0,filledAcc:0,by:SYS_T.map(()=>0),combo:{},nTools:[0,0,0],perTl:{}};
+   withCol.forEach(r=>{const m=+r[15]||0, tl=r[0]||r[1];const p=sy.perTl[tl]=sy.perTl[tl]||{tl,rows:0,acc:0,filled:0,by:SYS_T.map(()=>0),dates:{},lastFilled:''};
+     p.rows++;p.acc+=+r[11]||0;(p.dates[r[5]]=p.dates[r[5]]||[0,0])[0]++;
+     if(!m)return; sy.filled++;sy.filledAcc+=+r[11]||0;p.filled++;p.dates[r[5]][1]++;if(r[5]>p.lastFilled)p.lastFilled=r[5];
+     const ts=tools(m);ts.forEach(t=>{sy.by[SYS_T.indexOf(t)]++;p.by[SYS_T.indexOf(t)]++;});
+     const c=ts.map(t=>SYS_LABEL[t]).join(' + ');sy.combo[c]=(sy.combo[c]||0)+1;sy.nTools[Math.min(3,ts.length)-1]++;});
+   sy.perTl=Object.values(sy.perTl).map(p=>{const ds=Object.keys(p.dates).sort();
+     // tanggal di akhir yg seluruh barisnya belum dicentang → kemungkinan belum diisi
+     const tail=[];for(let i=ds.length-1;i>=0&&!p.dates[ds[i]][1];i--)tail.unshift(ds[i]);
+     return {...p,emptyTail:p.filled?tail:ds,none:!p.filled};}).sort((a,b)=>(a.filled/a.rows)-(b.filled/b.rows));
+   sy.noCol=[...new Set(SR.filter(r=>r[16]!==1).map(r=>r[0]))];
+   R.sys=sy;}
   R.chronic=R.accounts.filter(x=>x.chronic).sort((a,b)=>b.redDays-a.redDays||a.a.rate-b.a.rate);
   R.redN=R.accounts.filter(x=>x.red).length;
   R.badTls=R.tls.filter(t=>t.rate!==null&&t.rate<avgRate);
@@ -916,6 +953,10 @@ function anaRecs(R){
     if(R.intOk&&R.tot.call&&R.yield.CALL!==null&&R.yield.WA!==null&&R.yield.WA>R.yield.CALL*2)
       out.push(`<b>Fokus aktivitas:</b> WA menghasilkan 1 pembayaran tiap ±${fmtNum(100/R.yield.WA)} sentuhan, sedangkan call ${R.yield.CALL?'1 pembayaran tiap ±'+fmtNum(100/R.yield.CALL)+' call':'belum menghasilkan pembayaran dari '+fmtNum(R.tot.call)+' call'}. Pertimbangkan memindahkan sebagian waktu call ke follow-up WA, terutama untuk data yang sudah pernah merespon.`);
   }
+  if(R.sys&&R.sys.filled){const y=R.sys, top=SYS_T.map((t,i)=>({t,v:y.by[i]})).sort((a,b)=>b.v-a.v).filter(x=>x.v);
+    out.push(`<b>Bayar via Sistem bukan "datang sendiri":</b> ${(y.filled/y.hasCol*100).toFixed(0)}% baris pembayaran Sistem ternyata sebelumnya sudah disentuh agent — paling sering lewat ${top.slice(0,3).map(x=>`<b>${SYS_LABEL[x.t]}</b> (${(x.v/y.filled*100).toFixed(0)}%)`).join(', ')}. Kanal ini berperan sebagai pengingat walau pembayarannya tercatat lewat sistem — jangan dikurangi tanpa melihat angka ini.`);}
+  if(R.sys&&R.sys.hasCol){const miss=R.sys.perTl.filter(p=>p.none||p.emptyTail.length>=2);
+    if(miss.length)out.push(`<b>Lengkapi checklist sentuhan:</b> ${miss.map(p=>p.none?`<b>${escH(p.tl)}</b> belum mengisi sama sekali`:`<b>${escH(p.tl)}</b> kosong sejak ${dLabel(p.emptyTail[0])}`).join(', ')}. Tanpa ini pembayaran Sistem terlihat seperti tanpa usaha agent.`);}
   if(R.intOk&&R.tot.cover!==null&&R.tot.cover<80)out.push(`<b>Sentuhan:</b> baru ±${R.tot.cover.toFixed(0)}% dari total data yang tersentuh. Pastikan tiap data minimal tersentuh 1× per hari sebelum mengulang data yang sama.`);
   const lowConn=R.tls.filter(t=>t.connRate!==null&&R.tot.call&&t.connRate<(R.tot.conn/R.tot.call*100)*0.7);
   if(lowConn.length)out.push(`<b>Kualitas call:</b> % terhubung rendah di ${lowConn.map(t=>`${escH(t.tl)} (${t.connRate.toFixed(1)}%)`).join(', ')} vs rata-rata bucket ${(R.tot.conn/R.tot.call*100).toFixed(1)}% — cek kualitas nomor & jam telepon.`);
@@ -1041,7 +1082,36 @@ function renderAnalisa(){
           :'<div class="muted">Butuh data All Data.</div>'}
         <div class="ana-note">Contoh "1 : 312" = butuh ±312 aktivitas untuk 1 pembayaran — makin kecil angkanya, makin efektif. "Sistem" tidak dihitung karena nasabah bayar sendiri tanpa aktivitas.</div></div>
     </div>`:'<div class="empty">Belum ada Data Bayar untuk bucket ini di bulan terpilih.</div>'}`});
-  // 7. Rekomendasi
+  // 7. Bayar via Sistem
+  const Y=R.sys;
+  if(Y&&Y.rows){
+    const fp=Y.hasCol?Y.filled/Y.hasCol*100:0, attrAll=D.attr||0, agentPay=attrAll-(D.src[5]||0);
+    const combos=Object.entries(Y.combo).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    S.push({t:'Bayar via Sistem',h:`
+      <div class="ana-note" style="margin-top:0">Pembayaran "Sistem" = nasabah bayar sendiri tanpa bukti dari agent. Checklist di Data Bayar mencatat apakah nasabah itu <b>sebelumnya pernah disentuh</b> agent dan lewat apa. Baris yang tidak dicentang sama sekali dihitung "belum diisi / tidak disentuh".</div>
+      <div class="ana-kpis">
+        ${big(fmtNum(Y.acc),'Data bayar via Sistem',Y.rows+' baris agent-hari'+(attrAll?' · '+pct(D.src[5]/attrAll*100)+' dari semua pembayaran':''))}
+        ${big(Y.hasCol?pct(fp):'—','Sudah disentuh sebelumnya',Y.hasCol?Y.filled+' dari '+Y.hasCol+' baris dicentang':'kolom checklist belum ada',fp>=60?'good':fp?'':'bad')}
+        ${big(Y.hasCol?fmtNum(Y.hasCol-Y.filled):'—','Belum dicentang','belum diisi atau memang tidak disentuh',Y.hasCol-Y.filled?'bad':'good')}
+        ${attrAll?big(pct((agentPay+Y.filledAcc)/attrAll*100),'Porsi hasil kerja agent',`naik dari ${pct(agentPay/attrAll*100)} kalau Sistem yang sudah disentuh ikut dihitung`,'good'):''}
+      </div>
+      ${Y.filled?`<div class="ana-grid2">
+        <div><div class="ana-h3">Disentuh lewat apa? (dari ${Y.filled} baris yang dicentang)</div>
+          ${SYS_T.map((t,i)=>`<div class="ana-bar"><span class="nm"><i style="background:${SYS_COLOR[t]}"></i>${SYS_LABEL[t]}</span><span class="track"><span style="width:${Y.by[i]/Y.filled*100}%;background:${SYS_COLOR[t]}"></span></span><b>${Y.by[i]} <span class="muted">(${pct(Y.by[i]/Y.filled*100)})</span></b></div>`).join('')}
+          <div class="ana-note">Satu baris bisa dicentang lebih dari satu kanal, jadi total persen > 100%. ${Y.nTools[0]} baris hanya 1 kanal, ${Y.nTools[1]} baris 2 kanal, ${Y.nTools[2]} baris 3 kanal atau lebih.</div></div>
+        <div><div class="ana-h3">Kombinasi kanal paling sering</div>
+          ${combos.map(([c,v])=>`<div class="ana-bar"><span class="nm" style="width:170px">${escH(c)}</span><span class="track"><span style="width:${v/combos[0][1]*100}%"></span></span><b>${v}</b></div>`).join('')}
+          <div class="ana-note">Pola ini menunjukkan kanal yang biasanya "menyiapkan" nasabah sebelum bayar sendiri lewat sistem.</div></div>
+      </div>`:''}
+      ${Y.hasCol?`<div class="ana-h3" style="margin-top:14px">Per TL (tab Data Bayar)</div>
+      <div class="tbl-wrap"><table class="t"><thead><tr><th>TL</th><th class="n">Baris Sistem</th><th class="n">Data bayar</th><th class="n">Dicentang</th>${SYS_T.map(t=>`<th class="n">${SYS_LABEL[t]}</th>`).join('')}<th>Status pengisian</th></tr></thead><tbody>
+      ${Y.perTl.map(p=>`<tr class="${p.none?'flag':''}"><td><b>${escH(p.tl)}</b></td><td class="n">${p.rows}</td><td class="n">${p.acc}</td><td class="n ${p.filled/p.rows<.5?'bad':''}">${p.filled} <span class="muted">(${pct(p.filled/p.rows*100)})</span></td>
+        ${SYS_T.map((t,i)=>`<td class="n">${p.by[i]||'<span class="muted">·</span>'}</td>`).join('')}
+        <td>${p.none?'<span class="pill pill-red">belum diisi sama sekali</span>':p.emptyTail.length?`<span class="pill pill-warn">kosong sejak ${dLabel(p.emptyTail[0])}</span>`:'<span class="pill pill-ok">terisi</span>'}</td></tr>`).join('')}
+      </tbody></table></div>`:''}
+      ${Y.noCol.length?`<div class="ana-note">Tab tanpa kolom checklist: ${Y.noCol.map(escH).join(', ')}.</div>`:''}`});
+  }
+  // 8. Rekomendasi
   S.push({t:'Rekomendasi',h:recs.length?`<ol class="ana-recs">${recs.map(r=>`<li>${r}</li>`).join('')}</ol><div class="ana-note">Rekomendasi dibuat otomatis dari angka di atas — sesuaikan dengan kondisi lapangan.</div>`:'<div class="issues ok">Tidak ada catatan khusus.</div>'});
 
   ANA.n=S.length; if(ANA.slide>=S.length)ANA.slide=0;
