@@ -183,6 +183,21 @@ table.t tr.clk{cursor:pointer;}table.t tr.clk:hover td{background:var(--surface2
 .issues.bad{background:var(--danger-bg);color:var(--danger);}
 .story{font-size:14.5px;line-height:1.65;background:var(--accent-bg);border-left:4px solid var(--accent);padding:12px 16px;border-radius:8px;margin-bottom:16px;}
 .chip2{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);}
+/* layar penuh per kartu */
+.fsbtn{float:right;border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;margin-left:8px;}
+.fsbtn:hover{color:var(--accent);border-color:var(--accent);}
+.fsmode{position:fixed!important;inset:0!important;z-index:800!important;margin:0!important;border-radius:0!important;overflow:auto!important;max-width:none!important;padding:22px 28px!important;background:var(--surface)!important;}
+.fsmode .tbl-wrap{max-height:none!important;}
+.fsmode .vcards{grid-template-columns:repeat(auto-fill,minmax(420px,1fr));}
+body.fs-on{overflow:hidden;}
+.ladder td.gap{font-weight:800;color:var(--danger);}
+.goal{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0 14px;}
+.goal div{background:var(--surface2);border-radius:8px;padding:10px 12px;}
+.goal .l{font-size:11px;color:var(--text3);font-weight:700;}
+.goal .v{font-size:17px;font-weight:800;color:var(--danger);margin-top:2px;}
+.goal .s{font-size:11px;color:var(--text2);}
+.goal .ok .v{color:var(--success);}
+@media print{.fsbtn{display:none;}}
 /* presentasi */
 body.present .sidebar,body.present .navbar,body.present .filters,body.present .projsw,body.present .eyebrow,body.present h1,body.present .lead{display:none!important;}
 body.present .main{margin:0;padding:24px 32px 80px;max-width:none;}
@@ -296,6 +311,7 @@ const BAND_COLOR=['#047857','#22c55e','#a3e635','#facc15','#fb923c','#dc2626'];
 const VCOLOR={EDN:'#1d60c8',PIPER1:'#64748b','MAX-QIN':'#a855f7',CPU:'#0d9488'};
 // kolom baris dari endpoint pinj
 const C={date:0,group:3,asset:4,setup:5,outself:6,dpd:7,comp:8,mgr:9,tlno:10,tl:11,agno:12,ag:13,uid:14,baru:15,masuk:16,intv:17,os:18,paid:19,rate:20,days:21,gross:22,rank:23};
+let CUR={G:{},ednOnly:false};
 let DATA=null, VIEW={date:'',cmp:'',grp:'',ednOnly:false,allGroups:false}, INTERNAL={};
 
 function escH(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
@@ -421,12 +437,14 @@ function render(){
   S.push({id:'agent',t:'Peringkat Agent',h:`
     <div class="tabs2 noprint">${grs.map(x=>`<button class="${x.group===VIEW.grp?'on':''}" onclick="VIEW.grp='${escH(x.group)}';render();document.getElementById('sec-agent').scrollIntoView()">${escH(x.group)}<span class="c">${x.own?x.own.n+'/':''}${x.n}</span></button>`).join('')}
       <label class="chip2" style="margin-left:8px"><input type="checkbox" ${VIEW.ednOnly?'checked':''} onchange="VIEW.ednOnly=this.checked;render()"> EDN saja</label></div>
-    <div class="tbl-wrap" style="max-height:600px"><table class="t"><thead><tr><th class="n">Rank</th><th class="n">Δ</th><th>Agent</th><th>Vendor</th><th>TL</th><th class="n">Hari</th><th class="n">Pokok</th><th class="n">Terbayar</th><th class="n">Rate</th><th class="n">Gross</th><th>Persentil</th></tr></thead><tbody>
-    ${list.map(r=>{const p=pmap[key(r)];return `<tr class="${r.comp===OWN?'own clk':''}" ${r.comp===OWN?`onclick="openAgent('${escH(key(r))}')"`:''}><td class="n"><b>${r.rank}</b><span class="muted">/${g.n}</span></td><td class="n">${dRank(r,p)}</td>
+    <div class="tbl-wrap" style="max-height:600px"><table class="t"><thead><tr><th class="n">Rank</th><th class="n">Δ</th><th>Agent</th><th>Vendor</th><th>TL</th><th class="n">Hari</th><th class="n">Pokok</th><th class="n">Terbayar</th><th class="n">Rate</th><th class="n">Gross</th><th class="n" title="Selisih gross ke agent 1 peringkat di atasnya">Kejar 1 di atas</th><th class="n" title="Selisih gross ke peringkat #1 bucket">Kejar #1</th><th>Persentil</th></tr></thead><tbody>
+    ${list.map(r=>{const p=pmap[key(r)];const all=g.rows.slice().sort((a,b)=>b.gross-a.gross), top=all[0], up=all.filter(x=>x.gross>r.gross).pop();
+      return `<tr class="clk ${r.comp===OWN?'own':''}" onclick="openAgent('${escH(key(r))}')"><td class="n"><b>${r.rank}</b><span class="muted">/${g.n}</span></td><td class="n">${dRank(r,p)}</td>
       <td><b>${escH(r.ag)}</b>${r.baru?' <span class="ib" style="background:#d1fae5;color:#065f46">Baru</span>':''}</td><td><span class="ib" style="background:${vColor(r.comp)}22;color:${vColor(r.comp)}">${escH(r.comp)}</span></td><td>${escH(r.tl)}</td>
       <td class="n ${r.days<g.days?'bad':''}">${r.days}</td><td class="n">${fmtJt(r.os)}</td><td class="n">${fmtJt(r.paid)}</td><td class="n">${fmtPct(r.rate)}</td><td class="n"><b>${fmtRp(r.gross)}</b></td>
+      <td class="n">${up?`<span class="bad">${fmtRp(up.gross-r.gross)}</span>`:'<span class="good">—</span>'}</td><td class="n">${top&&top.gross>r.gross?`<span class="bad">${fmtRp(top.gross-r.gross)}</span>`:'<span class="good">#1 🏆</span>'}</td>
       <td>${bandPill(r.band)}</td></tr>`;}).join('')}
-    </tbody></table></div><div class="vnote">Klik baris EDN untuk detail agent + aktivitas internal (All Data). Hari merah = hari kerja lebih sedikit dari bucket (agent baru/pindahan).</div>`});
+    </tbody></table></div><div class="vnote">Klik nama agent untuk melihat selisih uang ke tiap peringkat di atasnya (+ aktivitas internal untuk agent EDN). "Kejar" = tambahan gross yang dibutuhkan untuk menyamai agent tsb. Hari merah = hari kerja lebih sedikit dari bucket (agent baru/pindahan).</div>`});
   // 6. Tim TL EDN
   const tls={};own.forEach(r=>{const k=r.group+'|'+r.tl;const t=tls[k]=tls[k]||{tl:r.tl,group:r.group,n:0,os:0,paid:0,gross:0,rank:0,top:0,low:0,baru:0};t.n++;t.os+=r.os;t.paid+=r.paid;t.gross+=r.gross;t.rank+=r.rank/G[r.group].n*100;if(r.band<=1&&r.band>=0)t.top++;if(r.band>=4)t.low++;if(r.baru)t.baru++;});
   S.push({id:'tl',t:'Tim TL EDN',h:`<div class="tbl-wrap"><table class="t"><thead><tr><th>TL (versi klien)</th><th>Bucket</th><th class="n">Agent</th><th class="n">Rate</th><th class="n">Gross/agent</th><th class="n">vs median bucket</th><th class="n" title="0% = paling atas bucket">Posisi rata²</th><th class="n">Top 25%</th><th class="n">Zona bawah</th></tr></thead><tbody>
@@ -439,11 +457,15 @@ function render(){
       return `<tr class="clk" onclick="openAgent('${escH(key(r))}')"><td><b>${escH(r.ag)}</b></td><td>${escH(r.group)}</td><td>${escH(r.tl)}</td><td class="n">${r.rank}<span class="muted">/${gg.n}</span></td><td class="n">${dRank(r,p)}</td><td>${bandPill(r.band)}</td><td class="n">${fmtRp(r.gross)}</td><td class="n bad">${gap>0?fmtRp(gap):'<span class="muted">—</span>'}</td><td class="n">${r.days}</td><td class="muted" style="white-space:normal;min-width:160px">${notes}</td></tr>`;}).join('')}
     </tbody></table></div><div class="vnote">Masuk daftar kalau persentil 70–90% / Bottom 10%, atau turun ≥5 peringkat dibanding laporan pembanding. Klik untuk melihat aktivitas internalnya.</div>`:'<div class="issues ok">Tidak ada agent EDN di zona bawah 👍</div>'});
 
-  box.innerHTML=S.map((s,i)=>`<section class="sec card" id="sec-${s.id}" data-i="${i}"><div class="sec-title">${i+1}. ${s.t}</div><div class="card-sub" style="margin-bottom:12px">Laporan ${dLabel(VIEW.date)}${VIEW.cmp?' · pembanding '+dLabel(VIEW.cmp):''}</div>${s.h}</section>`).join('');
+  CUR={G,ednOnly};
+  box.innerHTML=S.map((s,i)=>`<section class="sec card" id="sec-${s.id}" data-i="${i}"><button class="fsbtn noprint" onclick="fsToggle('sec-${s.id}')">⛶ Layar penuh</button><div class="sec-title">${i+1}. ${s.t}</div><div class="card-sub" style="margin-bottom:12px">Laporan ${dLabel(VIEW.date)}${VIEW.cmp?' · pembanding '+dLabel(VIEW.cmp):''}</div>${s.h}</section>`).join('');
   PRES.n=S.length;if(document.body.classList.contains('present'))pShow();
   S.forEach(s=>s.after&&s.after());
 }
-function dRank(r,p){if(!p)return '<span class="d-eq">baru</span>';const d=p.rank-r.rank;return d>0?`<span class="d-up">▲${d}</span>`:d<0?`<span class="d-dn">▼${-d}</span>`:'<span class="d-eq">=</span>';}
+function fsToggle(id){const el=document.getElementById(id);if(!el)return;const on=!el.classList.contains('fsmode');document.querySelectorAll('.fsmode').forEach(x=>x.classList.remove('fsmode'));
+  if(on)el.classList.add('fsmode');document.body.classList.toggle('fs-on',on);const b=el.querySelector('.fsbtn');if(b)b.textContent=on?'✕ Tutup layar penuh':'⛶ Layar penuh';}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelector('.fsmode')){const x=document.querySelector('.fsmode');fsToggle(x.id);}});
+function dRank(r,p){if(!VIEW.cmp)return '<span class="d-eq">—</span>';if(!p)return '<span class="d-eq">baru</span>';const d=p.rank-r.rank;return d>0?`<span class="d-up">▲${d}</span>`:d<0?`<span class="d-dn">▼${-d}</span>`:'<span class="d-eq">=</span>';}
 function bandPill(i){return i<0?'—':`<span class="ib" style="background:${BAND_COLOR[i]}26;color:${i===3?'#a16207':BAND_COLOR[i]}">${BANDS[i]}</span>`;}
 function scoreCard(g,pg,fg,fd){
   const maxG=Math.max(...g.vend.map(v=>v.grossPer),1), lead=g.byGross[0], rl=g.byRate[0];
@@ -456,7 +478,7 @@ function scoreCard(g,pg,fg,fd){
     if(rl===g.own&&lead!==g.own&&Math.abs(g.own.os/g.own.n-lead.os/lead.n)>0.1*lead.os/lead.n)note+=`EDN unggul rate tapi kalah gross — pokok per agent EDN ${fmtJt(g.own.os/g.own.n)} vs ${escH(lead.comp)} ${fmtJt(lead.os/lead.n)}. `;
     if(pOwn)note+=`Sejak ${dShort(VIEW.cmp)}: rate ${pOwn.rate<=g.own.rate?'naik':'turun'} ${fmtPct(Math.abs(g.own.rate-pOwn.rate))}, rata² rank ${g.own.avgRank<=pOwn.avgRank?'membaik':'memburuk'} ${Math.abs(pOwn.avgRank-g.own.avgRank).toFixed(1)}.`;
   }
-  return `<div class="vcard"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)} · ${g.days} hari</span></span><span>${badge}</span></div><div class="vcard-b">
+  return `<div class="vcard" id="vc-${escH(g.group)}"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)} · ${g.days} hari</span></span><span>${badge}<button class="fsbtn noprint" style="float:none" onclick="fsToggle('vc-${escH(g.group)}')">⛶</button></span></div><div class="vcard-b">
     <div class="vrow" style="font-size:10.5px;color:var(--text3);font-weight:700"><span>VENDOR</span><span>GROSS / AGENT</span><span class="n">RATE</span><span class="n">GROSS/AG</span><span class="n">RANK</span></div>
     ${g.byGross.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.grossPer/maxG*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===rl&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span></div>`).join('')}
     ${g.own&&g.vend.length<2?`<div class="vnote">Posisi rata² agent EDN: peringkat <b>${g.own.avgRank.toFixed(1)}</b> dari ${g.n}${g.nEst&&!fg?' (perkiraan)':''} agent di bucket → <b>${fmtPct(g.own.pctl,0)}</b> dari atas · ${g.own.top} agent Top 25%, ${g.own.low} di zona bawah.</div>`:''}
@@ -482,6 +504,28 @@ function pShow(){document.querySelectorAll('.sec').forEach((s,i)=>s.classList.to
 function pGo(d){PRES.i=Math.max(0,Math.min(PRES.n-1,PRES.i+d));pShow();window.scrollTo(0,0);}
 document.addEventListener('keydown',e=>{if(!document.body.classList.contains('present'))return;if(e.key==='ArrowRight'||e.key==='PageDown')pGo(1);if(e.key==='ArrowLeft'||e.key==='PageUp')pGo(-1);if(e.key==='Escape')togglePresent();});
 
+/* ── tangga selisih: uang yg harus dikejar ke tiap peringkat di atas ── */
+function gapLadder(r,g){
+  const seen=new Set(), above=g.rows.filter(x=>x.gross>r.gross&&!seen.has(key(x))&&seen.add(key(x))).sort((a,b)=>b.gross-a.gross);
+  const end=new Date(+VIEW.date.slice(0,4),+VIEW.date.slice(5,7),0), left=Math.max(1,Math.round((end-new Date(VIEW.date+'T00:00:00'))/86400000));
+  const perDay=v=>`≈ ${fmtJt(v/left)}/hari`;
+  // target band: agent terbawah di band yg lebih baik
+  const goals=[];
+  if(above.length){const nb=above.filter(x=>x.band>=0&&x.band<r.band);
+    [[r.band-1,'Naik 1 tingkat persentil'],[1,'Masuk Top 25%'],[0,'Masuk Top 5%']].forEach(([b,l])=>{if(b<0||b>=r.band)return;const t=nb.filter(x=>x.band<=b).sort((a,c)=>a.gross-c.gross)[0];if(t&&!goals.some(x=>x.t===t))goals.push({l:l+` (${BANDS[b]})`,t});});
+    goals.push({l:'Jadi #1 bucket',t:above[0]});}
+  const goalHtml=above.length?`<div class="goal">
+      <div><div class="l">Naik 1 peringkat (kejar ${escH(above[above.length-1].ag)})</div><div class="v">${fmtRp(above[above.length-1].gross-r.gross)}</div><div class="s">${perDay(above[above.length-1].gross-r.gross)}</div></div>
+      ${goals.map(x=>`<div><div class="l">${x.l}</div><div class="v">${fmtRp(x.t.gross-r.gross)}</div><div class="s">kejar ${escH(x.t.ag)} (#${x.t.rank}) · ${perDay(x.t.gross-r.gross)}</div></div>`).join('')}
+    </div>`:`<div class="goal"><div class="ok"><div class="l">Posisi</div><div class="v">#1 di bucket 🏆</div></div></div>`;
+  return `<div class="card-title" style="font-size:13px;margin:4px 0">Uang yang harus dikejar</div>${goalHtml}
+    ${above.length?`<details ${above.length<=12?'open':''}><summary style="font-size:12.5px">Selisih ke setiap peringkat di atasnya (${above.length} agent)</summary>
+    <div class="tbl-wrap" style="max-height:340px;margin-top:6px"><table class="t ladder"><thead><tr><th class="n">Rank</th><th>Agent</th><th>Vendor</th><th>Persentil</th><th class="n">Gross</th><th class="n">Selisih</th><th class="n">Per hari</th></tr></thead><tbody>
+    ${above.map(x=>`<tr class="${x.comp===OWN?'own':''}"><td class="n">${x.rank}</td><td>${escH(x.ag)}</td><td><span class="ib" style="background:${vColor(x.comp)}22;color:${vColor(x.comp)}">${escH(x.comp)}</span></td><td>${bandPill(x.band)}</td><td class="n">${fmtRp(x.gross)}</td><td class="n gap">${fmtRp(x.gross-r.gross)}</td><td class="n muted">${fmtJt((x.gross-r.gross)/left)}</td></tr>`).join('')}
+    </tbody></table></div></details>
+    <div class="vnote">Selisih = tambahan uang masuk (gross) yang dibutuhkan untuk menyamai agent tsb di laporan ${dLabel(VIEW.date)}. "Per hari" dibagi ${left} hari tersisa sampai akhir bulan (agent lain juga terus bertambah, jadi anggap sebagai batas minimal).${CUR.ednOnly?' Laporan ini versi EDN saja — yang terlihat hanya agent EDN di atasnya.':''}</div>`:''}`;
+}
+
 /* ── detail agent + data internal ── */
 async function loadInternal(){
   const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value, k=bulan+'|'+tahun;
@@ -496,11 +540,13 @@ async function openAgent(k){
   document.getElementById('agTitle').textContent=r.ag;
   document.getElementById('agSub').textContent=`${r.comp} · ${r.group} (DPD ${r.dpd}) · TL ${r.tl}${r.baru?' · agent baru, masuk '+r.masuk:''}`;
   const hist=DATA.dates.map(d=>({d,r:rowsAt(d).find(x=>key(x)===k)})).filter(x=>x.r);
-  const n=R.filter(x=>x.group===r.group).length;
+  const gg=CUR.G[r.group]||{n:R.filter(x=>x.group===r.group).length,rows:R.filter(x=>x.group===r.group)}, n=gg.n;
   let h=`<div class="kpis"><div class="kpi"><div class="l">Peringkat</div><div class="v">${r.rank}<small class="muted">/${n}</small></div><div class="s">${BANDS[r.band]||''}</div></div>
     <div class="kpi"><div class="l">Gross</div><div class="v">${fmtJt(r.gross)}</div><div class="s">${r.days} hari kerja · ${fmtJt(r.gross/Math.max(1,r.days))}/hari</div></div>
     <div class="kpi"><div class="l">Rate</div><div class="v">${fmtPct(r.rate)}</div><div class="s">${fmtJt(r.paid)} dari ${fmtJt(r.os)}</div></div></div>`;
+  h+=gapLadder(r,gg);
   if(hist.length>1)h+=`<div class="card-title" style="font-size:13px;margin:6px 0">Riwayat laporan</div><div class="tbl-wrap"><table class="t"><thead><tr><th>Laporan</th><th class="n">Rank</th><th>Persentil</th><th class="n">Gross</th><th class="n">Rate</th></tr></thead><tbody>${hist.map(x=>`<tr><td>${dLabel(x.d)}</td><td class="n">${x.r.rank}</td><td>${bandPill(x.r.band)}</td><td class="n">${fmtRp(x.r.gross)}</td><td class="n">${fmtPct(x.r.rate)}</td></tr>`).join('')}</tbody></table></div>`;
+  if(r.comp!==OWN){document.getElementById('agBody').innerHTML=h;return;}
   h+=`<div id="agInt" style="margin-top:14px"><div class="empty" style="padding:16px"><div class="spinner"></div>Memuat aktivitas internal (All Data Pinjamin)…</div></div>`;
   document.getElementById('agBody').innerHTML=h;
   const IR=(await loadInternal()).filter(x=>normKey(x.namaAkun)===normKey(r.ag)||normKey(x.agent)===normKey(r.ag));
