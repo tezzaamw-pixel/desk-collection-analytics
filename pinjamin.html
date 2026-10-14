@@ -145,12 +145,17 @@ body.fs-open{overflow:hidden;}
 .projsw a.on{background:var(--navy);color:#fff;}
 .sec{scroll-margin-top:70px;}
 .sec-title{font-size:17px;font-weight:800;margin-bottom:4px;}
-.vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;}
+.vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:14px;}
 .vcard{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);}
-.vcard-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);}
+.vcard-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--surface2);}
+.vcard-h .sub{font-size:11.5px;color:var(--text3);font-weight:600;margin-top:2px;white-space:nowrap;}
+.vcard-h .rt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+.fsbtn.ico{float:none;margin:0;padding:3px 8px;font-size:13px;line-height:1;}
 .vcard-h .g{font-weight:800;font-size:15px;}
 .vcard-b{padding:10px 14px;}
-.vrow{display:grid;grid-template-columns:110px 1fr 64px 86px 48px;gap:8px;align-items:center;font-size:12px;padding:5px 0;border-top:1px dashed var(--border);}
+.vrow{display:grid;grid-template-columns:118px minmax(50px,1fr) 66px 74px 44px;gap:10px;align-items:center;font-size:12.5px;padding:6px 0;border-top:1px dashed var(--border);}
+.vrow>*{white-space:nowrap;}
+.vrow.hd{font-size:10.5px;color:var(--text3);font-weight:700;letter-spacing:.03em;border-top:none;padding-top:0;}
 .vrow:first-child{border-top:none;}
 .vrow.own{font-weight:800;}
 .vrow .nm{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -207,7 +212,7 @@ body.present .sec.cur{display:block;}
 .pnav{display:none;}
 body.present .pnav{display:flex;position:fixed;left:0;right:0;bottom:0;justify-content:space-between;align-items:center;padding:10px 24px;background:var(--surface);border-top:1px solid var(--border);z-index:300;}
 @media print{.sidebar,.navbar,.filters,.projsw,.pnav,.noprint,.lock-overlay{display:none!important;}.main{margin:0!important;padding:0!important;}.card{break-inside:avoid;box-shadow:none;}body{background:#fff;}}
-@media(max-width:768px){.vcards{grid-template-columns:1fr;}.vrow{grid-template-columns:70px 1fr 54px 78px 40px;}}
+@media(max-width:768px){.vcards{grid-template-columns:1fr;}.vrow{grid-template-columns:96px minmax(30px,1fr) 58px 66px 38px;gap:6px;}}
 </style>
 </head>
 <body>
@@ -462,12 +467,12 @@ function render(){
 
   CUR={G,ednOnly};
   box.innerHTML=S.map((s,i)=>`<section class="sec card" id="sec-${s.id}" data-i="${i}"><button class="fsbtn noprint" onclick="fsToggle('sec-${s.id}')">⛶ Layar penuh</button><div class="sec-title">${i+1}. ${s.t}</div><div class="card-sub" style="margin-bottom:12px">Laporan ${dLabel(VIEW.date)}${VIEW.cmp?' · pembanding '+dLabel(VIEW.cmp):''}</div>${s.h}</section>`).join('');
-  if(VIEW.fs){const el=document.getElementById(VIEW.fs);if(el){el.classList.add('fsmode');const b=el.querySelector('.fsbtn');if(b)b.textContent='✕ Tutup layar penuh';}else{VIEW.fs='';document.body.classList.remove('fs-on');}}
+  if(VIEW.fs){const el=document.getElementById(VIEW.fs);if(el){el.classList.add('fsmode');const b=el.querySelector('.fsbtn');if(b)b.textContent=b.classList.contains('ico')?'✕':'✕ Tutup layar penuh';}else{VIEW.fs='';document.body.classList.remove('fs-on');}}
   PRES.n=S.length;if(document.body.classList.contains('present'))pShow();
   S.forEach(s=>s.after&&s.after());
 }
 function fsToggle(id){const el=document.getElementById(id);if(!el)return;const on=!el.classList.contains('fsmode');document.querySelectorAll('.fsmode').forEach(x=>x.classList.remove('fsmode'));
-  VIEW.fs=on?id:'';if(on)el.classList.add('fsmode');document.body.classList.toggle('fs-on',on);const b=el.querySelector('.fsbtn');if(b)b.textContent=on?'✕ Tutup layar penuh':'⛶ Layar penuh';}
+  VIEW.fs=on?id:'';if(on)el.classList.add('fsmode');document.body.classList.toggle('fs-on',on);document.querySelectorAll('.fsbtn').forEach(x=>x.textContent=x.classList.contains('ico')?'⛶':'⛶ Layar penuh');const b=el.querySelector('.fsbtn');if(b)b.textContent=b.classList.contains('ico')?(on?'✕':'⛶'):(on?'✕ Tutup layar penuh':'⛶ Layar penuh');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelector('.fsmode')){const x=document.querySelector('.fsmode');fsToggle(x.id);}});
 function dRank(r,p){if(!VIEW.cmp)return '<span class="d-eq">—</span>';if(!p)return '<span class="d-eq">baru</span>';const d=p.rank-r.rank;return d>0?`<span class="d-up">▲${d}</span>`:d<0?`<span class="d-dn">▼${-d}</span>`:'<span class="d-eq">=</span>';}
 function bandPill(i){return i<0?'—':`<span class="ib" style="background:${BAND_COLOR[i]}26;color:${i===3?'#a16207':BAND_COLOR[i]}">${BANDS[i]}</span>`;}
@@ -482,8 +487,8 @@ function scoreCard(g,pg,fg,fd){
     if(rl===g.own&&lead!==g.own&&Math.abs(g.own.os/g.own.n-lead.os/lead.n)>0.1*lead.os/lead.n)note+=`EDN unggul rate tapi kalah gross — pokok per agent EDN ${fmtJt(g.own.os/g.own.n)} vs ${escH(lead.comp)} ${fmtJt(lead.os/lead.n)}. `;
     if(pOwn)note+=`Sejak ${dShort(VIEW.cmp)}: rate ${pOwn.rate<=g.own.rate?'naik':'turun'} ${fmtPct(Math.abs(g.own.rate-pOwn.rate))}, rata² rank ${g.own.avgRank<=pOwn.avgRank?'membaik':'memburuk'} ${Math.abs(pOwn.avgRank-g.own.avgRank).toFixed(1)}.`;
   }
-  return `<div class="vcard" id="vc-${escH(g.group)}"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)} · ${g.days} hari</span></span><span>${badge}<button class="fsbtn noprint" style="float:none" onclick="fsToggle('vc-${escH(g.group)}')">⛶</button></span></div><div class="vcard-b">
-    <div class="vrow" style="font-size:10.5px;color:var(--text3);font-weight:700"><span>VENDOR</span><span>GROSS / AGENT</span><span class="n">RATE</span><span class="n">GROSS/AG</span><span class="n">RANK</span></div>
+  return `<div class="vcard" id="vc-${escH(g.group)}"><div class="vcard-h"><div><div class="g">${escH(g.group)}</div><div class="sub">DPD ${escH(g.dpd)} · ${g.days} hari kerja · ${g.n} agent</div></div><div class="rt">${badge}<button class="fsbtn ico noprint" title="Layar penuh" onclick="fsToggle('vc-${escH(g.group)}')">⛶</button></div></div><div class="vcard-b">
+    <div class="vrow hd"><span>VENDOR</span><span></span><span class="n">RATE</span><span class="n">GROSS/AGENT</span><span class="n" title="Rata-rata peringkat agent">RANK</span></div>
     ${g.byGross.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.grossPer/maxG*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===rl&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span></div>`).join('')}
     ${g.own&&g.vend.length<2?`<div class="vnote">Posisi rata² agent EDN: peringkat <b>${g.own.avgRank.toFixed(1)}</b> dari ${g.n}${g.nEst&&!fg?' (perkiraan)':''} agent di bucket → <b>${fmtPct(g.own.pctl,0)}</b> dari atas · ${g.own.top} agent Top 25%, ${g.own.low} di zona bawah.</div>`:''}
     ${g.vend.length<2&&fg&&fg.vend.length>1?`<div class="vnote" style="margin-top:10px;font-weight:700">Vendor lain — laporan lengkap ${dShort(fd)}</div>
