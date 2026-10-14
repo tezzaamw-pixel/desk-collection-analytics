@@ -920,7 +920,7 @@ function TEST_rankdata() {
  * klien.html memakai Gemini, lalu disimpan ke 3 sheet berikut (dibuat otomatis
  * kalau belum ada):
  *   KLIEN_AGENT  : 1 baris per agent per laporan (DAILY = per tanggal,
- *                  MONTHLY = snapshot akumulasi per periode, diganti tiap upload)
+ *                  MONTHLY = snapshot akumulasi per tanggal laporan; tiap tanggal disimpan)
  *   KLIEN_TL     : ranking TL lintas vendor (tabel atas di gambar)
  *   KLIEN_VENDOR : repay rate harian per vendor (kotak kanan di laporan Monthly)
  * Upload ulang laporan yg sama (jenis+tanggal/periode+bucket) MENGGANTI data
@@ -995,9 +995,10 @@ function klienSave_(body) {
   try {
     const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
     const res = {};
-    // Daily diganti per (tanggal,bucket); Monthly diganti per (periode,bucket)
+    // Daily & Monthly diganti per (jenis,tanggal,bucket). Monthly disimpan per tanggal
+    // laporan (snapshot akumulasi s/d tanggal itu) supaya bisa dilihat mundur via kalender.
     const isOldOf = r => _klienTxt_(r[0]) === jenis && _klienTxt_(r[3]) === bucket &&
-      (jenis === 'DAILY' ? _klienTxt_(r[1]) === tanggal : _klienTxt_(r[2]) === periode);
+      _klienTxt_(r[1]) === tanggal;
 
     const agents = (body.agents || []).map(a => [jenis, tanggal, periode, bucket,
       String(a.kufiId || ''), String(a.nama || ''), String(a.tl || ''), String(a.company || ''),

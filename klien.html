@@ -192,6 +192,9 @@ body.ana-printing>*:not(#modalAna){display:none!important;}
   body.ana-printing .modal-b{overflow:visible;}
   body.ana-printing .tbl-wrap{max-height:none!important;overflow:visible;}
   body.ana-printing .ana-sec{page-break-inside:avoid;}}
+.dpick{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:4px 8px;background:var(--surface);font-size:13px;cursor:pointer}
+.dpick input{border:0;background:transparent;color:var(--text);font:inherit;outline:none;cursor:pointer}
+html[data-theme="dark"] .dpick input{color-scheme:dark}
 </style>
 </head>
 <body>
@@ -355,7 +358,8 @@ async function loadData(){
     const res=await fetch(url).then(r=>r.json());
     if(!res.success)throw new Error(res.message||'Gagal memuat');
     recomputeRed(res);
-    DATA=res; VIEW={tlMode:'daily',tlDate:'',redDate:'',recDate:''};
+    splitMonthly(res);
+    DATA=res; VIEW={tlMode:'daily',tlDate:'',monDate:'',redDate:'',recDate:''};
     render();
   }catch(e){
     const old=/Unknown action/i.test(e.message);
@@ -369,7 +373,7 @@ async function loadData(){
 // tidak terbaca AI, tanpa perlu upload ulang.
 function recomputeRed(res){
   const g={};
-  res.agents.forEach(a=>{const k=a.jenis+'|'+(a.jenis==='MONTHLY'?'M':a.tanggal);(g[k]=g[k]||[]).push(a);});
+  res.agents.forEach(a=>{const k=a.jenis+'|'+a.tanggal;(g[k]=g[k]||[]).push(a);});
   Object.values(g).forEach(list=>{
     // laporan yang sudah punya tanda merah (upload versi baru pakai aturan rate < AVG asli) tidak diubah;
     // hanya laporan yang tanda merahnya kosong sama sekali (warna gagal terbaca) yang dihitung ulang
@@ -377,6 +381,33 @@ function recomputeRed(res){
     const avg=list.reduce((s,a)=>s+(a.rate||0),0)/list.length;
     list.forEach(a=>{a.merahStored=a.merah;if(Math.abs((a.rate||0)-avg)>0.005)a.merah=(a.rate||0)<avg;});
   });
+}
+
+// Laporan Monthly disimpan per tanggal (snapshot akumulasi). Semua snapshot disimpan di
+// res.monAll; res.tl/res.agents hanya berisi snapshot Monthly terakhir supaya bagian lain tetap sama.
+function splitMonthly(res){
+  const isM=x=>x.jenis==='MONTHLY';
+  res.monAll={tl:res.tl.filter(isM),agents:res.agents.filter(isM)};
+  res.monDates=[...new Set(res.monAll.tl.map(t=>t.tanggal).concat(res.monAll.agents.map(a=>a.tanggal)))].sort();
+  const last=res.monDates[res.monDates.length-1];
+  res.tl=res.tl.filter(t=>!isM(t)||t.tanggal===last);
+  res.agents=res.agents.filter(a=>!isM(a)||a.tanggal===last);
+}
+// Kalender: pilih tanggal bebas; kalau tanggal itu tidak ada laporannya, pakai laporan terdekat sebelumnya.
+function snapDate(v,dates){
+  if(!dates.length)return '';
+  if(dates.includes(v))return v;
+  const before=dates.filter(d=>d<=v);
+  return before.length?before[before.length-1]:dates[0];
+}
+function datePick(cur,dates,fn){
+  return `<label class="dpick" title="Tanggal yang ada laporannya: ${escH(dates.map(dShort).join(', '))}">📅 <input type="date" value="${cur}" min="${dates[0]||''}" max="${dates[dates.length-1]||''}" onchange="${fn}(this.value)"></label>`;
+}
+function tlPickDate(v){
+  const dates=VIEW.tlMode==='monthly'?DATA.monDates:tlDailyDates();
+  const d=snapDate(v,dates); VIEW._tlSnapNote=(v&&d!==v)?v:'';
+  if(VIEW.tlMode==='monthly')VIEW.monDate=d;else VIEW.tlDate=d;
+  renderTl();
 }
 
 /* turunan data */
@@ -410,9 +441,11 @@ function vendorMatrix(){
 // Selisih ≠ 0 berarti ada baris agent yang belum lengkap/terbaca salah saat upload.
 function agentGap(jenis,tanggal){
   const sum={};
-  DATA.agents.filter(a=>a.jenis===jenis&&(jenis==='MONTHLY'||a.tanggal===tanggal)).forEach(a=>{const k=normKey(a.tl);sum[k]=(sum[k]||0)+a.repay;});
+  const mon=jenis==='MONTHLY'&&tanggal&&DATA.monAll;
+  const AG=mon?DATA.monAll.agents:DATA.agents, TL=mon?DATA.monAll.tl:DATA.tl;
+  AG.filter(a=>a.jenis===jenis&&((jenis==='MONTHLY'&&!mon)||a.tanggal===tanggal)).forEach(a=>{const k=normKey(a.tl);sum[k]=(sum[k]||0)+a.repay;});
   const out={};
-  DATA.tl.filter(t=>t.jenis===jenis&&(jenis==='MONTHLY'||t.tanggal===tanggal)).forEach(t=>{
+  TL.filter(t=>t.jenis===jenis&&((jenis==='MONTHLY'&&!mon)||t.tanggal===tanggal)).forEach(t=>{
     const d=(sum[normKey(t.tl)]||0)-t.repay;
     if(Math.abs(d)>Math.max(1000,t.repay*0.0005))out[t.tl]={diff:d,company:t.company};
   });
@@ -532,26 +565,31 @@ function renderVendor(){
 function renderTl(){
   const el=document.getElementById('secTl');
   const dDates=tlDailyDates();
-  const hasMonthly=DATA.tl.some(t=>t.jenis==='MONTHLY');
+  const mDates=[...new Set(DATA.monAll.tl.map(t=>t.tanggal))].sort();
+  const hasMonthly=mDates.length>0;
   if(!dDates.length&&!hasMonthly){el.innerHTML='<div class="empty">Belum ada data ranking TL.</div>';return;}
   if(VIEW.tlMode==='daily'&&!dDates.length)VIEW.tlMode='monthly';
   if(!VIEW.tlDate||!dDates.includes(VIEW.tlDate))VIEW.tlDate=dDates[dDates.length-1]||'';
-  const rows=DATA.tl.filter(t=>VIEW.tlMode==='monthly'?t.jenis==='MONTHLY':(t.jenis==='DAILY'&&t.tanggal===VIEW.tlDate))
+  if(!VIEW.monDate||!mDates.includes(VIEW.monDate))VIEW.monDate=mDates[mDates.length-1]||'';
+  const isMon=VIEW.tlMode==='monthly', selDates=isMon?mDates:dDates, selDate=isMon?VIEW.monDate:VIEW.tlDate;
+  const rows=(isMon?DATA.monAll.tl.filter(t=>t.tanggal===VIEW.monDate):DATA.tl.filter(t=>t.jenis==='DAILY'&&t.tanggal===VIEW.tlDate))
     .sort((a,b)=>(a.rank||99)-(b.rank||99)||b.rate-a.rate);
   const top=rows[0];
   const own=rows.filter(r=>r.company===OWN);
   // tambahan repay yg dibutuhkan (dgn outstanding sekarang) supaya rate = rate #1
   const need=r=>top&&r!==top?Math.max(0,(top.rate-r.rate)/100*r.outstanding):0;
-  const gaps=agentGap(VIEW.tlMode==='monthly'?'MONTHLY':'DAILY',VIEW.tlDate);
-  const monthlyAsOf=hasMonthly?DATA.tl.filter(t=>t.jenis==='MONTHLY')[0].tanggal:'';
+  const gaps=agentGap(isMon?'MONTHLY':'DAILY',selDate);
+  const snapNote=VIEW._tlSnapNote?`<div class="muted" style="font-size:11.5px;margin:-4px 0 10px">Tidak ada laporan ${isMon?'Bulanan':'Harian'} tanggal ${dLabel(VIEW._tlSnapNote)} — ditampilkan laporan terdekat sebelumnya (${dLabel(selDate)}).</div>`:'';
+  VIEW._tlSnapNote='';
+  const monNote=isMon&&mDates.length===1?`<div class="muted" style="font-size:11.5px;margin:-4px 0 10px">Baru 1 laporan Bulanan tersimpan (${dLabel(mDates[0])}). Mulai sekarang setiap upload laporan Bulanan disimpan per tanggal, jadi tanggal sebelumnya bisa dipilih di kalender.</div>`:'';
   el.innerHTML=`
     <div class="card-head"><div><div class="card-title">🏆 Ranking TL Semua Vendor</div>
-      <div class="card-sub">${VIEW.tlMode==='monthly'?'Akumulasi bulan ini (laporan s/d '+dLabel(monthlyAsOf)+')':'Hasil harian '+dLabel(VIEW.tlDate)} · baris biru = TL EDN</div></div>
+      <div class="card-sub">${isMon?'Akumulasi bulan ini (laporan s/d '+dLabel(VIEW.monDate)+')':'Hasil harian '+dLabel(VIEW.tlDate)} · baris biru = TL EDN</div></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-        ${VIEW.tlMode==='daily'?`<select onchange="VIEW.tlDate=this.value;renderTl()">${dDates.slice().reverse().map(d=>`<option value="${d}" ${d===VIEW.tlDate?'selected':''}>${dLabel(d)}</option>`).join('')}</select>`:''}
+        ${datePick(selDate,selDates,'tlPickDate')}
         <div class="seg"><button class="${VIEW.tlMode==='daily'?'on':''}" ${dDates.length?'':'disabled'} onclick="VIEW.tlMode='daily';renderTl()">Harian</button><button class="${VIEW.tlMode==='monthly'?'on':''}" ${hasMonthly?'':'disabled'} onclick="VIEW.tlMode='monthly';renderTl()">Bulanan</button></div>
       </div></div>
-    <div class="kpis">${own.map(o=>`<div class="kpi"><div class="l">${escH(o.tl)}</div><div class="v">#${o.rank||'—'} <span style="font-size:13px;color:var(--text3)">dari ${rows.length}</span></div><div class="s">${fmtPct(o.rate)}${top&&o!==top?' · selisih '+fmtPct(top.rate-o.rate)+' dari #1<br>Kurang ±<b>'+fmtRpFull(need(o))+'</b> repay untuk menyamai #1':' · peringkat 1'}</div></div>`).join('')||'<div class="muted" style="font-size:12px">Tidak ada TL EDN di laporan ini.</div>'}</div>
+    ${snapNote}${monNote}<div class="kpis">${own.map(o=>`<div class="kpi"><div class="l">${escH(o.tl)}</div><div class="v">#${o.rank||'—'} <span style="font-size:13px;color:var(--text3)">dari ${rows.length}</span></div><div class="s">${fmtPct(o.rate)}${top&&o!==top?' · selisih '+fmtPct(top.rate-o.rate)+' dari #1<br>Kurang ±<b>'+fmtRpFull(need(o))+'</b> repay untuk menyamai #1':' · peringkat 1'}</div></div>`).join('')||'<div class="muted" style="font-size:12px">Tidak ada TL EDN di laporan ini.</div>'}</div>
     <div class="tbl-wrap"><table class="t"><thead><tr><th>#</th><th>TL</th><th>Vendor</th><th class="n">Outstanding</th><th class="n">Repay</th><th class="n">Rate</th><th class="n">Selisih dari #1</th><th class="n" title="Tambahan repay yang dibutuhkan (dengan outstanding sekarang) supaya rate-nya sama dengan peringkat 1">Kurang repay vs #1</th><th class="n">AHT</th></tr></thead>
     <tbody>${rows.map(r=>`<tr class="${r.company===OWN?'edn':''}"><td>${r.rank||''}</td><td style="font-weight:${r.company===OWN?700:500}">${escH(r.tl)}${gaps[r.tl]?` <span title="Data agent TL ini belum lengkap: jumlah repay agent selisih ${fmtRpFull(gaps[r.tl].diff)} dari total TL. Angka TL (baris ini) tetap sesuai laporan." style="cursor:help">⚠</span>`:''}</td><td>${r.company===OWN?'<span class="pill pill-edn">EDN</span>':escH(r.company)}</td><td class="n">${fmtRp(r.outstanding)}</td><td class="n">${fmtRpFull(r.repay)}</td><td class="n" style="font-weight:700">${fmtPct(r.rate)}</td><td class="n muted">${top&&r!==top?'-'+fmtPct(top.rate-r.rate):''}</td><td class="n" style="color:${r.company===OWN?'var(--danger)':'var(--text2)'}" title="${top&&r!==top?escH(fmtRpFull(need(r))):''}">${top&&r!==top?'-'+fmtRpFull(need(r)):''}</td><td class="n">${fmtNum(r.aht)}</td></tr>`).join('')}</tbody></table></div>`;
 }
