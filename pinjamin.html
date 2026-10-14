@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Laporan Klien Pinjamin — System TZ Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
+  --border:#e4e7ec;--text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --accent:#1d60c8;--accent-bg:#eef3fd;
+  --success:#059669;--success-bg:#ecfdf5;
+  --warning:#d97706;--warning-bg:#fffbeb;
+  --danger:#dc2626;--danger-bg:#fef2f2;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.07);--shadow-md:0 4px 12px rgba(0,0,0,0.1);
+  --sidebar-w:220px;
+}
+[data-theme="dark"]{
+  --navy:#0f1523;--bg:#0a0d14;--surface:#131825;--surface2:#1a2035;
+  --border:#252d42;--text:#f1f3f9;--text2:#9aa5be;--text3:#6b7690;
+  --accent:#4a8cf7;--accent-bg:#1a2540;
+  --success:#34d399;--success-bg:#0d2e22;
+  --warning:#fbbf24;--warning-bg:#2d200a;
+  --danger:#f87171;--danger-bg:#2d0f0f;
+  --shadow:0 1px 3px rgba(0,0,0,0.4);--shadow-md:0 4px 12px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+.navbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 calc(var(--sidebar-w) + 20px);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.nav-logo{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;text-decoration:none;}
+.nav-logo-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.nav-page-title{font-size:13px;color:rgba(255,255,255,0.5);border-left:1px solid rgba(255,255,255,0.15);padding-left:12px;margin-left:4px;}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.theme-toggle{display:flex;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-sm);overflow:hidden;}
+.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;}
+.theme-btn.active{background:rgba(255,255,255,0.2);color:#fff;}
+.sidebar{position:fixed;top:52px;left:0;width:var(--sidebar-w);height:calc(100vh - 52px);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;z-index:100;}
+.sidebar-section{padding:16px 12px 8px;}
+.sidebar-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text2);font-size:13px;font-weight:500;text-decoration:none;margin-bottom:2px;}
+.sidebar-item:hover{background:var(--surface2);color:var(--text);}
+.sidebar-item.active{background:var(--accent-bg);color:var(--accent);}
+.sidebar-item .icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
+.main{margin-left:var(--sidebar-w);margin-top:52px;padding:28px;min-height:calc(100vh - 52px);max-width:calc(1400px + var(--sidebar-w));}
+.eyebrow{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
+h1{font-size:26px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px;}
+.lead{color:var(--text2);font-size:14px;margin-bottom:20px;max-width:760px;line-height:1.5;}
+.filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:22px;}
+.filters label{font-size:12px;color:var(--text3);}
+select,input[type=date]{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;outline:none;}
+select:focus{border-color:var(--accent);}
+.btn{border:none;border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{opacity:.9;}
+.btn-ghost{background:var(--surface);color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface);}
+.seg button{padding:6px 14px;font-size:12px;font-weight:600;border:none;background:none;color:var(--text2);cursor:pointer;}
+.seg button.on{background:var(--accent);color:#fff;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:20px;}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.card-title{font-size:16px;font-weight:700;}
+.card-sub{font-size:12px;color:var(--text3);margin-top:3px;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;}
+.kpi{background:var(--surface2);border-radius:8px;padding:12px 14px;min-width:0;}
+.kpi .l{font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px;}
+.kpi .v{font-size:20px;font-weight:800;}
+.kpi .s{font-size:11.5px;color:var(--text2);margin-top:2px;}
+.good{color:var(--success)!important;}.bad{color:var(--danger)!important;}
+.chart-wrap{position:relative;height:320px;}
+.tbl-wrap{overflow:auto;border:1px solid var(--border);border-radius:8px;}
+table.t{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;}
+table.t th{position:sticky;top:0;background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;text-align:left;padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--border);z-index:1;}
+table.t td{padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;}
+table.t tr.edn td{background:var(--accent-bg);}
+table.t tr.edn td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+.pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;}
+.pill-edn{background:var(--accent);color:#fff;}
+.pill-red{background:var(--danger-bg);color:var(--danger);}
+.pill-ok{background:var(--success-bg);color:var(--success);}
+.pill-warn{background:var(--warning-bg);color:var(--warning);}
+.rankstrip{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+.rankstrip .d{background:var(--surface2);border-radius:6px;padding:5px 8px;text-align:center;min-width:54px;}
+.rankstrip .d .x{font-size:10px;color:var(--text3);}
+.rankstrip .d .y{font-size:13px;font-weight:800;}
+.tlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.tlbox{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.tlbox-h{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--surface2);font-weight:700;font-size:12.5px;gap:8px;}
+.tlbox-r{display:flex;justify-content:space-between;gap:8px;padding:6px 12px;border-top:1px solid var(--border);font-size:12px;}
+.tlbox-r .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.muted{color:var(--text3);}
+.empty{padding:36px 16px;text-align:center;color:var(--text3);font-size:13px;line-height:1.6;}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
+.lock-icon{font-size:48px;margin-bottom:16px;}
+.lock-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.lock-sub{font-size:13px;color:var(--text3);margin-bottom:24px;}
+.lock-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:14px;text-align:center;letter-spacing:2px;outline:none;margin-bottom:12px;}
+.lock-btn{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;}
+.lock-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
+@media(max-width:768px){:root{--sidebar-w:0px;}.sidebar{display:none;}.navbar{padding-left:16px;}.main{margin-left:0;padding:18px 16px;}.nav-page-title{display:none;}h1{font-size:22px;}.chart-wrap{height:260px;}}
+
+.tolbox{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:18px;}
+.tolbox input{width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px;}
+.flag{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;margin:1px 2px 1px 0;white-space:nowrap;}
+.f-beda{background:var(--danger-bg);color:var(--danger);}
+.f-absen{background:var(--warning-bg);color:var(--warning);}
+.f-copas{background:#ede9fe;color:#6d28d9;}
+[data-theme="dark"] .f-copas{background:#2a2145;color:#c4b5fd;}
+.f-asal{background:#e0f2fe;color:#0369a1;}
+[data-theme="dark"] .f-asal{background:#0c2a3d;color:#7dd3fc;}
+.f-conn{background:var(--surface2);color:var(--text2);}
+table.t tr.clickable{cursor:pointer;}
+table.t tr.clickable:hover td{background:var(--surface2);}
+details summary{cursor:pointer;font-weight:700;font-size:13px;}
+td.notes{white-space:normal!important;min-width:260px;}
+/* Fullscreen tabel detail */
+.card.fs{position:fixed;inset:0;z-index:600;margin:0;border-radius:0;overflow:auto;display:flex;flex-direction:column;}
+.card.fs .tbl-wrap{max-height:none!important;flex:1;}
+body.fs-open{overflow:hidden;}
+/* Popup agent per TL */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;align-items:flex-start;justify-content:center;padding:30px 12px;overflow-y:auto;}
+.modal.open{display:flex;}
+.modal-box{background:var(--surface);border-radius:var(--radius);width:100%;max-width:1000px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:calc(100vh - 60px);}
+.modal-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);}
+.modal-b{padding:14px 18px;overflow:auto;}
+.agcard{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.agcard-h{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);cursor:pointer;flex-wrap:wrap;}
+.agcard-h .nm{font-weight:800;font-size:13px;}
+.agcard-b{display:none;padding:4px 12px 10px;}
+.agcard.open .agcard-b{display:block;}
+.agline{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:12px;flex-wrap:wrap;align-items:baseline;}
+.agline .d{width:80px;flex-shrink:0;font-weight:700;}
+.agline .n{width:150px;flex-shrink:0;color:var(--text2);font-variant-numeric:tabular-nums;}
+
+/* ── Pinjamin ── */
+.projsw{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:var(--surface);margin-bottom:12px;}
+.projsw a{padding:5px 14px;font-size:12px;font-weight:700;color:var(--text2);text-decoration:none;}
+.projsw a.on{background:var(--navy);color:#fff;}
+.sec{scroll-margin-top:70px;}
+.sec-title{font-size:17px;font-weight:800;margin-bottom:4px;}
+.vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(360px,1fr));gap:14px;}
+.vcard{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);}
+.vcard-h{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:10px 14px;background:var(--surface2);}
+.vcard-h .g{font-weight:800;font-size:15px;}
+.vcard-b{padding:10px 14px;}
+.vrow{display:grid;grid-template-columns:110px 1fr 64px 86px 48px;gap:8px;align-items:center;font-size:12px;padding:5px 0;border-top:1px dashed var(--border);}
+.vrow:first-child{border-top:none;}
+.vrow.own{font-weight:800;}
+.vrow .nm{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vrow .n{text-align:right;font-variant-numeric:tabular-nums;}
+.trk{height:9px;background:var(--surface2);border-radius:5px;overflow:hidden;}
+.trk span{display:block;height:100%;background:#94a3b8;border-radius:5px;}
+.vrow.own .trk span{background:var(--accent);}
+.bands{display:flex;height:16px;border-radius:5px;overflow:hidden;background:var(--surface2);}
+.bands span{display:block;height:100%;}
+.bandrow{display:grid;grid-template-columns:110px 1fr 40px;gap:8px;align-items:center;font-size:11.5px;margin:4px 0;}
+.legend2{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-top:6px;}
+.legend2 i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+.vnote{font-size:11.5px;color:var(--text2);margin-top:8px;line-height:1.5;}
+.ib{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+.d-up{color:var(--success);font-weight:700;font-size:11px;}.d-dn{color:var(--danger);font-weight:700;font-size:11px;}.d-eq{color:var(--text3);font-size:11px;}
+table.t tr.own td{background:var(--accent-bg);}
+table.t tr.own td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+table.t tr.clk{cursor:pointer;}table.t tr.clk:hover td{background:var(--surface2);}
+.tabs2{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.tabs2 button{border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;}
+.tabs2 button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.tabs2 button .c{opacity:.7;font-weight:500;margin-left:4px;}
+.upzone{border:2px dashed var(--border);border-radius:10px;padding:26px;text-align:center;color:var(--text2);cursor:pointer;}
+.upzone:hover{border-color:var(--accent);color:var(--accent);}
+.upitem{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:12.5px;}
+.upitem .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.issues{border-radius:8px;padding:9px 12px;font-size:12.5px;margin:8px 0;line-height:1.5;}
+.issues.warn{background:var(--warning-bg);color:var(--warning);}
+.issues.ok{background:var(--success-bg);color:var(--success);}
+.issues.bad{background:var(--danger-bg);color:var(--danger);}
+.story{font-size:14.5px;line-height:1.65;background:var(--accent-bg);border-left:4px solid var(--accent);padding:12px 16px;border-radius:8px;margin-bottom:16px;}
+.chip2{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);}
+/* presentasi */
+body.present .sidebar,body.present .navbar,body.present .filters,body.present .projsw,body.present .eyebrow,body.present h1,body.present .lead{display:none!important;}
+body.present .main{margin:0;padding:24px 32px 80px;max-width:none;}
+body.present .sec{display:none;}
+body.present .sec.cur{display:block;}
+.pnav{display:none;}
+body.present .pnav{display:flex;position:fixed;left:0;right:0;bottom:0;justify-content:space-between;align-items:center;padding:10px 24px;background:var(--surface);border-top:1px solid var(--border);z-index:300;}
+@media print{.sidebar,.navbar,.filters,.projsw,.pnav,.noprint,.lock-overlay{display:none!important;}.main{margin:0!important;padding:0!important;}.card{break-inside:avoid;box-shadow:none;}body{background:#fff;}}
+@media(max-width:768px){.vcards{grid-template-columns:1fr;}.vrow{grid-template-columns:70px 1fr 54px 78px 40px;}}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">TZ</span> System TZ Analytics</a>
+    <span class="nav-page-title">Laporan Klien · Pinjamin</span>
+  </div>
+  <div class="nav-right">
+    <div class="theme-toggle">
+      <button class="theme-btn active" id="btnTerang" onclick="setTheme('light')">☀ Terang</button>
+      <button class="theme-btn" id="btnGelap" onclick="setTheme('dark')">🌙 Gelap</button>
+    </div>
+  </div>
+</nav>
+
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">Laporan Klien</div>
+    <div class="lock-sub">Masukkan kata kunci untuk mengakses halaman ini</div>
+    <input class="lock-input" type="password" id="lockInput" placeholder="••••••" onkeydown="if(event.key==='Enter')doUnlockPage()"/>
+    <button class="lock-btn" onclick="doUnlockPage()">Masuk</button>
+    <div class="lock-error" id="lockError">Kata kunci salah. Coba lagi.</div>
+  </div>
+</div>
+
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
+  </div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="team.html"><span class="icon">👥</span> Tim</a>
+    <a class="sidebar-item" href="agent.html"><span class="icon">👤</span> Agent</a>
+    <a class="sidebar-item" href="violation.html"><span class="icon">⚠️</span> Violation</a>
+    <a class="sidebar-item" href="rank.html"><span class="icon">🏆</span> Rank Board</a>
+    <a class="sidebar-item active" href="klien.html"><span class="icon">📑</span> Laporan Klien</a>
+    <a class="sidebar-item" href="qc.html"><span class="icon">📞</span> Cek Call (QC)</a>
+    <a class="sidebar-item" href="cek.html"><span class="icon">✅</span> Cek Kelengkapan</a>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="projsw"><a href="klien.html">Rupiah Cepat</a><a class="on" href="pinjamin.html">Pinjamin</a></div>
+  <div class="eyebrow">Pinjamin — Performance ranking dari klien</div>
+  <h1>Laporan Klien · Pinjamin</h1>
+  <p class="lead">Posisi EDN dibanding vendor lain (Piper1 = tim internal klien, Max-QIN, CPU, …) per bucket, sebaran peringkat agent, tim TL, dan agent yang perlu perhatian. Sumber: file <b>Performance_ranking_YYYY_MM_DD.xlsx</b> dari klien.</p>
+
+  <div class="filters">
+    <label for="selBulan">Bulan</label>
+    <select id="selBulan" onchange="loadData()">
+      <option>Januari</option><option>Februari</option><option>Maret</option><option>April</option>
+      <option>Mei</option><option>Juni</option><option>Juli</option><option>Agustus</option>
+      <option>September</option><option>Oktober</option><option>November</option><option>Desember</option>
+    </select>
+    <label for="selTahun">Tahun</label>
+    <select id="selTahun" onchange="loadData()"></select>
+    <label for="selDate">Laporan</label>
+    <select id="selDate" onchange="VIEW.date=this.value;fillCmp();render()"></select>
+    <label for="selCmp">Bandingkan</label>
+    <select id="selCmp" onchange="VIEW.cmp=this.value;render()"></select>
+    <button class="btn btn-ghost" id="btnRefresh" onclick="loadData()">↻ Refresh</button>
+    <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="togglePresent()">🎬 Presentasi</button>
+      <button class="btn btn-ghost" onclick="window.print()">🖨️ Cetak / PDF</button>
+      <button class="btn btn-primary" onclick="openUpload()">⬆ Upload Laporan</button>
+    </span>
+  </div>
+
+  <div id="content"><div class="empty"><div class="spinner"></div>Memuat data…</div></div>
+  <div class="pnav"><button class="btn btn-ghost" onclick="pGo(-1)">← Sebelumnya</button><span class="muted" id="pInfo"></span><span style="display:flex;gap:8px"><button class="btn btn-primary" onclick="pGo(1)">Berikutnya →</button><button class="btn btn-ghost" onclick="togglePresent()">✕</button></span></div>
+</main>
+
+<div class="modal" id="mUpload" onclick="if(event.target===this)closeUpload()">
+  <div class="modal-box" style="max-width:720px">
+    <div class="modal-h"><div><div class="card-title">Upload Performance ranking — Pinjamin</div><div class="card-sub">File lengkap (semua vendor) disarankan. File EDN saja hanya mengganti baris EDN di tanggal yang sama.</div></div><button class="btn btn-ghost" onclick="closeUpload()">✕</button></div>
+    <div class="modal-b">
+      <div class="upzone" onclick="document.getElementById('fileInput').click()" ondragover="event.preventDefault()" ondrop="event.preventDefault();addFiles(event.dataTransfer.files)">📄 Klik atau tarik file .xlsx / .csv ke sini<br><span class="muted" style="font-size:12px">Tanggal diambil dari nama file (…_2026_10_13.xlsx) — bisa diubah sebelum disimpan</span></div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple style="display:none" onchange="addFiles(this.files);this.value=''">
+      <div id="upList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mAgent" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <div class="modal-h"><div><div class="card-title" id="agTitle"></div><div class="card-sub" id="agSub"></div></div><button class="btn btn-ghost" onclick="document.getElementById('mAgent').classList.remove('open')">✕</button></div>
+    <div class="modal-b" id="agBody"></div>
+  </div>
+</div>
+
+<script>
+const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
+const OWN='EDN', APLIKASI_INTERNAL='PINJAMIN';
+const BULAN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+const BLN3=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+const HARI=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+const BANDS=['Top 5%','5%-25%','25%-50%','50%-70%','70%-90%','Bottom 10%'];
+const BAND_COLOR=['#047857','#22c55e','#a3e635','#facc15','#fb923c','#dc2626'];
+const VCOLOR={EDN:'#1d60c8',PIPER1:'#64748b','MAX-QIN':'#a855f7',CPU:'#0d9488'};
+// kolom baris dari endpoint pinj
+const C={date:0,group:3,asset:4,setup:5,outself:6,dpd:7,comp:8,mgr:9,tlno:10,tl:11,agno:12,ag:13,uid:14,baru:15,masuk:16,intv:17,os:18,paid:19,rate:20,days:21,gross:22,rank:23};
+let DATA=null, VIEW={date:'',cmp:'',grp:'',ednOnly:false,allGroups:false}, INTERNAL={};
+
+function escH(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtNum(n){return (n===null||n===undefined||isNaN(n))?'—':Math.round(n).toLocaleString('id-ID');}
+function fmtRp(n){return 'Rp '+fmtNum(n);}
+function fmtJt(n){const a=Math.abs(n);return (n<0?'-':'')+(a>=1e9?(a/1e9).toFixed(2).replace('.',',')+' M':a>=1e6?(a/1e6).toFixed(1).replace('.',',')+' jt':fmtNum(a));}
+function fmtPct(n,d=2){return (n===null||n===undefined||isNaN(n))?'—':Number(n).toFixed(d).replace('.',',')+'%';}
+function dLabel(iso){const d=new Date(iso+'T00:00:00');return isNaN(d)?iso:`${HARI[d.getDay()]} ${d.getDate()} ${BLN3[d.getMonth()]} ${d.getFullYear()}`;}
+function dShort(iso){const d=new Date(iso+'T00:00:00');return isNaN(d)?iso:`${d.getDate()} ${BLN3[d.getMonth()]}`;}
+function normKey(s){return String(s||'').toUpperCase().replace(/[^A-Z0-9]/g,'');}
+function bandIdx(s){const t=String(s||'').toUpperCase().replace(/\s+/g,'');if(/TOP5/.test(t))return 0;if(/^5%?-25/.test(t))return 1;if(/^25/.test(t))return 2;if(/^50/.test(t))return 3;if(/^70/.test(t))return 4;if(/BOTTOM/.test(t))return 5;return -1;}
+function vColor(c){return VCOLOR[String(c).toUpperCase()]||'#94a3b8';}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('dca_theme',t);}catch(e){}
+  document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');}
+(function(){let t='light';try{t=localStorage.getItem('dca_theme')||'light';}catch(e){}setTheme(t);})();
+(function(){const now=new Date(),st=document.getElementById('selTahun');
+  for(let y=2025;y<=now.getFullYear();y++){const o=document.createElement('option');o.textContent=y;st.appendChild(o);}
+  document.getElementById('selBulan').value=BULAN[now.getMonth()];st.value=String(now.getFullYear());})();
+
+async function loadData(keepDate){
+  const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value;
+  const box=document.getElementById('content');box.innerHTML='<div class="empty"><div class="spinner"></div>Memuat data…</div>';
+  try{
+    const res=await fetch(`${API_URL}?action=pinj&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}&_=${Date.now()}`).then(r=>r.json());
+    if(!res.success)throw new Error(res.message||'Gagal memuat');
+    DATA=res;
+    const per=res.periode, inMonth=res.dates.filter(d=>d.slice(0,7)===per);
+    const sd=document.getElementById('selDate'), sc=document.getElementById('selCmp');
+    sd.innerHTML=inMonth.slice().reverse().map(d=>`<option value="${d}">${dLabel(d)}</option>`).join('')||'<option value="">—</option>';
+    VIEW.date=keepDate&&inMonth.includes(keepDate)?keepDate:(inMonth[inMonth.length-1]||'');sd.value=VIEW.date;
+    fillCmp();
+    render();
+  }catch(e){
+    const old=/Unknown action/i.test(e.message);
+    box.innerHTML=`<div class="card"><div class="empty">⚠️ ${escH(old?'Code.gs di Apps Script belum diperbarui (fitur Pinjamin belum terpasang).':e.message)}<br><span class="muted">${old?'Tempel Code.gs terbaru lalu Kelola deployment → ✏️ → Versi baru.':'Klik Refresh untuk coba lagi.'}</span></div></div>`;
+  }
+}
+function fillCmp(){
+  const sc=document.getElementById('selCmp');const prev=DATA.dates.filter(d=>d<VIEW.date);
+  sc.innerHTML='<option value="">— tidak —</option>'+prev.slice().reverse().map(d=>`<option value="${d}">${dLabel(d)}</option>`).join('');
+  VIEW.cmp=prev.length?prev[prev.length-1]:'';sc.value=VIEW.cmp;
+}
+
+/* ── olah data ── */
+function rowsAt(d){return (DATA.rows||[]).filter(r=>r[C.date]===d).map(r=>({group:r[C.group],asset:r[C.asset],dpd:r[C.dpd],comp:r[C.comp]||'?',tl:r[C.tl],agno:r[C.agno],ag:r[C.ag],baru:/YES|Y/i.test(r[C.baru]),masuk:r[C.masuk],
+  band:bandIdx(r[C.intv]),intv:r[C.intv],os:r[C.os],paid:r[C.paid],rate:r[C.rate]*100,days:r[C.days],gross:r[C.gross],rank:r[C.rank]}));}
+function groupStats(R){
+  // agent dgn pokok tidak wajar (>5× median bucket, mis. salah alokasi) tidak dihitung di total vendor
+  const byG={};R.forEach(r=>(byG[r.group]=byG[r.group]||[]).push(r.os));
+  const medOs={};Object.entries(byG).forEach(([g,a])=>{a.sort((x,y)=>x-y);medOs[g]=a[Math.floor(a.length/2)]||0;});
+  R.forEach(r=>{r.outlier=medOs[r.group]>0&&r.os>medOs[r.group]*5;});
+  const G={};R.forEach(r=>{const g=G[r.group]=G[r.group]||{group:r.group,dpd:r.dpd,n:0,rows:[],V:{}};g.n++;g.rows.push(r);
+    const v=g.V[r.comp]=g.V[r.comp]||{comp:r.comp,n:0,os:0,paid:0,gross:0,rankSum:0,bands:[0,0,0,0,0,0],baru:0,outl:[]};
+    if(r.outlier){v.outl.push(r);return;}
+    v.n++;v.os+=r.os;v.paid+=r.paid;v.gross+=r.gross;v.rankSum+=r.rank;if(r.band>=0)v.bands[r.band]++;if(r.baru)v.baru++;});
+  Object.values(G).forEach(g=>{g.vend=Object.values(g.V).filter(v=>v.n>0).map(v=>({...v,rate:v.os?v.paid/v.os*100:0,grossPer:v.gross/v.n,avgRank:v.rankSum/v.n,pctl:v.rankSum/v.n/g.n*100,top:v.bands[0]+v.bands[1],low:v.bands[4]+v.bands[5]}));
+    g.byRate=g.vend.slice().sort((a,b)=>b.rate-a.rate);g.byGross=g.vend.slice().sort((a,b)=>b.grossPer-a.grossPer);
+    g.own=g.vend.find(v=>v.comp===OWN)||null;
+    const gs=g.rows.map(r=>r.gross).sort((a,b)=>a-b);g.median=gs.length?gs[Math.floor(gs.length/2)]:0;
+    g.days=Math.max(...g.rows.map(r=>r.days));});
+  return G;
+}
+function key(r){return r.group+'|'+(r.agno||normKey(r.ag));}
+
+/* ── render ── */
+function render(){
+  const box=document.getElementById('content');
+  if(!DATA||!VIEW.date){box.innerHTML=`<div class="card"><div class="empty">📭 Belum ada laporan Pinjamin untuk ${escH(document.getElementById('selBulan').value)} ${escH(document.getElementById('selTahun').value)}.<br>Klik <b>⬆ Upload Laporan</b> lalu pilih file Performance_ranking dari klien.</div></div>`;return;}
+  const R=rowsAt(VIEW.date), P=VIEW.cmp?rowsAt(VIEW.cmp):[], G=groupStats(R), PG=P.length?groupStats(P):{};
+  const pmap={};P.forEach(r=>pmap[key(r)]=r);
+  const own=R.filter(r=>r.comp===OWN), hasOther=new Set(R.map(r=>r.comp)).size>1;
+  const ownGroups=Object.values(G).filter(g=>g.own).sort((a,b)=>a.group.localeCompare(b.group));
+  const days=Math.max(0,...R.map(r=>r.days));
+  const bandOwn=[0,0,0,0,0,0];own.forEach(r=>{if(r.band>=0)bandOwn[r.band]++;});
+  const S=[];
+  // 1. Ringkasan
+  const lead=ownGroups.filter(g=>g.byRate[0]&&g.byRate[0].comp===OWN&&g.vend.length>1).map(g=>g.group);
+  const behind=ownGroups.filter(g=>g.vend.length>1&&g.byRate[0].comp!==OWN);
+  const story=[
+    `Laporan <b>${dLabel(VIEW.date)}</b> (${days} hari kerja): EDN memegang <b>${own.length} agent</b> di ${ownGroups.length} bucket (${ownGroups.map(g=>g.group).join(', ')}).`,
+    hasOther&&lead.length?`EDN <b>unggul rate</b> di ${lead.join(', ')}.`:'',
+    hasOther&&behind.length?`Tertinggal di ${behind.map(g=>`<b>${g.group}</b> (EDN ${fmtPct(g.own.rate)} vs ${escH(g.byRate[0].comp)} ${fmtPct(g.byRate[0].rate)})`).join(', ')}.`:'',
+    `Sebaran agent EDN: <b>${bandOwn[0]+bandOwn[1]}</b> di Top 25%, <b>${bandOwn[2]+bandOwn[3]}</b> di tengah, <b>${bandOwn[4]+bandOwn[5]}</b> di zona bawah (70%–Bottom 10%).`,
+    !hasOther?'<span class="muted">File ini hanya berisi EDN — perbandingan vendor butuh file lengkap.</span>':''].filter(Boolean).join(' ');
+  S.push({id:'ringkas',t:'Ringkasan',h:`<div class="story">${story}</div>
+    <div class="kpis">
+      <div class="kpi"><div class="l">Agent EDN</div><div class="v">${own.length}</div><div class="s">${own.filter(r=>r.baru).length} agent baru · ${R.length} agent total</div></div>
+      <div class="kpi"><div class="l">Bucket dipegang</div><div class="v">${ownGroups.length}</div><div class="s">${ownGroups.map(g=>g.group+' ('+g.dpd+')').join(' · ')}</div></div>
+      <div class="kpi"><div class="l">Top 25%</div><div class="v good">${bandOwn[0]+bandOwn[1]}</div><div class="s">Top 5%: ${bandOwn[0]} · 5–25%: ${bandOwn[1]}</div></div>
+      <div class="kpi"><div class="l">Zona bawah</div><div class="v bad">${bandOwn[4]+bandOwn[5]}</div><div class="s">70–90%: ${bandOwn[4]} · Bottom 10%: ${bandOwn[5]}</div></div>
+      <div class="kpi"><div class="l">Repay EDN (pokok)</div><div class="v">${fmtJt(own.reduce((a,r)=>a+r.paid,0))}</div><div class="s">rate ${fmtPct(own.reduce((a,r)=>a+r.paid,0)/Math.max(1,own.reduce((a,r)=>a+r.os,0))*100)} · gross ${fmtJt(own.reduce((a,r)=>a+r.gross,0))}</div></div>
+    </div>
+    <div class="legend2">${BANDS.map((b,i)=>`<span><i style="background:${BAND_COLOR[i]}"></i>${b}</span>`).join('')}</div>
+    <div class="bands" style="height:22px;margin-top:6px">${bandOwn.map((c,i)=>c?`<span style="width:${c/Math.max(1,own.length)*100}%;background:${BAND_COLOR[i]}" title="${BANDS[i]}: ${c} agent"></span>`:'').join('')}</div>
+    <div class="vnote">Peringkat agent versi klien diurutkan dari <b>total uang masuk (gross)</b> di dalam bucket, bukan dari rate.</div>`});
+  // 2. Papan skor per bucket
+  const showG=VIEW.allGroups?Object.values(G).sort((a,b)=>a.group.localeCompare(b.group)):ownGroups;
+  S.push({id:'skor',t:'Papan Skor per Bucket',h:`
+    <div class="noprint" style="margin-bottom:10px"><label class="chip2"><input type="checkbox" ${VIEW.allGroups?'checked':''} onchange="VIEW.allGroups=this.checked;render()"> tampilkan juga bucket yang tidak dipegang EDN</label></div>
+    <div class="vcards">${showG.map(g=>scoreCard(g,PG[g.group])).join('')}</div>
+    <div class="vnote"><b>Rate</b> = pokok terbayar ÷ pokok dibagikan. <b>Gross/agent</b> = rata-rata total uang masuk per agent (dasar ranking klien). <b>Rank</b> = rata-rata peringkat agent vendor itu (makin kecil makin baik). Δ dibanding laporan ${VIEW.cmp?dLabel(VIEW.cmp):'—'}.</div>`});
+  // 3. Sebaran persentil
+  S.push({id:'sebaran',t:'Sebaran Peringkat',h:`<div class="vcards">${showG.map(g=>`<div class="vcard"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)}</span></span><span class="muted" style="font-size:12px">${g.n} agent</span></div><div class="vcard-b">
+      ${g.vend.slice().sort((a,b)=>a.pctl-b.pctl).map(v=>`<div class="bandrow"><span style="font-weight:${v.comp===OWN?800:500}">${escH(v.comp)}</span><div class="bands">${v.bands.map((c,i)=>c?`<span style="width:${c/v.n*100}%;background:${BAND_COLOR[i]}" title="${BANDS[i]}: ${c}"></span>`:'').join('')}</div><span class="muted" style="text-align:right">${v.n}</span></div>`).join('')}
+      <div class="vnote">${g.own?`EDN: ${g.own.top} agent di Top 25%, ${g.own.low} di zona bawah (dari ${g.own.n}).`:''}</div></div></div>`).join('')}</div>
+    <div class="legend2">${BANDS.map((b,i)=>`<span><i style="background:${BAND_COLOR[i]}"></i>${b}</span>`).join('')}</div>`});
+  // 4. Tren antar laporan (kalau >1 laporan di bulan ini)
+  const mDates=DATA.dates.filter(d=>d.slice(0,7)===DATA.periode&&d<=VIEW.date);
+  if(mDates.length>1)S.push({id:'tren',t:'Tren EDN antar Laporan',h:`<div style="position:relative;height:280px"><canvas id="cTrend"></canvas></div><div class="vnote">Rate EDN per bucket di setiap laporan yang diupload bulan ini.</div>`,after:()=>trendChart(mDates,ownGroups.map(g=>g.group))});
+  // 5. Peringkat agent
+  const grs=Object.values(G).sort((a,b)=>a.group.localeCompare(b.group));
+  if(!VIEW.grp||!G[VIEW.grp])VIEW.grp=(ownGroups[0]||grs[0]).group;
+  const g=G[VIEW.grp];
+  const list=g.rows.slice().sort((a,b)=>a.rank-b.rank).filter(r=>!VIEW.ednOnly||r.comp===OWN);
+  S.push({id:'agent',t:'Peringkat Agent',h:`
+    <div class="tabs2 noprint">${grs.map(x=>`<button class="${x.group===VIEW.grp?'on':''}" onclick="VIEW.grp='${escH(x.group)}';render();document.getElementById('sec-agent').scrollIntoView()">${escH(x.group)}<span class="c">${x.own?x.own.n+'/':''}${x.n}</span></button>`).join('')}
+      <label class="chip2" style="margin-left:8px"><input type="checkbox" ${VIEW.ednOnly?'checked':''} onchange="VIEW.ednOnly=this.checked;render()"> EDN saja</label></div>
+    <div class="tbl-wrap" style="max-height:600px"><table class="t"><thead><tr><th class="n">Rank</th><th class="n">Δ</th><th>Agent</th><th>Vendor</th><th>TL</th><th class="n">Hari</th><th class="n">Pokok</th><th class="n">Terbayar</th><th class="n">Rate</th><th class="n">Gross</th><th>Persentil</th></tr></thead><tbody>
+    ${list.map(r=>{const p=pmap[key(r)];return `<tr class="${r.comp===OWN?'own clk':''}" ${r.comp===OWN?`onclick="openAgent('${escH(key(r))}')"`:''}><td class="n"><b>${r.rank}</b><span class="muted">/${g.n}</span></td><td class="n">${dRank(r,p)}</td>
+      <td><b>${escH(r.ag)}</b>${r.baru?' <span class="ib" style="background:#d1fae5;color:#065f46">Baru</span>':''}</td><td><span class="ib" style="background:${vColor(r.comp)}22;color:${vColor(r.comp)}">${escH(r.comp)}</span></td><td>${escH(r.tl)}</td>
+      <td class="n ${r.days<g.days?'bad':''}">${r.days}</td><td class="n">${fmtJt(r.os)}</td><td class="n">${fmtJt(r.paid)}</td><td class="n">${fmtPct(r.rate)}</td><td class="n"><b>${fmtRp(r.gross)}</b></td>
+      <td>${bandPill(r.band)}</td></tr>`;}).join('')}
+    </tbody></table></div><div class="vnote">Klik baris EDN untuk detail agent + aktivitas internal (All Data). Hari merah = hari kerja lebih sedikit dari bucket (agent baru/pindahan).</div>`});
+  // 6. Tim TL EDN
+  const tls={};own.forEach(r=>{const k=r.group+'|'+r.tl;const t=tls[k]=tls[k]||{tl:r.tl,group:r.group,n:0,os:0,paid:0,gross:0,rank:0,top:0,low:0,baru:0};t.n++;t.os+=r.os;t.paid+=r.paid;t.gross+=r.gross;t.rank+=r.rank/G[r.group].n*100;if(r.band<=1&&r.band>=0)t.top++;if(r.band>=4)t.low++;if(r.baru)t.baru++;});
+  S.push({id:'tl',t:'Tim TL EDN',h:`<div class="tbl-wrap"><table class="t"><thead><tr><th>TL (versi klien)</th><th>Bucket</th><th class="n">Agent</th><th class="n">Rate</th><th class="n">Gross/agent</th><th class="n">vs median bucket</th><th class="n" title="0% = paling atas bucket">Posisi rata²</th><th class="n">Top 25%</th><th class="n">Zona bawah</th></tr></thead><tbody>
+    ${Object.values(tls).sort((a,b)=>a.group.localeCompare(b.group)).map(t=>{const gp=t.gross/t.n, md=G[t.group].median;return `<tr><td><b>${escH(t.tl)}</b></td><td>${escH(t.group)}</td><td class="n">${t.n}${t.baru?` <span class="muted">(${t.baru} baru)</span>`:''}</td><td class="n">${fmtPct(t.paid/t.os*100)}</td><td class="n">${fmtRp(gp)}</td><td class="n ${gp<md?'bad':'good'}">${gp>=md?'+':''}${fmtJt(gp-md)}</td><td class="n ${t.rank/t.n>50?'bad':'good'}">${fmtPct(Math.min(t.rank/t.n,100),0)}</td><td class="n good">${t.top}</td><td class="n ${t.low?'bad':''}">${t.low}</td></tr>`;}).join('')}
+    </tbody></table></div><div class="vnote">"Posisi rata²" = rata-rata posisi agent tim di bucket (0% = paling atas, 100% = paling bawah; di atas 50% = separuh bawah). Median bucket = gross agent ke-tengah di bucket itu (semua vendor).</div>`});
+  // 7. Daftar perhatian
+  const watch=own.filter(r=>r.band>=4||(p=>p&&r.rank-p.rank>=5)(pmap[key(r)])).sort((a,b)=>b.band-a.band||(b.rank/G[b.group].n)-(a.rank/G[a.group].n));
+  S.push({id:'watch',t:'Agent Perlu Perhatian',h:watch.length?`<div class="tbl-wrap"><table class="t"><thead><tr><th>Agent</th><th>Bucket</th><th>TL</th><th class="n">Rank</th><th class="n">Δ</th><th>Persentil</th><th class="n">Gross</th><th class="n">Kurang dari median</th><th class="n">Hari</th><th>Catatan</th></tr></thead><tbody>
+    ${watch.map(r=>{const gg=G[r.group],p=pmap[key(r)],gap=gg.median-r.gross;const notes=[r.baru?'agent baru (masuk '+escH(r.masuk)+')':'',r.days<gg.days?`baru ${r.days} hari kerja`:'',p&&r.rank-p.rank>=5?`turun ${r.rank-p.rank} peringkat`:''].filter(Boolean).join(' · ');
+      return `<tr class="clk" onclick="openAgent('${escH(key(r))}')"><td><b>${escH(r.ag)}</b></td><td>${escH(r.group)}</td><td>${escH(r.tl)}</td><td class="n">${r.rank}<span class="muted">/${gg.n}</span></td><td class="n">${dRank(r,p)}</td><td>${bandPill(r.band)}</td><td class="n">${fmtRp(r.gross)}</td><td class="n bad">${gap>0?fmtRp(gap):'—'}</td><td class="n">${r.days}</td><td class="muted" style="white-space:normal;min-width:160px">${notes}</td></tr>`;}).join('')}
+    </tbody></table></div><div class="vnote">Masuk daftar kalau persentil 70–90% / Bottom 10%, atau turun ≥5 peringkat dibanding laporan pembanding. Klik untuk melihat aktivitas internalnya.</div>`:'<div class="issues ok">Tidak ada agent EDN di zona bawah 👍</div>'});
+
+  box.innerHTML=S.map((s,i)=>`<section class="sec card" id="sec-${s.id}" data-i="${i}"><div class="sec-title">${i+1}. ${s.t}</div><div class="card-sub" style="margin-bottom:12px">Laporan ${dLabel(VIEW.date)}${VIEW.cmp?' · pembanding '+dLabel(VIEW.cmp):''}</div>${s.h}</section>`).join('');
+  PRES.n=S.length;if(document.body.classList.contains('present'))pShow();
+  S.forEach(s=>s.after&&s.after());
+}
+function dRank(r,p){if(!p)return '<span class="d-eq">baru</span>';const d=p.rank-r.rank;return d>0?`<span class="d-up">▲${d}</span>`:d<0?`<span class="d-dn">▼${-d}</span>`:'<span class="d-eq">=</span>';}
+function bandPill(i){return i<0?'—':`<span class="ib" style="background:${BAND_COLOR[i]}26;color:${i===3?'#a16207':BAND_COLOR[i]}">${BANDS[i]}</span>`;}
+function scoreCard(g,pg){
+  const maxG=Math.max(...g.vend.map(v=>v.grossPer),1), lead=g.byGross[0], rl=g.byRate[0];
+  const posR=g.own?g.byRate.indexOf(g.own)+1:null, posG=g.own?g.byGross.indexOf(g.own)+1:null;
+  const pOwn=pg&&pg.own;
+  const badge=!g.own?'<span class="ib" style="background:var(--surface);color:var(--text3)">tanpa EDN</span>':g.vend.length<2?'<span class="ib" style="background:var(--surface);color:var(--text3)">EDN saja</span>':`<span class="ib" style="background:${posR===1?'var(--success-bg)':'var(--danger-bg)'};color:${posR===1?'var(--success)':'var(--danger)'}">Rate #${posR}/${g.vend.length}</span> <span class="ib" style="background:${posG===1?'var(--success-bg)':'var(--warning-bg)'};color:${posG===1?'var(--success)':'var(--warning)'}">Gross #${posG}/${g.vend.length}</span>`;
+  let note='';
+  if(g.own&&g.vend.length>1){
+    if(lead!==g.own)note+=`Untuk menyamai ${escH(lead.comp)}, tiap agent EDN butuh tambahan uang masuk ±<b>${fmtRp(lead.grossPer-g.own.grossPer)}</b> (total ±${fmtJt((lead.grossPer-g.own.grossPer)*g.own.n)}). `;
+    if(rl===g.own&&lead!==g.own&&Math.abs(g.own.os/g.own.n-lead.os/lead.n)>0.1*lead.os/lead.n)note+=`EDN unggul rate tapi kalah gross — pokok per agent EDN ${fmtJt(g.own.os/g.own.n)} vs ${escH(lead.comp)} ${fmtJt(lead.os/lead.n)}. `;
+    if(pOwn)note+=`Sejak ${dShort(VIEW.cmp)}: rate ${pOwn.rate<=g.own.rate?'naik':'turun'} ${fmtPct(Math.abs(g.own.rate-pOwn.rate))}, rata² rank ${g.own.avgRank<=pOwn.avgRank?'membaik':'memburuk'} ${Math.abs(pOwn.avgRank-g.own.avgRank).toFixed(1)}.`;
+  }
+  return `<div class="vcard"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)} · ${g.days} hari</span></span><span>${badge}</span></div><div class="vcard-b">
+    <div class="vrow" style="font-size:10.5px;color:var(--text3);font-weight:700"><span>VENDOR</span><span>GROSS / AGENT</span><span class="n">RATE</span><span class="n">GROSS/AG</span><span class="n">RANK</span></div>
+    ${g.byGross.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.grossPer/maxG*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===rl&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span></div>`).join('')}
+    ${note?`<div class="vnote">${note}</div>`:''}
+    ${g.vend.some(v=>v.outl.length)?`<div class="vnote muted">Tidak dihitung (pokok tidak wajar, >5× median bucket): ${g.vend.flatMap(v=>v.outl.map(r=>`${escH(r.ag)} (${escH(v.comp)}, ${fmtJt(r.os)})`)).join(', ')}.</div>`:''}</div></div>`;
+}
+let TCH=null;
+function trendChart(dates,groups){
+  const c=document.getElementById('cTrend');if(!c)return;if(TCH){TCH.destroy();TCH=null;}
+  const pal=['#1d60c8','#16a34a','#d97706','#7c3aed','#db2777','#0891b2'];
+  const ds=groups.map((gname,i)=>({label:gname,borderColor:pal[i%pal.length],backgroundColor:pal[i%pal.length]+'33',tension:.25,borderWidth:2.5,pointRadius:3,
+    data:dates.map(d=>{const v=rowsAt(d).filter(r=>r.group===gname&&r.comp===OWN);const os=v.reduce((a,r)=>a+r.os,0);return os?v.reduce((a,r)=>a+r.paid,0)/os*100:null;})}));
+  TCH=new Chart(c,{type:'line',data:{labels:dates.map(dShort),datasets:ds},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'}},scales:{y:{ticks:{callback:v=>v.toFixed(2)+'%'}}}}});
+}
+
+/* ── presentasi ── */
+const PRES={i:0,n:0};
+function togglePresent(){document.body.classList.toggle('present');PRES.i=0;pShow();window.scrollTo(0,0);}
+function pShow(){document.querySelectorAll('.sec').forEach((s,i)=>s.classList.toggle('cur',i===PRES.i));document.getElementById('pInfo').textContent=`${PRES.i+1} / ${PRES.n} · tombol panah ← →`;}
+function pGo(d){PRES.i=Math.max(0,Math.min(PRES.n-1,PRES.i+d));pShow();window.scrollTo(0,0);}
+document.addEventListener('keydown',e=>{if(!document.body.classList.contains('present'))return;if(e.key==='ArrowRight'||e.key==='PageDown')pGo(1);if(e.key==='ArrowLeft'||e.key==='PageUp')pGo(-1);if(e.key==='Escape')togglePresent();});
+
+/* ── detail agent + data internal ── */
+async function loadInternal(){
+  const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value, k=bulan+'|'+tahun;
+  if(INTERNAL[k])return INTERNAL[k];
+  try{const res=await fetch(`${API_URL}?action=agentdata&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}&aplikasi=${encodeURIComponent(APLIKASI_INTERNAL)}`).then(r=>r.json());
+    INTERNAL[k]=res.success?res.rows:[];}catch(e){INTERNAL[k]=[];}
+  return INTERNAL[k];
+}
+async function openAgent(k){
+  const R=rowsAt(VIEW.date), r=R.find(x=>key(x)===k);if(!r)return;
+  const m=document.getElementById('mAgent');m.classList.add('open');
+  document.getElementById('agTitle').textContent=r.ag;
+  document.getElementById('agSub').textContent=`${r.comp} · ${r.group} (DPD ${r.dpd}) · TL ${r.tl}${r.baru?' · agent baru, masuk '+r.masuk:''}`;
+  const hist=DATA.dates.map(d=>({d,r:rowsAt(d).find(x=>key(x)===k)})).filter(x=>x.r);
+  const n=R.filter(x=>x.group===r.group).length;
+  let h=`<div class="kpis"><div class="kpi"><div class="l">Peringkat</div><div class="v">${r.rank}<small class="muted">/${n}</small></div><div class="s">${BANDS[r.band]||''}</div></div>
+    <div class="kpi"><div class="l">Gross</div><div class="v">${fmtJt(r.gross)}</div><div class="s">${r.days} hari kerja · ${fmtJt(r.gross/Math.max(1,r.days))}/hari</div></div>
+    <div class="kpi"><div class="l">Rate</div><div class="v">${fmtPct(r.rate)}</div><div class="s">${fmtJt(r.paid)} dari ${fmtJt(r.os)}</div></div></div>`;
+  if(hist.length>1)h+=`<div class="card-title" style="font-size:13px;margin:6px 0">Riwayat laporan</div><div class="tbl-wrap"><table class="t"><thead><tr><th>Laporan</th><th class="n">Rank</th><th>Persentil</th><th class="n">Gross</th><th class="n">Rate</th></tr></thead><tbody>${hist.map(x=>`<tr><td>${dLabel(x.d)}</td><td class="n">${x.r.rank}</td><td>${bandPill(x.r.band)}</td><td class="n">${fmtRp(x.r.gross)}</td><td class="n">${fmtPct(x.r.rate)}</td></tr>`).join('')}</tbody></table></div>`;
+  h+=`<div id="agInt" style="margin-top:14px"><div class="empty" style="padding:16px"><div class="spinner"></div>Memuat aktivitas internal (All Data Pinjamin)…</div></div>`;
+  document.getElementById('agBody').innerHTML=h;
+  const IR=(await loadInternal()).filter(x=>normKey(x.namaAkun)===normKey(r.ag)||normKey(x.agent)===normKey(r.ag));
+  const el=document.getElementById('agInt');if(!el)return;
+  if(!IR.length){el.innerHTML=`<div class="issues warn">Akun "${escH(r.ag)}" tidak ditemukan di All Data (aplikasi ${APLIKASI_INTERNAL}) bulan ini. Pencocokan memakai kolom NAMA AKUN.</div>`;return;}
+  const hold={};IR.forEach(x=>{hold[x.agent]=(hold[x.agent]||0)+1;});
+  const work=IR.filter(x=>!/OFF|LIBUR/i.test(x.absensi||'')), hadir=work.filter(x=>/HADIR/i.test(x.absensi||''));
+  const sum=f=>hadir.reduce((a,x)=>a+(+x[f]||0),0), hd=Math.max(1,hadir.length);
+  el.innerHTML=`<div class="card-title" style="font-size:13px;margin-bottom:6px">Aktivitas internal (All Data) — dipegang: ${Object.entries(hold).map(([a,c])=>`<b>${escH(a)}</b> ${c} hari`).join(', ')} · TL internal ${escH([...new Set(IR.map(x=>x.teamLeader))].join(', '))}</div>
+    <div class="kpis">
+      <div class="kpi"><div class="l">Hadir</div><div class="v">${hadir.length}<small class="muted">/${work.length}</small></div><div class="s">${work.length-hadir.length} izin/sakit/lainnya</div></div>
+      <div class="kpi"><div class="l">Call / hari</div><div class="v">${fmtNum(sum('callManual')/hd)}</div><div class="s">terhubung ${sum('callManual')?fmtPct(sum('callTerhubung')/sum('callManual')*100,1):'—'}</div></div>
+      <div class="kpi"><div class="l">WA / hari</div><div class="v">${fmtNum((sum('sentuhWA')+sum('sentuhWABA'))/hd)}</div><div class="s">Gojek ${fmtNum(sum('sentuhGojek')/hd)}/hari · SMS ${fmtNum(sum('smsManual')/hd)}/hari</div></div>
+      <div class="kpi"><div class="l">Total data / hari</div><div class="v">${fmtNum(sum('totalData')/hd)}</div><div class="s">PTP ${fmtNum(sum('ptp'))} → bayar ${fmtNum(sum('ptpBayar'))}</div></div>
+      <div class="kpi"><div class="l">Daily payment (internal)</div><div class="v">${fmtJt(sum('dailyPayment'))}</div><div class="s">${fmtNum(sum('jmlDataBayar'))} data bayar</div></div>
+    </div>`;
+}
+
+/* ── upload ── */
+let UP=[];
+const XLSX_SRC='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';let XLSX_P=null;
+function loadXLSX(){if(window.XLSX)return Promise.resolve(window.XLSX);if(!XLSX_P)XLSX_P=new Promise((res,rej)=>{const s=document.createElement('script');s.src=XLSX_SRC;s.onload=()=>res(window.XLSX);s.onerror=()=>{XLSX_P=null;rej(new Error('library Excel gagal dimuat'));};document.head.appendChild(s);});return XLSX_P;}
+function openUpload(){document.getElementById('mUpload').classList.add('open');renderUp();}
+function closeUpload(){document.getElementById('mUpload').classList.remove('open');}
+const HMAP={group:['group_name'],asset:['asset_group_name'],setup:['work_set_up'],outself:['out_self'],dpd:['账龄','aging','dpd'],comp:['director_user_name','company','vendor'],mgr:['manager_user_name'],tlno:['leader_user_no'],tl:['leader_user_name','tl'],
+  agno:['user_no'],ag:['组员','user_name','agent','name'],uid:['user_id'],baru:['newly_enrolled_yes_no','newly_enrolled'],masuk:['date_new'],os:['分案本金','principal','assigned_principal'],paid:['repaid_principal'],rate:['individual_collection_rate'],
+  days:['总天数','days'],gross:['总实收','gross','total_collection'],rank:['gross_collection_ranking','ranking','rank'],intv:['ranking_intervals']};
+function isoOf(v){if(Object.prototype.toString.call(v)==='[object Date]'&&!isNaN(v))return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+  if(typeof v==='number'&&v>30000){const d=new Date(Date.UTC(1899,11,30)+v*86400000);return d.toISOString().slice(0,10);}return String(v??'').trim().slice(0,10);}
+async function addFiles(files){
+  for(const f of files){const u={name:f.name,status:'baca'};UP.push(u);renderUp();
+    try{const X=await loadXLSX();const wb=X.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+      let rows=null;
+      for(const sn of wb.SheetNames){const A=X.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:''});
+        const hi=A.findIndex(r=>r.some(c=>/group_name/i.test(String(c)))&&r.some(c=>/组员|user_no|repaid/i.test(String(c))));if(hi<0)continue;
+        const H=A[hi].map(c=>String(c).trim().toLowerCase());const col={};Object.entries(HMAP).forEach(([k,al])=>{col[k]=H.findIndex(h=>al.includes(h));});
+        if(col.ag<0||col.group<0||col.os<0)continue;
+        const at=(r,k)=>col[k]>=0?r[col[k]]:'';
+        rows=A.slice(hi+1).filter(r=>String(at(r,'ag')).trim()&&String(at(r,'group')).trim()).map(r=>[
+          at(r,'group'),at(r,'asset'),at(r,'setup'),at(r,'outself'),at(r,'dpd'),String(at(r,'comp')||'').trim()||'?',at(r,'mgr'),at(r,'tlno'),at(r,'tl'),at(r,'agno'),at(r,'ag'),at(r,'uid'),at(r,'baru'),isoOf(at(r,'masuk')),at(r,'intv'),
+          +at(r,'os')||0,+at(r,'paid')||0,+at(r,'rate')||0,+at(r,'days')||0,+at(r,'gross')||0,+at(r,'rank')||0].map(v=>typeof v==='string'?v.trim():v));
+        break;}
+      if(!rows||!rows.length)throw new Error('Kolom Performance ranking (group_name, 组员, 分案本金, …) tidak ditemukan.');
+      const m=f.name.match(/(20\d{2})[_\-.](\d{1,2})[_\-.](\d{1,2})/);
+      u.tanggal=m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:'';
+      u.rows=rows;u.comps=[...new Set(rows.map(r=>r[5]))];u.groups=[...new Set(rows.map(r=>r[0]))];u.status='siap';
+      u.own=rows.filter(r=>r[5]===OWN).length;
+    }catch(e){u.status='gagal';u.msg=e.message;}
+    renderUp();}
+}
+function renderUp(){
+  document.getElementById('upList').innerHTML=UP.map((u,i)=>`<div class="upitem"><div class="row"><b>${escH(u.name)}</b>
+    ${u.status==='baca'?'<span class="muted">membaca…</span>':u.status==='gagal'?`<span class="bad">❌ ${escH(u.msg)}</span>`:u.status==='ok'?`<span class="good">✅ tersimpan (${escH(u.msg)})</span>`:u.status==='simpan'?'<span class="muted">menyimpan…</span>':''}</div>
+    ${u.rows?`<div class="row" style="margin-top:6px"><span>${u.rows.length} agent · ${u.own} EDN · vendor: ${u.comps.map(escH).join(', ')} · bucket: ${u.groups.map(escH).join(', ')}</span></div>
+    ${u.comps.length===1?`<div class="issues warn" style="margin:6px 0 0">File ini hanya berisi ${escH(u.comps[0])} — hanya baris ${escH(u.comps[0])} di tanggal tsb yang diganti; perbandingan vendor tetap pakai data file lengkap kalau sudah ada.</div>`:''}
+    ${u.status==='siap'||u.status==='gagal-simpan'?`<div class="row" style="margin-top:8px"><label>Tanggal data <input type="date" value="${u.tanggal}" onchange="UP[${i}].tanggal=this.value"></label><button class="btn btn-primary" onclick="saveUp(${i})">💾 Simpan</button>${u.status==='gagal-simpan'?`<span class="bad">${escH(u.msg)}</span>`:''}</div>`:''}`:''}</div>`).join('');
+}
+async function saveUp(i){
+  const u=UP[i];if(!/^\d{4}-\d{2}-\d{2}$/.test(u.tanggal||'')){alert('Isi tanggal data dulu.');return;}
+  u.status='simpan';renderUp();
+  try{const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'pinj_save',tanggal:u.tanggal,rows:u.rows})}).then(r=>r.json());
+    if(!res.success)throw new Error(/Unknown action/i.test(res.message||'')?'Code.gs belum diperbarui — tempel Code.gs terbaru & deploy versi baru.':res.message);
+    u.status='ok';u.msg=`${u.tanggal}, ${res.result.added} baris`;renderUp();
+    const [y,mo]=u.tanggal.split('-');document.getElementById('selBulan').value=BULAN[+mo-1];document.getElementById('selTahun').value=y;
+    await loadData(u.tanggal);
+  }catch(e){u.status='gagal-simpan';u.msg=e.message;renderUp();}
+}
+
+/* ── LOCK (sama dgn Laporan Klien) ── */
+const PAGE_PASSWORD='Marki';
+const PAGE_SESSION_KEY='tz_page_auth_klien';
+(function(){let ok=false;try{ok=sessionStorage.getItem(PAGE_SESSION_KEY)==='1';}catch(e){}
+  if(ok)document.getElementById('lockOverlay').remove();else document.body.style.overflow='hidden';})();
+function doUnlockPage(){
+  if(document.getElementById('lockInput').value===PAGE_PASSWORD){try{sessionStorage.setItem(PAGE_SESSION_KEY,'1');}catch(e){}document.getElementById('lockOverlay').remove();document.body.style.overflow='';}
+  else{document.getElementById('lockError').style.display='block';document.getElementById('lockInput').value='';}
+}
+loadData();
+</script>
+</body>
+</html>
