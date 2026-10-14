@@ -20,7 +20,6 @@
 .cpimg:hover{color:var(--accent);border-color:var(--accent)}
 .cpimg-wrap{display:inline-flex;gap:6px;align-items:center;margin-left:auto}
 .cpshot .tbl-wrap{overflow:visible!important;max-height:none!important}
-.cpshot .tbl-wrap table{width:auto}
 @media print{.cpimg{display:none!important}}`;
   document.head.appendChild(css);
 
@@ -29,6 +28,11 @@
     try {
       const h2c = await lib();
       const bg = getComputedStyle(target).backgroundColor;
+      // tabel yang lebih lebar dari kartu: lebarkan kartu sementara supaya tidak terpotong
+      let extra = 0;
+      target.querySelectorAll('.tbl-wrap').forEach(t => { extra = Math.max(extra, t.scrollWidth - t.clientWidth); });
+      const oldW = target.style.width, oldMax = target.style.maxWidth;
+      if (extra > 0) { target.style.maxWidth = 'none'; target.style.width = (target.offsetWidth + extra + 2) + 'px'; }
       target.classList.add('cpshot');
       const w = Math.max(target.scrollWidth, target.offsetWidth);
       const canvas = await h2c(target, {
@@ -36,7 +40,7 @@
         useCORS: true, logging: false, windowWidth: Math.max(document.documentElement.clientWidth, w + 80),
         ignoreElements: el => !!(el.classList && (el.classList.contains('noprint') || el.classList.contains('cpimg') || el.classList.contains('fsbtn')))
       });
-      target.classList.remove('cpshot');
+      target.classList.remove('cpshot'); target.style.width = oldW; target.style.maxWidth = oldMax;
       const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
       let copied = false;
       try {
@@ -53,7 +57,7 @@
       }
       btn.textContent = copied ? '✅ Tersalin — paste di WA' : '⬇ Diunduh (PNG)';
     } catch (e) {
-      target.classList.remove('cpshot');
+      target.classList.remove('cpshot'); target.style.width = ''; target.style.maxWidth = '';
       btn.textContent = '❌ Gagal'; console.error(e);
     }
     setTimeout(() => { btn.textContent = old; btn.disabled = false; }, 2200);
