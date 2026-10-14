@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="id" data-theme="light">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pinjamin Harian — System TZ Analytics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
+  --border:#e4e7ec;--text:#111827;--text2:#4b5563;--text3:#9ca3af;
+  --accent:#1d60c8;--accent-bg:#eef3fd;
+  --success:#059669;--success-bg:#ecfdf5;
+  --warning:#d97706;--warning-bg:#fffbeb;
+  --danger:#dc2626;--danger-bg:#fef2f2;
+  --radius:10px;--radius-sm:6px;
+  --shadow:0 1px 3px rgba(0,0,0,0.07);--shadow-md:0 4px 12px rgba(0,0,0,0.1);
+  --sidebar-w:220px;
+}
+[data-theme="dark"]{
+  --navy:#0f1523;--bg:#0a0d14;--surface:#131825;--surface2:#1a2035;
+  --border:#252d42;--text:#f1f3f9;--text2:#9aa5be;--text3:#6b7690;
+  --accent:#4a8cf7;--accent-bg:#1a2540;
+  --success:#34d399;--success-bg:#0d2e22;
+  --warning:#fbbf24;--warning-bg:#2d200a;
+  --danger:#f87171;--danger-bg:#2d0f0f;
+  --shadow:0 1px 3px rgba(0,0,0,0.4);--shadow-md:0 4px 12px rgba(0,0,0,0.5);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px;}
+.navbar{position:fixed;top:0;left:0;right:0;height:52px;background:var(--navy);display:flex;align-items:center;justify-content:space-between;padding:0 20px 0 calc(var(--sidebar-w) + 20px);z-index:200;box-shadow:0 2px 8px rgba(0,0,0,0.3);}
+.nav-logo{font-size:15px;font-weight:700;color:#fff;display:flex;align-items:center;gap:8px;text-decoration:none;}
+.nav-logo-badge{background:var(--accent);color:#fff;font-size:11px;font-weight:700;padding:2px 8px;border-radius:4px;}
+.nav-page-title{font-size:13px;color:rgba(255,255,255,0.5);border-left:1px solid rgba(255,255,255,0.15);padding-left:12px;margin-left:4px;}
+.nav-right{display:flex;align-items:center;gap:10px;}
+.theme-toggle{display:flex;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:var(--radius-sm);overflow:hidden;}
+.theme-btn{padding:5px 10px;font-size:12px;color:rgba(255,255,255,0.5);cursor:pointer;border:none;background:none;}
+.theme-btn.active{background:rgba(255,255,255,0.2);color:#fff;}
+.sidebar{position:fixed;top:52px;left:0;width:var(--sidebar-w);height:calc(100vh - 52px);background:var(--surface);border-right:1px solid var(--border);overflow-y:auto;z-index:100;}
+.sidebar-section{padding:16px 12px 8px;}
+.sidebar-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:var(--radius-sm);color:var(--text2);font-size:13px;font-weight:500;text-decoration:none;margin-bottom:2px;}
+.sidebar-item:hover{background:var(--surface2);color:var(--text);}
+.sidebar-item.active{background:var(--accent-bg);color:var(--accent);}
+.sidebar-item .icon{font-size:15px;width:18px;text-align:center;flex-shrink:0;}
+.sidebar-divider{height:1px;background:var(--border);margin:8px 12px;}
+.main{margin-left:var(--sidebar-w);margin-top:52px;padding:28px;min-height:calc(100vh - 52px);max-width:calc(1400px + var(--sidebar-w));}
+.eyebrow{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px;}
+h1{font-size:26px;font-weight:800;letter-spacing:-.01em;margin-bottom:6px;}
+.lead{color:var(--text2);font-size:14px;margin-bottom:20px;max-width:760px;line-height:1.5;}
+.filters{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:22px;}
+.filters label{font-size:12px;color:var(--text3);}
+select,input[type=date]{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;outline:none;}
+select:focus{border-color:var(--accent);}
+.btn{border:none;border-radius:var(--radius-sm);padding:8px 14px;font-size:13px;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px;}
+.btn-primary{background:var(--accent);color:#fff;}
+.btn-primary:hover{opacity:.9;}
+.btn-ghost{background:var(--surface);color:var(--text2);border:1px solid var(--border);}
+.btn-ghost:hover{color:var(--text);}
+.btn:disabled{opacity:.5;cursor:not-allowed;}
+.seg{display:inline-flex;border:1px solid var(--border);border-radius:var(--radius-sm);overflow:hidden;background:var(--surface);}
+.seg button{padding:6px 14px;font-size:12px;font-weight:600;border:none;background:none;color:var(--text2);cursor:pointer;}
+.seg button.on{background:var(--accent);color:#fff;}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:18px 20px;margin-bottom:20px;}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px;}
+.card-title{font-size:16px;font-weight:700;}
+.card-sub{font-size:12px;color:var(--text3);margin-top:3px;}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin-bottom:16px;}
+.kpi{background:var(--surface2);border-radius:8px;padding:12px 14px;min-width:0;}
+.kpi .l{font-size:11px;color:var(--text3);font-weight:600;margin-bottom:4px;}
+.kpi .v{font-size:20px;font-weight:800;}
+.kpi .s{font-size:11.5px;color:var(--text2);margin-top:2px;}
+.good{color:var(--success)!important;}.bad{color:var(--danger)!important;}
+.chart-wrap{position:relative;height:320px;}
+.tbl-wrap{overflow:auto;border:1px solid var(--border);border-radius:8px;}
+table.t{border-collapse:separate;border-spacing:0;width:100%;font-size:12px;}
+table.t th{position:sticky;top:0;background:var(--surface2);color:var(--text2);font-size:11px;font-weight:700;text-align:left;padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--border);z-index:1;}
+table.t td{padding:6px 10px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td.n,table.t th.n{text-align:right;font-variant-numeric:tabular-nums;}
+table.t tr.edn td{background:var(--accent-bg);}
+table.t tr.edn td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+.pill{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;}
+.pill-edn{background:var(--accent);color:#fff;}
+.pill-red{background:var(--danger-bg);color:var(--danger);}
+.pill-ok{background:var(--success-bg);color:var(--success);}
+.pill-warn{background:var(--warning-bg);color:var(--warning);}
+.rankstrip{display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;}
+.rankstrip .d{background:var(--surface2);border-radius:6px;padding:5px 8px;text-align:center;min-width:54px;}
+.rankstrip .d .x{font-size:10px;color:var(--text3);}
+.rankstrip .d .y{font-size:13px;font-weight:800;}
+.tlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
+.tlbox{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.tlbox-h{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--surface2);font-weight:700;font-size:12.5px;gap:8px;}
+.tlbox-r{display:flex;justify-content:space-between;gap:8px;padding:6px 12px;border-top:1px solid var(--border);font-size:12px;}
+.tlbox-r .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.muted{color:var(--text3);}
+.empty{padding:36px 16px;text-align:center;color:var(--text3);font-size:13px;line-height:1.6;}
+.spinner{width:28px;height:28px;border:3px solid var(--border);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 12px;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.lock-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;}
+.lock-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow-md);padding:36px 40px;text-align:center;max-width:360px;width:100%;}
+.lock-icon{font-size:48px;margin-bottom:16px;}
+.lock-title{font-size:18px;font-weight:700;margin-bottom:6px;}
+.lock-sub{font-size:13px;color:var(--text3);margin-bottom:24px;}
+.lock-input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface2);color:var(--text);font-size:14px;text-align:center;letter-spacing:2px;outline:none;margin-bottom:12px;}
+.lock-btn{width:100%;padding:10px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius-sm);font-size:14px;font-weight:600;cursor:pointer;}
+.lock-error{font-size:12px;color:var(--danger);margin-top:8px;display:none;}
+@media(max-width:768px){:root{--sidebar-w:0px;}.sidebar{display:none;}.navbar{padding-left:16px;}.main{margin-left:0;padding:18px 16px;}.nav-page-title{display:none;}h1{font-size:22px;}.chart-wrap{height:260px;}}
+
+.tolbox{display:flex;gap:10px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--text2);background:var(--surface);border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:18px;}
+.tolbox input{width:60px;padding:5px 6px;border:1px solid var(--border);border-radius:6px;background:var(--surface2);color:var(--text);font-size:12px;}
+.flag{display:inline-block;padding:1px 6px;border-radius:999px;font-size:10px;font-weight:700;margin:1px 2px 1px 0;white-space:nowrap;}
+.f-beda{background:var(--danger-bg);color:var(--danger);}
+.f-absen{background:var(--warning-bg);color:var(--warning);}
+.f-copas{background:#ede9fe;color:#6d28d9;}
+[data-theme="dark"] .f-copas{background:#2a2145;color:#c4b5fd;}
+.f-asal{background:#e0f2fe;color:#0369a1;}
+[data-theme="dark"] .f-asal{background:#0c2a3d;color:#7dd3fc;}
+.f-conn{background:var(--surface2);color:var(--text2);}
+table.t tr.clickable{cursor:pointer;}
+table.t tr.clickable:hover td{background:var(--surface2);}
+details summary{cursor:pointer;font-weight:700;font-size:13px;}
+td.notes{white-space:normal!important;min-width:260px;}
+/* Fullscreen tabel detail */
+.card.fs{position:fixed;inset:0;z-index:600;margin:0;border-radius:0;overflow:auto;display:flex;flex-direction:column;}
+.card.fs .tbl-wrap{max-height:none!important;flex:1;}
+body.fs-open{overflow:hidden;}
+/* Popup agent per TL */
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:700;align-items:flex-start;justify-content:center;padding:30px 12px;overflow-y:auto;}
+.modal.open{display:flex;}
+.modal-box{background:var(--surface);border-radius:var(--radius);width:100%;max-width:1000px;box-shadow:0 20px 60px rgba(0,0,0,.3);display:flex;flex-direction:column;max-height:calc(100vh - 60px);}
+.modal-h{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;padding:14px 18px;border-bottom:1px solid var(--border);}
+.modal-b{padding:14px 18px;overflow:auto;}
+.agcard{border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.agcard-h{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);cursor:pointer;flex-wrap:wrap;}
+.agcard-h .nm{font-weight:800;font-size:13px;}
+.agcard-b{display:none;padding:4px 12px 10px;}
+.agcard.open .agcard-b{display:block;}
+.agline{display:flex;gap:10px;padding:6px 0;border-top:1px solid var(--border);font-size:12px;flex-wrap:wrap;align-items:baseline;}
+.agline .d{width:80px;flex-shrink:0;font-weight:700;}
+.agline .n{width:150px;flex-shrink:0;color:var(--text2);font-variant-numeric:tabular-nums;}
+
+/* ── Pinjamin ── */
+.projsw{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:var(--surface);margin-bottom:12px;}
+.projsw a{padding:5px 14px;font-size:12px;font-weight:700;color:var(--text2);text-decoration:none;}
+.projsw a.on{background:var(--navy);color:#fff;}
+.sec{scroll-margin-top:70px;}
+.sec-title{font-size:17px;font-weight:800;margin-bottom:4px;}
+.vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(620px,1fr));gap:14px;}
+.vcard{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);}
+.vcard-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--surface2);}
+.vcard-h .sub{font-size:11.5px;color:var(--text3);font-weight:600;margin-top:2px;white-space:nowrap;}
+.vcard-h .rt{display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+.fsbtn.ico{float:none;margin:0;padding:3px 8px;font-size:13px;line-height:1;}
+.vcard-h .g{font-weight:800;font-size:15px;}
+.vcard-b{padding:10px 14px;}
+.vrow{display:grid;grid-template-columns:100px minmax(24px,1fr) 58px 66px 38px 118px 108px;gap:10px;align-items:center;font-size:12.5px;padding:6px 0;border-top:1px dashed var(--border);}
+.vrow>*{white-space:nowrap;}
+.vrow .gp{font-size:11.5px;}
+.vrow.hd{font-size:10.5px;color:var(--text3);font-weight:700;letter-spacing:.03em;border-top:none;padding-top:0;}
+.vrow:first-child{border-top:none;}
+.vrow.own{font-weight:800;}
+.vrow .nm{display:flex;align-items:center;gap:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.vrow .n{text-align:right;font-variant-numeric:tabular-nums;}
+.trk{height:9px;background:var(--surface2);border-radius:5px;overflow:hidden;}
+.trk span{display:block;height:100%;background:#94a3b8;border-radius:5px;}
+.vrow.own .trk span{background:var(--accent);}
+.bands{display:flex;height:16px;border-radius:5px;overflow:hidden;background:var(--surface2);}
+.bands span{display:block;height:100%;}
+.bandrow{display:grid;grid-template-columns:110px 1fr 40px;gap:8px;align-items:center;font-size:11.5px;margin:4px 0;}
+.legend2{display:flex;gap:10px;flex-wrap:wrap;font-size:11px;color:var(--text2);margin-top:6px;}
+.legend2 i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+.vnote{font-size:11.5px;color:var(--text2);margin-top:8px;line-height:1.5;}
+.ib{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
+.d-up{color:var(--success);font-weight:700;font-size:11px;}.d-dn{color:var(--danger);font-weight:700;font-size:11px;}.d-eq{color:var(--text3);font-size:11px;}
+table.t tr.own td{background:var(--accent-bg);}
+table.t tr.own td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+table.t tr.clk{cursor:pointer;}table.t tr.clk:hover td{background:var(--surface2);}
+.tabs2{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px;}
+.tabs2 button{border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:999px;padding:5px 12px;font-size:12px;font-weight:600;cursor:pointer;}
+.tabs2 button.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.tabs2 button .c{opacity:.7;font-weight:500;margin-left:4px;}
+.upzone{border:2px dashed var(--border);border-radius:10px;padding:26px;text-align:center;color:var(--text2);cursor:pointer;}
+.upzone:hover{border-color:var(--accent);color:var(--accent);}
+.upitem{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:10px;font-size:12.5px;}
+.upitem .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.issues{border-radius:8px;padding:9px 12px;font-size:12.5px;margin:8px 0;line-height:1.5;}
+.issues.warn{background:var(--warning-bg);color:var(--warning);}
+.issues.ok{background:var(--success-bg);color:var(--success);}
+.issues.bad{background:var(--danger-bg);color:var(--danger);}
+.story{font-size:14.5px;line-height:1.65;background:var(--accent-bg);border-left:4px solid var(--accent);padding:12px 16px;border-radius:8px;margin-bottom:16px;}
+.chip2{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);}
+.rankstrip{display:flex;gap:6px;flex-wrap:wrap;}
+.rankstrip .d{border-radius:6px;padding:5px 8px;text-align:center;min-width:58px;}
+.rankstrip .d .x{font-size:10px;color:var(--text3);}
+.rankstrip .d .y{font-size:14px;font-weight:800;}
+/* layar penuh per kartu */
+.fsbtn{float:right;border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;margin-left:8px;}
+.fsbtn:hover{color:var(--accent);border-color:var(--accent);}
+.fsmode{position:fixed!important;inset:0!important;z-index:800!important;margin:0!important;border-radius:0!important;overflow:auto!important;max-width:none!important;padding:22px 28px!important;background:var(--surface)!important;}
+.fsmode .tbl-wrap{max-height:none!important;}
+.fsmode .vcards{grid-template-columns:repeat(auto-fill,minmax(600px,1fr));}
+body.fs-on{overflow:hidden;}
+.modal{z-index:900!important;}
+.ladder td.gap{font-weight:800;color:var(--danger);}
+.goal{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px;margin:8px 0 14px;}
+.goal div{background:var(--surface2);border-radius:8px;padding:10px 12px;}
+.goal .l{font-size:11px;color:var(--text3);font-weight:700;}
+.goal .v{font-size:17px;font-weight:800;color:var(--danger);margin-top:2px;}
+.goal .s{font-size:11px;color:var(--text2);}
+.goal .ok .v{color:var(--success);}
+@media print{.fsbtn{display:none;}}
+/* presentasi */
+body.present .sidebar,body.present .navbar,body.present .filters,body.present .projsw,body.present .eyebrow,body.present h1,body.present .lead{display:none!important;}
+body.present .main{margin:0;padding:24px 32px 80px;max-width:none;}
+body.present .sec{display:none;}
+body.present .sec.cur{display:block;}
+.pnav{display:none;}
+body.present .pnav{display:flex;position:fixed;left:0;right:0;bottom:0;justify-content:space-between;align-items:center;padding:10px 24px;background:var(--surface);border-top:1px solid var(--border);z-index:300;}
+@media print{.sidebar,.navbar,.filters,.projsw,.pnav,.noprint,.lock-overlay{display:none!important;}.main{margin:0!important;padding:0!important;}.card{break-inside:avoid;box-shadow:none;}body{background:#fff;}}
+@media(max-width:768px){.vcards{grid-template-columns:1fr;}.vrow{grid-template-columns:70px 0 48px 54px 30px 1fr 1fr;gap:5px;font-size:10.5px;}.vrow .trk{display:none;}}
+.vrow{grid-template-columns:96px minmax(24px,1fr) 52px 108px 108px 118px 112px;}
+.dpick{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:2px 8px;background:var(--surface);font-size:13px;}
+.dpick input{border:0;padding:5px 0;background:transparent;}
+[data-theme="dark"] input[type=date],[data-theme="dark"] input[type=time]{color-scheme:dark;}
+input[type=time]{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;color:var(--text);font-size:13px;}
+.legend2 span{display:block;}
+@media(max-width:768px){.vrow{grid-template-columns:70px 0 48px 1fr 40px 1fr 1fr;}}
+</style>
+</head>
+<body>
+
+<nav class="navbar">
+  <div style="display:flex;align-items:center;gap:12px;">
+    <a class="nav-logo" href="index.html"><span class="nav-logo-badge">TZ</span> System TZ Analytics</a>
+    <span class="nav-page-title">Laporan Klien · Pinjamin Harian</span>
+  </div>
+  <div class="nav-right">
+    <div class="theme-toggle">
+      <button class="theme-btn active" id="btnTerang" onclick="setTheme('light')">☀ Terang</button>
+      <button class="theme-btn" id="btnGelap" onclick="setTheme('dark')">🌙 Gelap</button>
+    </div>
+  </div>
+</nav>
+
+<div class="lock-overlay" id="lockOverlay">
+  <div class="lock-card">
+    <div class="lock-icon">🔒</div>
+    <div class="lock-title">Laporan Klien</div>
+    <div class="lock-sub">Masukkan kata kunci untuk mengakses halaman ini</div>
+    <input class="lock-input" type="password" id="lockInput" placeholder="••••••" onkeydown="if(event.key==='Enter')doUnlockPage()"/>
+    <button class="lock-btn" onclick="doUnlockPage()">Masuk</button>
+    <div class="lock-error" id="lockError">Kata kunci salah. Coba lagi.</div>
+  </div>
+</div>
+
+<aside class="sidebar">
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="index.html"><span class="icon">🏠</span> Home</a>
+  </div>
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section">
+    <a class="sidebar-item" href="team.html"><span class="icon">👥</span> Tim</a>
+    <a class="sidebar-item" href="agent.html"><span class="icon">👤</span> Agent</a>
+    <a class="sidebar-item" href="violation.html"><span class="icon">⚠️</span> Violation</a>
+    <a class="sidebar-item" href="rank.html"><span class="icon">🏆</span> Rank Board</a>
+    <a class="sidebar-item active" href="klien.html"><span class="icon">📑</span> Laporan Klien</a>
+    <a class="sidebar-item" href="qc.html"><span class="icon">📞</span> Cek Call (QC)</a>
+    <a class="sidebar-item" href="cek.html"><span class="icon">✅</span> Cek Kelengkapan</a>
+  </div>
+</aside>
+
+<main class="main">
+  <div class="projsw"><a href="klien.html">Rupiah Cepat</a><a href="jam.html">Per Jam (RC)</a><a href="pinjamin.html">Pinjamin</a><a class="on" href="pinjd.html">Pinjamin Harian</a></div>
+  <div class="eyebrow">Pinjamin — hasil & aktivitas per hari</div>
+  <h1>Pinjamin Harian</h1>
+  <p class="lead">Hasil hari itu per bucket &amp; vendor (EDN, Piper1, Max-QIN, CPU, SCQ) lengkap dengan aktivitas: call, tersambung, durasi, SMS, WA. Sumber: file harian <b>Report.performance</b> (kolom Statistics Date, Business Group). Tarikan siang/sore disimpan per jam; file final besok paginya disimpan sebagai <b>FINAL</b>.</p>
+
+  <div class="filters">
+    <span class="dpick">📅 <input type="date" id="selTanggal" onchange="pickDate(this.value)"></span>
+    <label for="selJam">Tarikan</label>
+    <select id="selJam" onchange="VIEW.jam=this.value;render()"></select>
+    <button class="btn btn-ghost" id="btnRefresh" onclick="loadData(VIEW.tanggal)">↻ Refresh</button>
+    <label class="chip2"><input type="checkbox" id="chkAll" onchange="VIEW.all=this.checked;render()"> semua bucket (termasuk tanpa EDN)</label>
+    <span style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn btn-ghost" onclick="window.print()">🖨️ Cetak / PDF</button>
+      <button class="btn btn-primary" onclick="openUpload()">⬆ Upload File Harian</button>
+    </span>
+  </div>
+
+  <div id="content"><div class="empty"><div class="spinner"></div>Memuat data…</div></div>
+</main>
+
+<div class="modal" id="mUpload" onclick="if(event.target===this)closeUpload()">
+  <div class="modal-box" style="max-width:720px">
+    <div class="modal-h"><div><div class="card-title">Upload file harian Pinjamin</div><div class="card-sub">Tanggal dari kolom Statistics Date. Jam tarik = jam upload (bisa diubah). Kalau tanggal data sudah lewat (file besok pagi) otomatis ditandai FINAL.</div></div><button class="btn btn-ghost" onclick="closeUpload()">✕</button></div>
+    <div class="modal-b">
+      <div class="upzone" onclick="document.getElementById('fileInput').click()" ondragover="event.preventDefault()" ondrop="event.preventDefault();addFiles(event.dataTransfer.files)">📄 Klik atau tarik file .xlsx / .csv ke sini</div>
+      <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" multiple style="display:none" onchange="addFiles(this.files);this.value=''">
+      <div id="upList"></div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="mTl" onclick="if(event.target===this)this.classList.remove('open')">
+  <div class="modal-box">
+    <div class="modal-h"><div><div class="card-title" id="tlTitle"></div><div class="card-sub" id="tlSub"></div></div><button class="btn btn-ghost" onclick="document.getElementById('mTl').classList.remove('open')">✕</button></div>
+    <div class="modal-b" id="tlBody"></div>
+  </div>
+</div>
+
+<script>
+const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYClQWyIadM1bNYkVvzUCgR4TPwdlSLkXEazbDmb6ELKGN/exec';
+const OWN='EDN';
+const BLN3=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
+const HARI=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
+const VCOLOR={EDN:'#1d60c8',PIPER1:'#64748b','MAX-QIN':'#a855f7',CPU:'#0d9488',SCQ:'#ea580c'};
+const GORDER=['A1-1','A1-2','A2','B1','M2','M3','P'];
+// indeks kolom baris endpoint pinjd
+const C={tgl:0,jam:1,grp:2,vend:3,bg:4,tl:5,tlno:6,ag:7,agno:8,cs:9,csNew:10,csIn:11,pokIn:12,pok:13,paid:14,paidD:15,gross:16,call:17,conn:18,self:19,emg:20,callCase:21,depth:22,dur:23,sms:24,cov:25,covIn:26,days:27,waba:28,auto:29};
+let DATA=null, VIEW={tanggal:'',jam:'',all:false,trendG:''}, CH={};
+
+function escH(s){return String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function fmtNum(n){return (n===null||n===undefined||isNaN(n))?'—':Math.round(n).toLocaleString('id-ID');}
+function fmtRp(n){return 'Rp '+fmtNum(n);}
+function fmtPct(n,d=2){return (n===null||n===undefined||isNaN(n)||!isFinite(n))?'—':Number(n).toFixed(d).replace('.',',')+'%';}
+function fmtDur(s){s=Math.round(s||0);const h=Math.floor(s/3600),m=Math.floor(s%3600/60);return h?`${h}j ${m}m`:`${m}m`;}
+function dLabel(iso){const d=new Date(iso+'T00:00:00');return isNaN(d)?iso:`${HARI[d.getDay()]} ${d.getDate()} ${BLN3[d.getMonth()]} ${d.getFullYear()}`;}
+function dShort(iso){const d=new Date(iso+'T00:00:00');return isNaN(d)?iso:`${d.getDate()} ${BLN3[d.getMonth()]}`;}
+function vColor(c){return VCOLOR[String(c).toUpperCase()]||'#94a3b8';}
+function jamKey(j){return j==='FINAL'?'99:99':j;}
+function jamLabel(j){return j==='FINAL'?'FINAL':j;}
+function isDark(){return document.documentElement.getAttribute('data-theme')==='dark';}
+function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{localStorage.setItem('dca_theme',t);}catch(e){}
+  document.getElementById('btnTerang').classList.toggle('active',t==='light');document.getElementById('btnGelap').classList.toggle('active',t==='dark');if(DATA)render();}
+(function(){let t='light';try{t=localStorage.getItem('dca_theme')||'light';}catch(e){}setTheme(t);})();
+
+async function loadData(tgl){
+  const box=document.getElementById('content');box.innerHTML='<div class="empty"><div class="spinner"></div>Memuat data…</div>';
+  const btn=document.getElementById('btnRefresh');btn.disabled=true;
+  try{
+    const res=await fetch(`${API_URL}?action=pinjd${tgl?'&tanggal='+tgl:''}&_=${Date.now()}`).then(r=>r.json());
+    if(!res.success)throw new Error(res.message||'Gagal memuat');
+    DATA=res;VIEW.tanggal=res.tanggal;VIEW.jam='';
+    const inp=document.getElementById('selTanggal');inp.value=res.tanggal||'';
+    if(res.dates.length){inp.min=res.dates[0];inp.max=res.dates[res.dates.length-1];}
+    inp.title='Tanggal yang ada datanya: '+res.dates.join(', ');
+    render();
+  }catch(e){
+    const old=/Unknown action/i.test(e.message);
+    box.innerHTML=`<div class="card"><div class="empty">⚠️ ${escH(old?'Code.gs di Apps Script belum diperbarui (fitur Pinjamin Harian belum terpasang).':e.message)}<br><span class="muted">${old?'Tempel Code.gs terbaru lalu Kelola deployment → ✏️ → Versi baru.':'Klik Refresh untuk coba lagi.'}</span></div></div>`;
+  }
+  btn.disabled=false;
+}
+function pickDate(v){if(!DATA||!DATA.dates.length)return;const ds=DATA.dates;loadData(ds.includes(v)?v:(ds.filter(x=>x<=v).pop()||ds[0]));}
+
+/* ── turunan ── */
+function jams(){return [...new Set(DATA.rows.map(r=>r[C.jam]))].sort((a,b)=>jamKey(a).localeCompare(jamKey(b)));}
+function agents(j){return DATA.rows.filter(r=>r[C.jam]===j).map(r=>({grp:r[C.grp],vend:r[C.vend],tl:r[C.tl],ag:r[C.ag],agno:r[C.agno],pok:r[C.pok],paid:r[C.paid],gross:r[C.gross],
+  call:r[C.call],conn:r[C.conn],dur:r[C.dur],sms:r[C.sms],waba:r[C.waba],cs:r[C.cs],csIn:r[C.csIn],callCase:r[C.callCase],covIn:r[C.covIn],depth:r[C.depth]}));}
+function sumUp(list){const s={n:list.length,pok:0,paid:0,gross:0,call:0,conn:0,dur:0,sms:0,waba:0,csIn:0,callCase:0,nol:0};
+  list.forEach(a=>{['pok','paid','gross','call','conn','dur','sms','waba','csIn','callCase'].forEach(k=>s[k]+=a[k]||0);if(!a.gross)s.nol++;});
+  s.rate=s.pok?s.paid/s.pok*100:0;s.grossPer=s.n?s.gross/s.n:0;s.callPer=s.n?s.call/s.n:0;s.connR=s.call?s.conn/s.call*100:0;s.durPer=s.n?s.dur/s.n:0;
+  s.smsPer=s.n?s.sms/s.n:0;s.wabaPer=s.n?s.waba/s.n:0;s.perCall=s.call?s.gross/s.call:0;return s;}
+function groupsAt(j){
+  const A=agents(j), G={};
+  A.forEach(a=>{(G[a.grp]=G[a.grp]||[]).push(a);});
+  return Object.entries(G).map(([g,list])=>{const V={};list.forEach(a=>(V[a.vend]=V[a.vend]||[]).push(a));
+    const vend=Object.entries(V).map(([v,l])=>Object.assign(sumUp(l),{comp:v,list:l}));
+    const byRate=vend.slice().sort((a,b)=>b.rate-a.rate||b.grossPer-a.grossPer), byGross=vend.slice().sort((a,b)=>b.grossPer-a.grossPer);
+    return {group:g,vend,byRate,byGross,own:vend.find(v=>v.comp===OWN)||null,n:list.length};})
+    .sort((a,b)=>(GORDER.indexOf(a.group)+99*(GORDER.indexOf(a.group)<0))-(GORDER.indexOf(b.group)+99*(GORDER.indexOf(b.group)<0)));
+}
+
+/* ── render ── */
+function render(){
+  Object.values(CH).forEach(c=>c.destroy());CH={};
+  const box=document.getElementById('content');
+  const J=DATA.rows.length?jams():[];
+  const sj=document.getElementById('selJam');
+  if(!J.length){sj.innerHTML='';box.innerHTML=`<div class="card"><div class="empty">${DATA.dates.length?'Tidak ada data tanggal '+dLabel(VIEW.tanggal)+'.':'Belum ada data harian Pinjamin.'}<br><span class="muted">Klik <b>⬆ Upload File Harian</b>.</span></div></div>`;return;}
+  if(!J.includes(VIEW.jam))VIEW.jam=J[J.length-1];
+  sj.innerHTML=J.slice().reverse().map(j=>`<option value="${j}" ${j===VIEW.jam?'selected':''}>${j==='FINAL'?'FINAL (lengkap)':'jam '+j}</option>`).join('');
+  const ji=J.indexOf(VIEW.jam), prevJ=ji>0?J[ji-1]:null;
+  const G=groupsAt(VIEW.jam).filter(g=>VIEW.all||g.own);
+  const PG=prevJ?Object.fromEntries(groupsAt(prevJ).map(g=>[g.group,g])):{};
+  const isFinal=VIEW.jam==='FINAL';
+
+  // ringkasan teks
+  const lines=G.filter(g=>g.own&&g.vend.length>1).map(g=>{const pr=g.byRate.indexOf(g.own)+1, pgx=g.byGross.indexOf(g.own)+1, best=g.byGross[0];
+    return `${g.group}: EDN rate ${fmtPct(g.own.rate)} (#${pr}/${g.vend.length}), gross/agent ${fmtRp(g.own.grossPer)} (#${pgx})`+(best!==g.own?` — kurang ${fmtRp(best.grossPer-g.own.grossPer)}/agent ke ${best.comp}`:' — terbaik')+(g.own.nol?`, ${g.own.nol}/${g.own.n} agent belum ada hasil`:'');});
+  const story=`Pinjamin ${dLabel(VIEW.tanggal)} ${isFinal?'(FINAL)':'s/d jam '+VIEW.jam}\n`+lines.join('\n');
+  window._story=story;
+
+  const own=G.flatMap(g=>g.own?g.own.list:[]), so=sumUp(own);
+  box.innerHTML=`
+  <div class="card">
+    <div class="card-head"><div><div class="card-title">📝 Ringkasan ${escH(dLabel(VIEW.tanggal))} · ${isFinal?'FINAL':'s/d jam '+VIEW.jam}</div><div class="card-sub">${J.length} tarikan: ${J.map(jamLabel).join(' · ')}${isFinal?'':' · angka masih berjalan sampai file FINAL besok pagi'}</div></div>
+      <button class="btn btn-ghost noprint" onclick="copyStory(this)">📋 Salin</button></div>
+    <div class="story" style="white-space:pre-line">${escH(story)}</div>
+    <div class="kpis" style="margin-bottom:0">
+      <div class="kpi"><div class="l">Gross EDN hari ini</div><div class="v">${fmtRp(so.gross)}</div><div class="s">${so.n} agent · terbayar pokok ${fmtRp(so.paid)}</div></div>
+      <div class="kpi"><div class="l">Agent EDN belum ada hasil</div><div class="v ${so.nol?'bad':'good'}">${so.nol} <span style="font-size:13px;color:var(--text3)">/ ${so.n}</span></div><div class="s">gross = 0 ${isFinal?'sepanjang hari':'sampai jam '+VIEW.jam}</div></div>
+      <div class="kpi"><div class="l">Call EDN</div><div class="v">${fmtNum(so.call)}</div><div class="s">${fmtNum(so.callPer)}/agent · tersambung ${fmtPct(so.connR,1)}</div></div>
+      <div class="kpi"><div class="l">Durasi call EDN</div><div class="v">${fmtDur(so.dur)}</div><div class="s">${fmtDur(so.durPer)}/agent · WA ${fmtNum(so.wabaPer)}/agent</div></div>
+    </div>
+  </div>
+
+  <div class="card sec" id="secScore">
+    <div class="card-head"><div><div class="card-title">🏁 Papan Skor Harian per Bucket</div><div class="card-sub">Urut rate (terbayar pokok ÷ pokok hari ini) · ${prevJ?`Δ dibanding tarikan ${jamLabel(prevJ)}`:'Δ muncul kalau ada tarikan sebelumnya di hari yang sama'}</div></div>
+      <button class="fsbtn noprint" onclick="fsToggle('secScore')">⛶ Layar penuh</button></div>
+    <div class="vcards">${G.map(g=>scoreCard(g,PG[g.group])).join('')}</div>
+  </div>
+
+  <div class="card sec" id="secEffort">
+    <div class="card-head"><div><div class="card-title">⚙️ Usaha vs Hasil per Vendor</div><div class="card-sub">Per agent · Rp/call = gross ÷ jumlah call (efektivitas) · baris biru = EDN</div></div>
+      <button class="fsbtn noprint" onclick="fsToggle('secEffort')">⛶ Layar penuh</button></div>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>Bucket</th><th>Vendor</th><th class="n">Agent</th><th class="n">Call/agent</th><th class="n">Tersambung</th><th class="n">Durasi/agent</th><th class="n">SMS/agent</th><th class="n">WA/agent</th><th class="n" title="Kasus yang ditelepon ÷ kasus di tangan">Kasus ditelepon</th><th class="n">Gross/agent</th><th class="n">Rp per call</th><th class="n">Agent nol</th></tr></thead><tbody>
+    ${G.flatMap(g=>g.byGross.map((v,i)=>{const maxC=Math.max(...g.vend.map(x=>x.callPer)),maxP=Math.max(...g.vend.map(x=>x.perCall));
+      return `<tr class="${v.comp===OWN?'own':''}"><td style="font-weight:700">${i===0?escH(g.group):''}</td><td><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block;margin-right:5px"></i>${escH(v.comp)}</td><td class="n">${v.n}</td>
+      <td class="n" style="${v.callPer===maxC&&g.vend.length>1?'font-weight:800':''}">${fmtNum(v.callPer)}</td><td class="n">${fmtPct(v.connR,1)}</td><td class="n">${fmtDur(v.durPer)}</td><td class="n">${fmtNum(v.smsPer)}</td><td class="n">${fmtNum(v.wabaPer)}</td>
+      <td class="n">${v.csIn?fmtPct(v.callCase/v.csIn*100,0):'—'}</td><td class="n" style="font-weight:700">${fmtRp(v.grossPer)}</td><td class="n" style="${v.perCall===maxP&&g.vend.length>1?'color:var(--success);font-weight:800':''}">${fmtRp(v.perCall)}</td><td class="n">${v.nol?`<span class="ib" style="background:var(--danger-bg);color:var(--danger)">${v.nol}/${v.n}</span>`:'0'}</td></tr>`;})).join('')}
+    </tbody></table></div>
+  </div>
+
+  <div class="card sec" id="secTl">
+    <div class="card-head"><div><div class="card-title">👥 Tim TL EDN hari ini</div><div class="card-sub">Klik TL untuk melihat agent: siapa yang belum ada hasil, rajin tapi belum bayar, atau kurang gerak</div></div>
+      <button class="fsbtn noprint" onclick="fsToggle('secTl')">⛶ Layar penuh</button></div>
+    ${tlTable(G)}
+  </div>
+
+  ${J.length>1?`<div class="card sec" id="secIntra">
+    <div class="card-head"><div><div class="card-title">⏱️ Pergerakan Antar Tarikan Hari Ini</div><div class="card-sub">Gross per agent tiap vendor di setiap tarikan · pilih bucket</div></div>
+      <div style="display:flex;gap:8px;align-items:center"><div class="tabs2" style="margin:0">${G.map(g=>`<button class="${(VIEW.intraG||G[0].group)===g.group?'on':''}" onclick="VIEW.intraG='${escH(g.group)}';render()">${escH(g.group)}</button>`).join('')}</div>
+      <button class="fsbtn noprint" onclick="fsToggle('secIntra')">⛶</button></div></div>
+    <div class="chart-wrap"><canvas id="chIntra"></canvas></div></div>`:''}
+
+  <div class="card sec" id="secTrend">
+    <div class="card-head"><div><div class="card-title">📈 Tren Harian Bulan Ini</div><div class="card-sub">Gross per agent per hari (FINAL; kalau belum ada pakai tarikan terakhir) · pilih bucket</div></div>
+      <div style="display:flex;gap:8px;align-items:center"><div class="tabs2" style="margin:0">${trendGroups().map(g=>`<button class="${trendG()===g?'on':''}" onclick="VIEW.trendG='${escH(g)}';render()">${escH(g)}</button>`).join('')}</div>
+      <button class="fsbtn noprint" onclick="fsToggle('secTrend')">⛶</button></div></div>
+    ${trendBlock()}
+  </div>`;
+  if(J.length>1)intraChart(J,G);
+  trendChart();
+}
+
+function scoreCard(g,pg){
+  const maxR=Math.max(...g.vend.map(v=>v.rate),1e-9), bR=g.byRate[0], bG=g.byGross[0];
+  const posR=g.own?g.byRate.indexOf(g.own)+1:null, posG=g.own?g.byGross.indexOf(g.own)+1:null;
+  const badge=!g.own?'<span class="ib" style="background:var(--surface);color:var(--text3)">tanpa EDN</span>':g.vend.length<2?'<span class="ib" style="background:var(--surface);color:var(--text3)">EDN saja</span>':
+    `<span class="ib" style="background:${posR===1?'var(--success-bg)':'var(--danger-bg)'};color:${posR===1?'var(--success)':'var(--danger)'}">Rate #${posR}/${g.vend.length}</span> <span class="ib" style="background:${posG===1?'var(--success-bg)':'var(--warning-bg)'};color:${posG===1?'var(--success)':'var(--warning)'}">Gross #${posG}/${g.vend.length}</span>`;
+  const pv=pg?Object.fromEntries(pg.vend.map(v=>[v.comp,v])):{};
+  const row=v=>{const rm=(bR.rate-v.rate)/100*v.pok, gm=(bG.grossPer-v.grossPer);const p=pv[v.comp];const dG=p?v.gross-p.gross:null;
+    return `<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span>
+    <div class="trk"><span style="width:${v.rate/maxR*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div>
+    <span class="n" style="${v===bR&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n" title="${fmtRp(v.grossPer)}">${fmtRp(v.grossPer)}</span>
+    <span class="n" title="Tambahan gross sejak tarikan sebelumnya">${dG===null?'<span class="muted">—</span>':dG>0?`<span class="good">+${fmtRp(dG)}</span>`:'<span class="muted">0</span>'}</span>
+    <span class="n gp">${g.vend.length<2?'<span class="muted">—</span>':v===bR?'<span class="good">🏆 terbaik</span>':rm<1?'<span class="muted">setara</span>':`<span class="bad">-${fmtRp(rm)}</span>`}</span>
+    <span class="n gp">${g.vend.length<2?'<span class="muted">—</span>':v===bG?'<span class="good">🏆 terbaik</span>':`<span class="bad">-${fmtRp(gm)}</span>`}</span></div>`;};
+  let note='';
+  if(g.own&&g.vend.length>1&&bG!==g.own)note=`Supaya gross/agent EDN menyamai ${escH(bG.comp)}, tiap agent butuh tambahan <b>${fmtRp(bG.grossPer-g.own.grossPer)}</b> (total ${fmtRp((bG.grossPer-g.own.grossPer)*g.own.n)} untuk ${g.own.n} agent).`;
+  if(g.own&&g.own.nol)note+=` ${g.own.nol} dari ${g.own.n} agent EDN belum ada hasil.`;
+  return `<div class="vcard" id="vc-${escH(g.group)}"><div class="vcard-h"><div><div class="g">${escH(g.group)}</div><div class="sub">${g.n} agent · pokok hari ini ${fmtRp(g.vend.reduce((s,v)=>s+v.pok,0))}</div></div><div class="rt">${badge}</div></div><div class="vcard-b">
+    <div class="vrow hd"><span>VENDOR</span><span></span><span class="n">RATE</span><span class="n">GROSS/AGENT</span><span class="n" title="Tambahan gross sejak tarikan sebelumnya hari ini">Δ</span><span class="n" title="Terbayar tambahan supaya rate sama dengan vendor rate terbaik: selisih rate × pokok vendor ini">KURANG RATE</span><span class="n" title="Selisih gross per agent dengan vendor gross/agent tertinggi">KURANG GROSS/AG</span></div>
+    ${g.byRate.map(row).join('')}${note?`<div class="vnote">${note}</div>`:''}</div></div>`;
+}
+
+function tlTable(G){
+  const T={};G.forEach(g=>{if(!g.own)return;g.own.list.forEach(a=>{(T[a.tl+'|'+g.group]=T[a.tl+'|'+g.group]||{tl:a.tl,grp:g.group,list:[]}).list.push(a);});});
+  const rows=Object.values(T).map(t=>Object.assign(t,sumUp(t.list))).sort((a,b)=>b.grossPer-a.grossPer);
+  if(!rows.length)return '<div class="empty">Tidak ada agent EDN di tarikan ini.</div>';
+  return `<div class="tbl-wrap"><table class="t"><thead><tr><th>TL</th><th>Bucket</th><th class="n">Agent</th><th class="n">Pokok</th><th class="n">Terbayar</th><th class="n">Rate</th><th class="n">Gross</th><th class="n">Gross/agent</th><th class="n">Call/agent</th><th class="n">Tersambung</th><th class="n">Durasi/agent</th><th class="n">Belum ada hasil</th></tr></thead><tbody>
+  ${rows.map(t=>`<tr class="clk" onclick="openTl('${escH(t.tl).replace(/'/g,"\\'")}','${escH(t.grp)}')"><td style="font-weight:700">${escH(t.tl)}</td><td>${escH(t.grp)}</td><td class="n">${t.n}</td><td class="n">${fmtRp(t.pok)}</td><td class="n">${fmtRp(t.paid)}</td><td class="n" style="font-weight:700">${fmtPct(t.rate)}</td><td class="n">${fmtRp(t.gross)}</td><td class="n" style="font-weight:700">${fmtRp(t.grossPer)}</td><td class="n">${fmtNum(t.callPer)}</td><td class="n">${fmtPct(t.connR,1)}</td><td class="n">${fmtDur(t.durPer)}</td><td class="n">${t.nol?`<span class="ib" style="background:var(--danger-bg);color:var(--danger)">${t.nol}/${t.n}</span>`:'0'}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function openTl(tl,grp){
+  const A=agents(VIEW.jam).filter(a=>a.grp===grp);
+  const own=A.filter(a=>a.vend===OWN&&a.tl===tl);
+  const J=jams(), ji=J.indexOf(VIEW.jam), prevJ=ji>0?J[ji-1]:null;
+  const pa={};if(prevJ)agents(prevJ).forEach(a=>pa[a.agno||a.ag]=a);
+  const calls=A.map(a=>a.call).sort((x,y)=>x-y), med=calls.length?calls[Math.floor(calls.length/2)]:0;
+  const ranked=A.slice().sort((a,b)=>b.gross-a.gross);
+  const rows=own.map(a=>{const p=pa[a.agno||a.ag];return {...a,rank:ranked.indexOf(a)+1,dG:p?a.gross-p.gross:null,dC:p?a.call-p.call:null,rate:a.pok?a.paid/a.pok*100:0};}).sort((a,b)=>b.gross-a.gross);
+  const s=sumUp(own);
+  document.getElementById('tlTitle').textContent=`${tl} · ${grp}`;
+  document.getElementById('tlSub').textContent=`${own.length} agent EDN · ${VIEW.jam==='FINAL'?'FINAL':'s/d jam '+VIEW.jam} · gross ${fmtRp(s.gross)} · median call bucket ${fmtNum(med)}`;
+  document.getElementById('tlBody').innerHTML=`<div class="tbl-wrap"><table class="t"><thead><tr><th class="n" title="Peringkat gross di bucket (semua vendor)">Rank</th><th>Agent</th><th class="n">Pokok</th><th class="n">Terbayar</th><th class="n">Rate</th><th class="n">Gross</th>${prevJ?'<th class="n">+Gross</th><th class="n">+Call</th>':''}<th class="n">Call</th><th class="n">Tersambung</th><th class="n">Durasi</th><th class="n">WA</th><th>Status</th></tr></thead><tbody>
+  ${rows.map(a=>{const st=a.gross>0?'<span class="ib" style="background:var(--success-bg);color:var(--success)">ada hasil</span>':a.call>=med?'<span class="ib" style="background:var(--warning-bg);color:var(--warning)">rajin, belum bayar</span>':'<span class="ib" style="background:var(--danger-bg);color:var(--danger)">kurang gerak</span>';
+    return `<tr><td class="n">${a.rank}/${A.length}</td><td style="font-weight:600">${escH(a.ag)} <span class="muted" style="font-size:10.5px;font-weight:400">${escH(a.agno)}</span></td><td class="n">${fmtRp(a.pok)}</td><td class="n">${fmtRp(a.paid)}</td><td class="n">${fmtPct(a.rate)}</td><td class="n" style="font-weight:700">${fmtRp(a.gross)}</td>
+    ${prevJ?`<td class="n ${a.dG>0?'good':''}">${a.dG===null?'—':a.dG>0?'+'+fmtRp(a.dG):'0'}</td><td class="n">${a.dC===null?'—':fmtNum(a.dC)}</td>`:''}<td class="n">${fmtNum(a.call)}</td><td class="n">${a.call?fmtPct(a.conn/a.call*100,1):'—'}</td><td class="n">${fmtDur(a.dur)}</td><td class="n">${fmtNum(a.waba)}</td><td>${st}</td></tr>`;}).join('')}</tbody></table></div>
+  <div class="legend2"><span><b>rajin, belum bayar</b> = gross 0 tapi call ≥ median bucket (${fmtNum(med)}) → cek kualitas call / janji bayar.</span><span><b>kurang gerak</b> = gross 0 dan call di bawah median.</span></div>`;
+  document.getElementById('mTl').classList.add('open');
+}
+
+function intraChart(J,G){
+  const el=document.getElementById('chIntra');if(!el)return;
+  const g=VIEW.intraG&&G.find(x=>x.group===VIEW.intraG)?VIEW.intraG:G[0].group;
+  const snaps=J.map(j=>groupsAt(j).find(x=>x.group===g));
+  const comps=[...new Set(snaps.flatMap(s=>s?s.vend.map(v=>v.comp):[]))];
+  const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
+  CH.intra=new Chart(el,{type:'line',data:{labels:J.map(jamLabel),datasets:comps.map(c=>({label:c,data:snaps.map(s=>{const v=s&&s.vend.find(x=>x.comp===c);return v?v.grossPer:null;}),
+    borderColor:vColor(c),backgroundColor:vColor(c),borderWidth:c===OWN?3.5:1.8,pointRadius:3,tension:.2,borderDash:c===OWN?[]:[4,3]}))},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12}},tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${fmtRp(x.parsed.y)}/agent`}}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>(v/1e6).toLocaleString('id-ID')+' jt'}}}}});
+}
+function trendGroups(){const s=new Set(DATA.trend.filter(r=>VIEW.all||r[3]===OWN).map(r=>r[2]));return GORDER.filter(g=>s.has(g)).concat([...s].filter(g=>!GORDER.includes(g)));}
+function trendG(){const gs=trendGroups();return gs.includes(VIEW.trendG)?VIEW.trendG:gs[0];}
+function trendData(){
+  const g=trendG(), R=DATA.trend.filter(r=>r[2]===g);
+  const dates=[...new Set(R.map(r=>r[0]))].sort(), comps=[...new Set(R.map(r=>r[3]))];
+  const m={};R.forEach(r=>{const k=r[0]+'|'+r[3];const o=m[k]||(m[k]={n:0,gross:0,pok:0,paid:0,jam:r[1]});o.n+=r[5];o.gross+=r[8];o.pok+=r[6];o.paid+=r[7];});
+  return {g,dates,comps,m};
+}
+function trendBlock(){
+  if(!DATA.trend.length)return '<div class="empty">Belum ada data.</div>';
+  const {dates,comps,m}=trendData();
+  const strip=dates.map(d=>{const arr=comps.map(c=>({c,v:m[d+'|'+c]})).filter(x=>x.v&&x.v.n).sort((a,b)=>b.v.gross/b.v.n-a.v.gross/a.v.n);const i=arr.findIndex(x=>x.c===OWN);
+    return `<div class="d" style="background:var(--surface2)" title="${dLabel(d)} · ${m[d+'|'+OWN]?escH(m[d+'|'+OWN].jam):''}"><div class="x">${dShort(d)}${m[d+'|'+(arr[0]||{}).c]&&m[d+'|'+arr[0].c].jam!=='FINAL'?'*':''}</div><div class="y ${i===0?'good':i===arr.length-1&&i>0?'bad':''}">${i>=0?'#'+(i+1):'—'}</div></div>`;}).join('');
+  return `<div class="chart-wrap"><canvas id="chTrend"></canvas></div><div class="rankstrip" style="margin-top:12px">${strip}</div><div class="legend2"><span>Peringkat EDN per hari (gross/agent). * = belum FINAL.</span></div>`;
+}
+function trendChart(){
+  const el=document.getElementById('chTrend');if(!el)return;
+  const {dates,comps,m}=trendData();
+  const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
+  CH.trend=new Chart(el,{type:dates.length>1?'line':'bar',data:{labels:dates.map(dShort),datasets:comps.map(c=>({label:c,data:dates.map(d=>{const o=m[d+'|'+c];return o&&o.n?o.gross/o.n:null;}),
+    borderColor:vColor(c),backgroundColor:vColor(c),borderWidth:c===OWN?3.5:1.8,pointRadius:3,tension:.2,borderDash:c===OWN?[]:[4,3]}))},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12}},tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${fmtRp(x.parsed.y)}/agent`}}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>(v/1e6).toLocaleString('id-ID')+' jt'}}}}});
+}
+
+function fsToggle(id){const el=document.getElementById(id);if(!el)return;const on=!el.classList.contains('fsmode');
+  document.querySelectorAll('.fsmode').forEach(x=>x.classList.remove('fsmode'));if(on)el.classList.add('fsmode');document.body.classList.toggle('fs-on',on);Object.values(CH).forEach(c=>c.resize());}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){document.querySelectorAll('.fsmode').forEach(x=>x.classList.remove('fsmode'));document.body.classList.remove('fs-on');document.querySelectorAll('.modal.open').forEach(m=>m.classList.remove('open'));}});
+function copyStory(btn){const t=window._story||'';(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{btn.textContent='✅ Tersalin';setTimeout(()=>btn.textContent='📋 Salin',1500);}).catch(()=>prompt('Salin teks ini:',t));}
+
+/* ── upload ── */
+let UP=[];
+const XLSX_SRC='https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';let XLSX_P=null;
+function loadXLSX(){if(window.XLSX)return Promise.resolve(window.XLSX);if(!XLSX_P)XLSX_P=new Promise((res,rej)=>{const s=document.createElement('script');s.src=XLSX_SRC;s.onload=()=>res(window.XLSX);s.onerror=()=>{XLSX_P=null;rej(new Error('library Excel gagal dimuat'));};document.head.appendChild(s);});return XLSX_P;}
+function openUpload(){document.getElementById('mUpload').classList.add('open');renderUp();}
+function closeUpload(){document.getElementById('mUpload').classList.remove('open');}
+// nama kolom (tanpa awalan "Report.performance.") → urutan PINJD_NUM di Code.gs
+const NUMCOLS=['assignedCaseCount','newCaseAssignedCount','inHandCaseCount','inHandPrincipalAmount','assignedPrincipalAmount','repaidPrincipalAmount','dailyRepaidPrincipalAmount','actualCollectionAmount',
+  'callCount','connectedCallCount','selfCallCount','emergencyCallCount','callCaseCount','caseFollowUpDepth','callDuration','smsCount','totalCaseCoverageRate','inHandCaseCoverageRate','totalOnlineDays','wabaSuccessCount','aotuSuccessCount'];
+const VEND_MAP={QIN:'Max-QIN',EDN:'EDN',CPU:'CPU',SCQ:'SCQ'};
+function splitBG(bg){const s=String(bg||'').trim();const p=s.split('-');const last=p[p.length-1];
+  if(p.length>1&&/^[A-Za-z]{3,}$/.test(last))return {grp:p.slice(0,-1).join('-'),vend:VEND_MAP[last.toUpperCase()]||last.toUpperCase()};
+  return {grp:s,vend:'Piper1'};}
+function toNum(v,k){if(v===null||v===undefined||v==='')return 0;if(typeof v==='number')return k==='callDuration'?v*86400:v;const s=String(v).trim();
+  if(k==='callDuration'){const t=s.split(':').map(Number);return t.length===3?t[0]*3600+t[1]*60+t[2]:t.length===2?t[0]*60+t[1]:0;}
+  return parseFloat(s.replace('%','').replace(/,/g,''))||0;}
+function isoOf(v){if(Object.prototype.toString.call(v)==='[object Date]'&&!isNaN(v))return v.getFullYear()+'-'+String(v.getMonth()+1).padStart(2,'0')+'-'+String(v.getDate()).padStart(2,'0');
+  if(typeof v==='number'&&v>30000){const d=new Date(Date.UTC(1899,11,30)+v*86400000);return d.toISOString().slice(0,10);}const m=String(v||'').match(/(20\d{2})[-\/.](\d{1,2})[-\/.](\d{1,2})/);return m?`${m[1]}-${m[2].padStart(2,'0')}-${m[3].padStart(2,'0')}`:'';}
+function todayIso(){const d=new Date();return isoOf(d);}
+function nowHM(){const d=new Date();return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+async function addFiles(files){
+  for(const f of files){const u={name:f.name,status:'baca'};UP.push(u);renderUp();
+    try{const X=await loadXLSX();const wb=X.read(await f.arrayBuffer(),{type:'array',cellDates:true});
+      let found=null;
+      for(const sn of wb.SheetNames){const A=X.utils.sheet_to_json(wb.Sheets[sn],{header:1,raw:true,defval:''});
+        const hi=A.findIndex(r=>r.some(c=>/business group/i.test(String(c)))&&r.some(c=>/username/i.test(String(c))));if(hi<0)continue;
+        const H=A[hi].map(c=>String(c).trim().replace(/^Report\.performance\./i,''));
+        const ix=n=>H.findIndex(h=>h.toLowerCase()===n.toLowerCase());
+        const col={date:ix('Statistics Date'),bg:ix('Business Group'),ag:ix('userName'),agno:ix('userNo'),tl:ix('leaderUserName'),tlno:ix('leaderUserNo')};
+        if(col.bg<0||col.ag<0)continue;
+        const nIx=NUMCOLS.map(ix);
+        const rows=[];const dates={};
+        A.slice(hi+1).forEach(r=>{const ag=String(r[col.ag]||'').trim();if(!ag)return;const {grp,vend}=splitBG(r[col.bg]);
+          const d=col.date>=0?isoOf(r[col.date]):'';if(d)dates[d]=(dates[d]||0)+1;
+          rows.push([grp,vend,String(r[col.bg]).trim(),String(r[col.tl]??'').trim(),String(r[col.tlno]??'').trim(),ag,String(r[col.agno]??'').trim()].concat(nIx.map((i,k)=>i<0?0:toNum(r[i],NUMCOLS[k]))));});
+        found={rows,dates};break;}
+      if(!found||!found.rows.length)throw new Error('Kolom Business Group / userName tidak ditemukan — pastikan file harian Report.performance.');
+      const ds=Object.keys(found.dates).sort();
+      u.tanggal=ds[ds.length-1]||'';
+      if(ds.length>1)u.warn=`File berisi ${ds.length} tanggal (${ds.join(', ')}) — semua baris disimpan ke ${u.tanggal}. Sebaiknya 1 file = 1 tanggal.`;
+      u.final=u.tanggal&&u.tanggal<todayIso();u.jam=nowHM();
+      u.rows=found.rows;u.vends={};found.rows.forEach(r=>u.vends[r[1]]=(u.vends[r[1]]||0)+1);u.status='siap';
+    }catch(e){u.status='gagal';u.msg=e.message;}
+    renderUp();}
+}
+function renderUp(){
+  document.getElementById('upList').innerHTML=UP.map((u,i)=>`<div class="upitem"><div class="row"><b>${escH(u.name)}</b>
+    ${u.status==='baca'?'<span class="muted">membaca…</span>':u.status==='gagal'?`<span class="bad">❌ ${escH(u.msg)}</span>`:u.status==='ok'?`<span class="good">✅ tersimpan (${escH(u.msg)})</span>`:u.status==='simpan'?'<span class="muted">menyimpan…</span>':''}</div>
+    ${u.rows?`<div class="row" style="margin-top:6px"><span>${u.rows.length} agent · ${Object.entries(u.vends).map(([v,n])=>`${escH(v)} ${n}`).join(' · ')}</span></div>${u.warn?`<div class="issues warn">${escH(u.warn)}</div>`:''}
+    ${u.status==='siap'||u.status==='gagal-simpan'?`<div class="row" style="margin-top:8px"><label>Tanggal <input type="date" value="${u.tanggal}" onchange="UP[${i}].tanggal=this.value"></label>
+      <label class="chip2"><input type="checkbox" ${u.final?'checked':''} onchange="UP[${i}].final=this.checked;renderUp()"> FINAL (file besok pagi)</label>
+      ${u.final?'':`<label>Jam tarik <input type="time" value="${u.jam}" onchange="UP[${i}].jam=this.value"></label>`}
+      <button class="btn btn-primary" onclick="saveUp(${i})">💾 Simpan</button>${u.status==='gagal-simpan'?`<span class="bad">${escH(u.msg)}</span>`:''}</div>`:''}`:''}</div>`).join('');
+}
+async function saveUp(i){
+  const u=UP[i];if(!/^\d{4}-\d{2}-\d{2}$/.test(u.tanggal||'')){alert('Isi tanggal dulu.');return;}
+  const jam=u.final?'FINAL':u.jam;if(!u.final&&!/^\d{2}:\d{2}$/.test(jam||'')){alert('Isi jam tarik dulu.');return;}
+  u.status='simpan';renderUp();
+  try{const res=await fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({action:'pinjd_save',tanggal:u.tanggal,jam,rows:u.rows})}).then(r=>r.json());
+    if(!res.success)throw new Error(/Unknown action/i.test(res.message||'')?'Code.gs belum diperbarui — tempel Code.gs terbaru & deploy versi baru.':res.message);
+    u.status='ok';u.msg=`${u.tanggal} ${jam}, ${res.result.added} baris`;renderUp();
+    await loadData(u.tanggal);
+  }catch(e){u.status='gagal-simpan';u.msg=e.message;renderUp();}
+}
+
+/* ── LOCK (sama dgn Laporan Klien) ── */
+const PAGE_PASSWORD='Marki';
+const PAGE_SESSION_KEY='tz_page_auth_klien';
+(function(){let ok=false;try{ok=sessionStorage.getItem(PAGE_SESSION_KEY)==='1';}catch(e){}
+  if(ok)document.getElementById('lockOverlay').remove();else document.body.style.overflow='hidden';})();
+function doUnlockPage(){
+  if(document.getElementById('lockInput').value===PAGE_PASSWORD){try{sessionStorage.setItem(PAGE_SESSION_KEY,'1');}catch(e){}document.getElementById('lockOverlay').remove();document.body.style.overflow='';}
+  else{document.getElementById('lockError').style.display='block';document.getElementById('lockInput').value='';}
+}
+loadData();
+</script>
+</body>
+</html>

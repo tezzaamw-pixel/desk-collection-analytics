@@ -423,6 +423,7 @@ function doGet(e) {
       case 'databayar': result = endpointDataBayar_(e); break;
       case 'pinj':      result = endpointPinj_(e);      break;
       case 'jam':       result = endpointJam_(e);       break;
+      case 'pinjd':     result = endpointPinjD_(e);     break;
       case 'qccheck':   result = endpointQcCheck_(e);   break;
       case 'kelengkapan': result = endpointKelengkapan_(e); break;
       default: result = { success: false, message: 'Unknown action: ' + action };
@@ -1204,6 +1205,7 @@ function doPost(e) {
       case 'klien_kategori_save': result = klienKategoriSave_(body); break;
       case 'pinj_save': result = pinjSave_(body); break;
       case 'jam_save':  result = jamSave_(body);  break;
+      case 'pinjd_save': result = pinjDSave_(body); break;
       default: result = { success: false, message: 'Unknown action: ' + body.action };
     }
   } catch (err) {
@@ -1580,4 +1582,72 @@ function endpointJam_(e) {
   const rows = all.filter(r => _klienTxt_(r[0]) === tanggal)
     .map(r => r.slice(0, 16).map((v, i) => i === 1 ? _jamTxt_(v) : i < JAM_SHEET.textCols ? _klienTxt_(v) : (Number(v) || 0)));
   return { success: true, action: 'jam', tanggal, dates, cols: JAM_SHEET.head.slice(0, 16), rows };
+}
+
+
+/*** ============ PINJAMIN HARIAN (Report.performance per hari) ============ ***
+ * File harian dari sistem Pinjamin (kolom "Statistics Date", "Report.performance.*",
+ * "Business Group" mis. A2-EDN / B1-QIN / M2-CPU / P). Isi = hasil HARI ITU s/d jam tarik.
+ * Ditarik beberapa kali sehari (JAM = 'HH:MM') + file final besok paginya (JAM = 'FINAL').
+ * Simpan: POST {action:'pinjd_save', tanggal, jam, rows:[[GROUP,VENDOR,BG,TL,TL_NO,AGENT,AGENT_NO, ...PINJD_NUM]]}
+ *   → baris lama dgn TANGGAL+JAM sama & VENDOR yg ada di upload diganti.
+ * Baca: GET ?action=pinjd&tanggal=yyyy-mm-dd → {tanggal, dates, cols, rows, trend}
+ *   trend = ringkasan per tanggal (snapshot FINAL, kalau belum ada pakai jam terakhir) per GROUP+VENDOR+TL, bulan yg sama.
+ ***********************************************************/
+const PINJD_NUM = ['CASE','CASE_BARU','CASE_INHAND','POKOK_INHAND','POKOK','TERBAYAR','TERBAYAR_HARIAN','GROSS',
+  'CALL','CALL_TERSAMBUNG','CALL_SELF','CALL_DARURAT','CASE_DITELEPON','KEDALAMAN','DURASI_DETIK','SMS',
+  'COVERAGE','COVERAGE_INHAND','HARI_ONLINE','WABA','AUTO'];
+const PINJD_SHEET = { name: 'KLIEN_PINJ_HARIAN',
+  head: ['TANGGAL','JAM','GROUP','VENDOR','BG','TL','TL_NO','AGENT','AGENT_NO'].concat(PINJD_NUM, ['DIUPLOAD']),
+  textCols: 9 };
+function pinjDSave_(body) {
+  const tanggal = String(body.tanggal || '').slice(0, 10);
+  const jam = String(body.jam || '').toUpperCase() === 'FINAL' ? 'FINAL' : String(body.jam || '').slice(0, 5);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) throw new Error('Tanggal tidak valid: ' + tanggal);
+  if (jam !== 'FINAL' && !/^\d{2}:\d{2}$/.test(jam)) throw new Error('Jam tidak valid: ' + jam);
+  const rows = body.rows || [];
+  if (!rows.length) throw new Error('Tidak ada baris data.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+    const sh = _klienSheet_(ss, PINJD_SHEET);
+    const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+    const num = v => Number(v) || 0, txt = v => v === null || v === undefined ? '' : String(v).trim();
+    const nN = PINJD_NUM.length;
+    const out = rows.map(r => [tanggal, jam].concat(r.slice(0, 7).map(txt), r.slice(7, 7 + nN).map(num), [now]));
+    const vend = {}; out.forEach(r => vend[r[3]] = 1);
+    const res = _klienReplace_(sh, PINJD_SHEET,
+      r => _klienTxt_(r[0]) === tanggal && _jamTxt_(r[1]).toUpperCase() === jam && !!vend[_klienTxt_(r[3])], out);
+    return { success: true, action: 'pinjd_save', tanggal, jam, vendors: Object.keys(vend), result: res };
+  } finally { lock.releaseLock(); }
+}
+function endpointPinjD_(e) {
+  const p = (e && e.parameter) || {};
+  const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+  const sh = ss.getSheetByName(PINJD_SHEET.name);
+  const W = PINJD_SHEET.head.length - 1;
+  const all = (sh ? _klienReadAll_(sh, W) : []).map(r => r.map((v, i) =>
+    i === 1 ? _jamTxt_(v).toUpperCase() : i < PINJD_SHEET.textCols ? _klienTxt_(v) : (Number(v) || 0)));
+  const dset = {};
+  all.forEach(r => { if (r[0]) dset[r[0]] = 1; });
+  const dates = Object.keys(dset).sort();
+  const tanggal = /^\d{4}-\d{2}-\d{2}$/.test(String(p.tanggal || '')) ? String(p.tanggal) : (dates[dates.length - 1] || '');
+  const rows = all.filter(r => r[0] === tanggal);
+  // ringkasan tren 1 bulan: snapshot terbaik per tanggal (FINAL > jam terakhir)
+  const per = tanggal.slice(0, 7), best = {};
+  all.forEach(r => { if (r[0].slice(0, 7) !== per) return;
+    const k = r[1] === 'FINAL' ? '99:99' : r[1];
+    if (!best[r[0]] || k > best[r[0]]) best[r[0]] = k; });
+  const ci = name => PINJD_SHEET.head.indexOf(name);
+  const I = { pokok: ci('POKOK'), paid: ci('TERBAYAR'), gross: ci('GROSS'), call: ci('CALL'), conn: ci('CALL_TERSAMBUNG'), dur: ci('DURASI_DETIK') };
+  const agg = {};
+  all.forEach(r => { if (r[0].slice(0, 7) !== per) return;
+    const k = r[1] === 'FINAL' ? '99:99' : r[1]; if (k !== best[r[0]]) return;
+    const key = [r[0], r[1], r[2], r[3], r[5]].join('|');
+    const a = agg[key] || (agg[key] = [r[0], r[1], r[2], r[3], r[5], 0, 0, 0, 0, 0, 0, 0, 0]);
+    a[5]++; a[6] += r[I.pokok]; a[7] += r[I.paid]; a[8] += r[I.gross]; a[9] += r[I.call]; a[10] += r[I.conn]; a[11] += r[I.dur];
+    if (!r[I.gross]) a[12]++; });
+  return { success: true, action: 'pinjd', tanggal, dates, cols: PINJD_SHEET.head.slice(0, W), rows,
+    trendCols: ['TANGGAL','JAM','GROUP','VENDOR','TL','AGENT','POKOK','TERBAYAR','GROSS','CALL','CALL_TERSAMBUNG','DURASI_DETIK','AGENT_NOL'],
+    trend: Object.keys(agg).sort().map(k => agg[k]) };
 }
