@@ -165,7 +165,7 @@ table.t td.flagcell{background:rgba(220,38,38,.18)!important;font-weight:700;}
 .ana-tlpick .lnk{border:none;background:none;color:var(--accent);cursor:pointer;font-size:12px;text-decoration:underline;padding:0 4px;}
 .ana-cmp td.stack{min-width:160px;}
 @media print{.ana-tlpick input,.ana-tlpick .lnk{display:none;}.ana-tlpick label:not(.on){display:none;}}
-.ana-bar{display:grid;grid-template-columns:170px 1fr 150px;align-items:center;gap:10px;font-size:12.5px;margin-bottom:7px;}
+.ana-bar{display:grid;grid-template-columns:170px 1fr 170px;align-items:center;gap:10px;font-size:12.5px;margin-bottom:7px;}
 .ana-bar .nm{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px;}
 .ana-bar .nm i{width:10px;height:10px;border-radius:2px;display:inline-block;flex-shrink:0;}
 .ana-bar .track{height:12px;background:var(--surface2);border-radius:6px;overflow:hidden;}
@@ -1044,7 +1044,8 @@ function renderAnalisa(){
   S.push({t:'Hasil vs Vendor',h:`
     <div class="ana-grid2">
       <div><div class="ana-h3">Rate ${R.isMonthly?'bulanan':'akumulasi'} per vendor</div>
-        ${R.comp.map((c,i)=>`<div class="ana-bar ${c.c===OWN?'own':''}"><span class="nm">${i+1}. ${escH(c.c)}</span><span class="track"><span style="width:${R.best&&R.best.rate?c.rate/R.best.rate*100:0}%"></span></span><b>${fmtPct(c.rate)}</b></div>`).join('')}
+        <div class="ana-bar" style="font-size:10.5px;color:var(--text3);font-weight:700;margin-bottom:2px"><span class="nm">VENDOR</span><span></span><b style="font-weight:700;text-align:right">RATE · KURANG KE #1</b></div>
+        ${R.comp.map((c,i)=>{const gap=R.best&&i>0?(R.best.rate-c.rate)/100*c.os:0;return `<div class="ana-bar ${c.c===OWN?'own':''}"><span class="nm">${i+1}. ${escH(c.c)}</span><span class="track"><span style="width:${R.best&&R.best.rate?c.rate/R.best.rate*100:0}%"></span></span><b style="text-align:right">${fmtPct(c.rate)}<div style="font-size:11px;font-weight:${c.c===OWN?800:600};color:${i?'var(--danger)':'var(--success)'}" title="${i?`Repay tambahan supaya rate sama dengan ${escH(R.best.c)} (selisih ${fmtPct(R.best.rate-c.rate)} × outstanding ${fmtRpFull(c.os)})`:'Peringkat 1'}">${i?'-'+fmtRpFull(gap):'🏆 #1'}</div></b></div>`;}).join('')}
         ${R.need?`<div class="ana-note">EDN butuh ±<b>${fmtRpFull(R.need)}</b> repay tambahan (dengan outstanding ${fmtRpFull(R.edn.os)}) untuk menyamai ${escH(R.best.c)}.</div>`:''}</div>
       <div><div class="ana-h3">Tren harian: EDN vs vendor terbaik</div><div style="position:relative;height:260px"><canvas id="anaTrend"></canvas></div>
         <div class="ana-note">Peringkat EDN per hari: ${R.trend.map(x=>`<span class="pill ${x.rank===1?'pill-ok':x.rank===x.n?'pill-red':'pill-warn'}" title="${dLabel(x.d)}">${dShort(x.d)}: #${x.rank??'—'}</span>`).join(' ')}</div></div>
