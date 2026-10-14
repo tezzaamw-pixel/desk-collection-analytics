@@ -421,6 +421,7 @@ function doGet(e) {
       case 'paymenttrend': result = endpointPaymentTrend_(e); break;
       case 'klien':     result = endpointKlien_(e);     break;
       case 'databayar': result = endpointDataBayar_(e); break;
+      case 'pinj':      result = endpointPinj_(e);      break;
       case 'qccheck':   result = endpointQcCheck_(e);   break;
       case 'kelengkapan': result = endpointKelengkapan_(e); break;
       default: result = { success: false, message: 'Unknown action: ' + action };
@@ -1199,6 +1200,7 @@ function doPost(e) {
     switch (String(body.action || '').toLowerCase()) {
       case 'klien_save': result = klienSave_(body); break;
       case 'klien_kategori_save': result = klienKategoriSave_(body); break;
+      case 'pinj_save': result = pinjSave_(body); break;
       default: result = { success: false, message: 'Unknown action: ' + body.action };
     }
   } catch (err) {
@@ -1473,4 +1475,55 @@ function TEST_kelengkapan() {
   Logger.log('rows=' + r.rows.length + ' warn=' + JSON.stringify(r.warn));
   Logger.log(JSON.stringify(r.rows.slice(0, 5)));
   Logger.log(JSON.stringify({ databayar: r.databayar, rank: r.rank, klien: r.klien }).slice(0, 3000));
+}
+
+
+/*** ============ LAPORAN KLIEN — PINJAMIN (Performance ranking) ============ ***
+ * File Excel dari klien "Performance_ranking_YYYY_MM_DD.xlsx" (semua vendor) atau
+ * "EDN_Performance_ranking_…" (EDN saja). 1 upload = 1 snapshot per TANGGAL.
+ * Simpan: POST {action:'pinj_save', tanggal:'yyyy-mm-dd', rows:[[...PINJ_HEAD tanpa TANGGAL/PERIODE/PROJECT/DIUPLOAD]]}
+ *   → baris lama dgn TANGGAL sama & COMPANY yg ada di upload diganti (upload EDN saja tidak menghapus vendor lain).
+ * Baca: GET ?action=pinj&bulan=Oktober&tahun=2026 → {dates, cols, rows}
+ ***********************************************************/
+const PINJ_SHEET = { name: 'KLIEN_PINJAMIN',
+  head: ['TANGGAL','PERIODE','PROJECT','GROUP','ASSET_GROUP','SETUP','OUT_SELF','DPD','COMPANY','MANAGER','TL_NO','TL',
+         'AGENT_NO','AGENT','USER_ID','BARU','TGL_MASUK','INTERVAL','POKOK','TERBAYAR','RATE','HARI','GROSS','RANK','DIUPLOAD'],
+  textCols: 18 };
+function pinjSave_(body) {
+  const tanggal = String(body.tanggal || '').slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) throw new Error('Tanggal laporan tidak valid: ' + tanggal);
+  const rows = body.rows || [];
+  if (!rows.length) throw new Error('Tidak ada baris data.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+    const sh = _klienSheet_(ss, PINJ_SHEET);
+    const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+    const num = v => Number(v) || 0, txt = v => v === null || v === undefined ? '' : String(v).trim();
+    const out = rows.map(r => [tanggal, tanggal.slice(0, 7), 'PINJAMIN'].concat(
+      r.slice(0, 15).map(txt), [num(r[15]), num(r[16]), num(r[17]), num(r[18]), num(r[19]), num(r[20]), now]));
+    const comps = {}; out.forEach(r => comps[r[8]] = 1);
+    const res = _klienReplace_(sh, PINJ_SHEET, r => _klienTxt_(r[0]) === tanggal && !!comps[_klienTxt_(r[8])], out);
+    return { success: true, action: 'pinj_save', tanggal, companies: Object.keys(comps), result: res };
+  } finally { lock.releaseLock(); }
+}
+function endpointPinj_(e) {
+  const p = (e && e.parameter) || {};
+  let periode = '';
+  if (p.bulan && p.tahun) {
+    const idx = BULAN_LIST.indexOf(normBulan_(p.bulan));
+    if (idx >= 0) periode = normTahun_(p.tahun) + '-' + String(idx + 1).padStart(2, '0');
+  }
+  const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+  const sh = ss.getSheetByName(PINJ_SHEET.name);
+  const all = sh ? _klienReadAll_(sh, PINJ_SHEET.head.length) : [];
+  // snapshot terakhir bulan sebelumnya ikut dikirim sbg pembanding awal bulan
+  const prevOf = per => { const y = +per.slice(0, 4), m = +per.slice(5, 7); return m === 1 ? (y - 1) + '-12' : y + '-' + String(m - 1).padStart(2, '0'); };
+  const prev = periode ? prevOf(periode) : '';
+  let prevLast = '';
+  all.forEach(r => { const t = _klienTxt_(r[0]); if (prev && t.slice(0, 7) === prev && t > prevLast) prevLast = t; });
+  const rows = all.filter(r => { const t = _klienTxt_(r[0]); return !periode || t.slice(0, 7) === periode || t === prevLast; })
+    .map(r => r.slice(0, 24).map((v, i) => i < PINJ_SHEET.textCols ? _klienTxt_(v) : (Number(v) || 0)));
+  const dates = [...new Set(rows.map(r => r[0]))].sort();
+  return { success: true, action: 'pinj', periode, prevLast, dates, cols: PINJ_SHEET.head.slice(0, 24), rows };
 }

@@ -154,6 +154,9 @@ table.t td.flagcell{background:rgba(220,38,38,.18)!important;font-weight:700;}
 .ana-kpi .s{font-size:12px;color:var(--text2);}
 .ana-grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(380px,1fr));gap:22px;}
 .ana-h3{font-size:13px;font-weight:700;margin:4px 0 10px;}
+.projsw{display:inline-flex;border:1px solid var(--border);border-radius:999px;overflow:hidden;background:var(--surface);margin-bottom:12px;}
+.projsw a{padding:5px 14px;font-size:12px;font-weight:700;color:var(--text2);text-decoration:none;}
+.projsw a.on{background:var(--navy);color:#fff;}
 .ana-tlpick{display:flex;flex-wrap:wrap;gap:6px;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:12px;}
 .ana-tlpick b{margin-right:4px;}
 .ana-tlpick label{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border:1px solid var(--border);border-radius:999px;background:var(--surface);cursor:pointer;color:var(--text3);}
@@ -234,6 +237,7 @@ body.ana-printing>*:not(#modalAna){display:none!important;}
 </aside>
 
 <main class="main">
+  <div class="projsw"><a class="on" href="klien.html">Rupiah Cepat</a><a href="pinjamin.html">Pinjamin</a></div>
   <div class="eyebrow">Rupiah Cepat — laporan dari klien</div>
   <h1>Laporan Klien</h1>
   <p class="lead">Posisi EDN dibanding vendor lain, ranking TL, agent merah, dan kecocokan payment versi klien dengan input internal. Data diambil dari gambar laporan yang dikirim klien di grup.</p>
