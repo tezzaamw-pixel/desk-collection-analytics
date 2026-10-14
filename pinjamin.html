@@ -343,8 +343,13 @@ function fillCmp(){
 function rowsAt(d){return (DATA.rows||[]).filter(r=>r[C.date]===d).map(r=>({group:r[C.group],asset:r[C.asset],dpd:r[C.dpd],comp:r[C.comp]||'?',tl:r[C.tl],agno:r[C.agno],ag:r[C.ag],baru:/YES|Y/i.test(r[C.baru]),masuk:r[C.masuk],
   band:bandIdx(r[C.intv]),intv:r[C.intv],os:r[C.os],paid:r[C.paid],rate:r[C.rate]*100,days:r[C.days],gross:r[C.gross],rank:r[C.rank]}));}
 function groupStats(R){
+  // agent dgn pokok tidak wajar (>5× median bucket, mis. salah alokasi) tidak dihitung di total vendor
+  const byG={};R.forEach(r=>(byG[r.group]=byG[r.group]||[]).push(r.os));
+  const medOs={};Object.entries(byG).forEach(([g,a])=>{a.sort((x,y)=>x-y);medOs[g]=a[Math.floor(a.length/2)]||0;});
+  R.forEach(r=>{r.outlier=medOs[r.group]>0&&r.os>medOs[r.group]*5;});
   const G={};R.forEach(r=>{const g=G[r.group]=G[r.group]||{group:r.group,dpd:r.dpd,n:0,rows:[],V:{}};g.n++;g.rows.push(r);
-    const v=g.V[r.comp]=g.V[r.comp]||{comp:r.comp,n:0,os:0,paid:0,gross:0,rankSum:0,bands:[0,0,0,0,0,0],baru:0};
+    const v=g.V[r.comp]=g.V[r.comp]||{comp:r.comp,n:0,os:0,paid:0,gross:0,rankSum:0,bands:[0,0,0,0,0,0],baru:0,outl:[]};
+    if(r.outlier){v.outl.push(r);return;}
     v.n++;v.os+=r.os;v.paid+=r.paid;v.gross+=r.gross;v.rankSum+=r.rank;if(r.band>=0)v.bands[r.band]++;if(r.baru)v.baru++;});
   Object.values(G).forEach(g=>{g.vend=Object.values(g.V).map(v=>({...v,rate:v.os?v.paid/v.os*100:0,grossPer:v.gross/v.n,avgRank:v.rankSum/v.n,pctl:v.rankSum/v.n/g.n*100,top:v.bands[0]+v.bands[1],low:v.bands[4]+v.bands[5]}));
     g.byRate=g.vend.slice().sort((a,b)=>b.rate-a.rate);g.byGross=g.vend.slice().sort((a,b)=>b.grossPer-a.grossPer);
@@ -446,7 +451,8 @@ function scoreCard(g,pg){
   return `<div class="vcard"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)} · ${g.days} hari</span></span><span>${badge}</span></div><div class="vcard-b">
     <div class="vrow" style="font-size:10.5px;color:var(--text3);font-weight:700"><span>VENDOR</span><span>GROSS / AGENT</span><span class="n">RATE</span><span class="n">GROSS/AG</span><span class="n">RANK</span></div>
     ${g.byGross.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.grossPer/maxG*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===rl&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span></div>`).join('')}
-    ${note?`<div class="vnote">${note}</div>`:''}</div></div>`;
+    ${note?`<div class="vnote">${note}</div>`:''}
+    ${g.vend.some(v=>v.outl.length)?`<div class="vnote muted">Tidak dihitung (pokok tidak wajar, >5× median bucket): ${g.vend.flatMap(v=>v.outl.map(r=>`${escH(r.ag)} (${escH(v.comp)}, ${fmtJt(r.os)})`)).join(', ')}.</div>`:''}</div></div>`;
 }
 let TCH=null;
 function trendChart(dates,groups){
