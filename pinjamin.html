@@ -189,6 +189,10 @@ table.t tr.clk{cursor:pointer;}table.t tr.clk:hover td{background:var(--surface2
 .issues.bad{background:var(--danger-bg);color:var(--danger);}
 .story{font-size:14.5px;line-height:1.65;background:var(--accent-bg);border-left:4px solid var(--accent);padding:12px 16px;border-radius:8px;margin-bottom:16px;}
 .chip2{display:inline-flex;align-items:center;gap:4px;font-size:12px;color:var(--text2);}
+.rankstrip{display:flex;gap:6px;flex-wrap:wrap;}
+.rankstrip .d{border-radius:6px;padding:5px 8px;text-align:center;min-width:58px;}
+.rankstrip .d .x{font-size:10px;color:var(--text3);}
+.rankstrip .d .y{font-size:14px;font-weight:800;}
 /* layar penuh per kartu */
 .fsbtn{float:right;border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:6px;padding:3px 9px;font-size:12px;cursor:pointer;margin-left:8px;}
 .fsbtn:hover{color:var(--accent);border-color:var(--accent);}
@@ -338,6 +342,15 @@ function setTheme(t){document.documentElement.setAttribute('data-theme',t);try{l
   for(let y=2025;y<=now.getFullYear();y++){const o=document.createElement('option');o.textContent=y;st.appendChild(o);}
   document.getElementById('selBulan').value=BULAN[now.getMonth()];st.value=String(now.getFullYear());})();
 
+let RANKD=null, RCH=[];
+async function loadRank(){
+  if(RANKD)return RANKD;
+  try{const r=await fetch(`${API_URL}?action=rankdata&_=${Date.now()}`).then(x=>x.json());
+    RANKD={daily:(r.daily||[]).filter(x=>/PINJAMIN/i.test(x.aplikasi)),monthly:(r.monthly||[]).filter(x=>/PINJAMIN/i.test(x.aplikasi))};}
+  catch(e){RANKD={daily:[],monthly:[],err:e.message};}
+  if(DATA&&VIEW.date)render();
+  return RANKD;
+}
 async function loadData(keepDate){
   const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value;
   const box=document.getElementById('content');box.innerHTML='<div class="empty"><div class="spinner"></div>Memuat data…</div>';
@@ -345,6 +358,7 @@ async function loadData(keepDate){
     const res=await fetch(`${API_URL}?action=pinj&bulan=${encodeURIComponent(bulan)}&tahun=${tahun}&_=${Date.now()}`).then(r=>r.json());
     if(!res.success)throw new Error(res.message||'Gagal memuat');
     DATA=res;
+    loadRank();
     const per=res.periode, inMonth=res.dates.filter(d=>d.slice(0,7)===per);
     const sd=document.getElementById('selDate'), sc=document.getElementById('selCmp');
     sd.innerHTML=inMonth.slice().reverse().map(d=>`<option value="${d}">${dLabel(d)}</option>`).join('')||'<option value="">—</option>';
@@ -428,6 +442,8 @@ function render(){
     <div class="noprint" style="margin-bottom:10px"><label class="chip2"><input type="checkbox" ${VIEW.allGroups?'checked':''} onchange="VIEW.allGroups=this.checked;render()"> tampilkan juga bucket yang tidak dipegang EDN</label></div>
     <div class="vcards">${showG.map(g=>scoreCard(g,PG[g.group],FG&&FG[g.group],FD)).join('')}</div>
     <div class="vnote"><b>Kurang rate</b> = terbayar tambahan (total vendor) supaya rate vendor itu sama dengan vendor rate terbaik. <b>Kurang gross/ag</b> = selisih uang masuk per agent dengan vendor gross/agent tertinggi. <b>Rate</b> = pokok terbayar ÷ pokok dibagikan. <b>Gross/agent</b> = rata-rata total uang masuk per agent (dasar ranking klien). <b>Rank</b> = rata-rata peringkat agent vendor itu (makin kecil makin baik). Δ dibanding laporan ${VIEW.cmp?dLabel(VIEW.cmp):'—'}.</div>`});
+  // 2b. Rank harian vendor (Rank Board)
+  S.push({id:'rankd',t:'Rank Harian Vendor',h:rankSection(),after:rankCharts});
   // 3. Sebaran persentil
   S.push({id:'sebaran',t:'Sebaran Peringkat',h:`<div class="vcards">${showG.map(g=>`<div class="vcard"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)}</span></span><span class="muted" style="font-size:12px">${g.n} agent</span></div><div class="vcard-b">
       ${g.vend.slice().sort((a,b)=>a.pctl-b.pctl).map(v=>`<div class="bandrow"><span style="font-weight:${v.comp===OWN?800:500}">${escH(v.comp)}</span><div class="bands">${v.bands.map((c,i)=>c?`<span style="width:${c/v.n*100}%;background:${BAND_COLOR[i]}" title="${BANDS[i]}: ${c}"></span>`:'').join('')}</div><span class="muted" style="text-align:right">${v.n}</span></div>`).join('')}
@@ -486,7 +502,7 @@ function vGap(v,g){
     `<span class="n gp" title="${v===bG?'Gross/agent tertinggi':`vs ${escH(bG.comp)} ${fmtJt(bG.grossPer)}/agent`}">${v===bG?'<span class="good">🏆 terbaik</span>':`<span class="bad">-${fmtRp(gm)}</span>`}</span>`;
 }
 function scoreCard(g,pg,fg,fd){
-  const maxG=Math.max(...g.vend.map(v=>v.grossPer),1), lead=g.byGross[0], rl=g.byRate[0];
+  const maxG=Math.max(...g.vend.map(v=>v.rate),1e-9), lead=g.byGross[0], rl=g.byRate[0];
   const posR=g.own?g.byRate.indexOf(g.own)+1:null, posG=g.own?g.byGross.indexOf(g.own)+1:null;
   const pOwn=pg&&pg.own;
   const badge=!g.own?'<span class="ib" style="background:var(--surface);color:var(--text3)">tanpa EDN</span>':g.vend.length<2?'<span class="ib" style="background:var(--surface);color:var(--text3)">EDN saja</span>':`<span class="ib" style="background:${posR===1?'var(--success-bg)':'var(--danger-bg)'};color:${posR===1?'var(--success)':'var(--danger)'}">Rate #${posR}/${g.vend.length}</span> <span class="ib" style="background:${posG===1?'var(--success-bg)':'var(--warning-bg)'};color:${posG===1?'var(--success)':'var(--warning)'}">Gross #${posG}/${g.vend.length}</span>`;
@@ -498,13 +514,41 @@ function scoreCard(g,pg,fg,fd){
   }
   return `<div class="vcard" id="vc-${escH(g.group)}"><div class="vcard-h"><div><div class="g">${escH(g.group)}</div><div class="sub">DPD ${escH(g.dpd)} · ${g.days} hari kerja · ${g.n} agent</div></div><div class="rt">${badge}<button class="fsbtn ico noprint" title="Layar penuh" onclick="fsToggle('vc-${escH(g.group)}')">⛶</button></div></div><div class="vcard-b">
     <div class="vrow hd"><span>VENDOR</span><span></span><span class="n">RATE</span><span class="n">GROSS/AGENT</span><span class="n" title="Rata-rata peringkat agent">RANK</span><span class="n" title="Terbayar tambahan (total vendor) supaya rate-nya sama dengan vendor rate terbaik: selisih rate × pokok vendor ini">KURANG RATE</span><span class="n" title="Selisih gross per agent dengan vendor gross/agent tertinggi">KURANG GROSS/AG</span></div>
-    ${g.byGross.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.grossPer/maxG*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===rl&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span>${vGap(v,g)}</div>`).join('')}
+    ${g.byRate.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk" title="Rate"><span style="width:${v.rate/maxG*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===rl&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span>${vGap(v,g)}</div>`).join('')}
     ${g.own&&g.vend.length<2?`<div class="vnote">Posisi rata² agent EDN: peringkat <b>${g.own.avgRank.toFixed(1)}</b> dari ${g.n}${g.nEst&&!fg?' (perkiraan)':''} agent di bucket → <b>${fmtPct(g.own.pctl,0)}</b> dari atas · ${g.own.top} agent Top 25%, ${g.own.low} di zona bawah.</div>`:''}
     ${g.vend.length<2&&fg&&fg.vend.length>1?`<div class="vnote" style="margin-top:10px;font-weight:700">Vendor lain — laporan lengkap ${dShort(fd)}</div>
-      ${fg.byGross.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}" style="opacity:.6"><span class="nm">${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.grossPer/Math.max(...fg.vend.map(x=>x.grossPer),1)*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span>${vGap(v,fg)}</div>`).join('')}
+      ${fg.byRate.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}" style="opacity:.6"><span class="nm">${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.rate/Math.max(...fg.vend.map(x=>x.rate),1e-9)*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span>${vGap(v,fg)}</div>`).join('')}
       <div class="vnote muted">Angka di atas dari tanggal ${dShort(fd)} (hari kerja berbeda), dipakai sebagai acuan posisi vendor.</div>`:''}
     ${note?`<div class="vnote">${note}</div>`:''}
     ${g.vend.some(v=>v.outl.length)?`<div class="vnote muted">Tidak dihitung (pokok tidak wajar, >5× median bucket): ${g.vend.flatMap(v=>v.outl.map(r=>`${escH(r.ag)} (${escH(v.comp)}, ${fmtJt(r.os)})`)).join(', ')}.</div>`:''}</div></div>`;
+}
+/* ── rank harian vendor (sumber: Rank Board / sheet DATA RANK) ── */
+function rankRows(){if(!RANKD)return null;const per=DATA.periode;const src=VIEW.rkMode==='monthly'?RANKD.monthly:RANKD.daily;return src.filter(x=>String(x.tanggal).slice(0,7)===per);}
+function rankSection(){
+  if(!RANKD)return '<div class="empty"><div class="spinner"></div>Memuat rank harian dari Rank Board…</div>';
+  const rows=rankRows();if(!rows.length)return `<div class="empty">Belum ada data rank Pinjamin bulan ini di Rank Board (sheet DATA RANK).</div>`;
+  const bks=[...new Set(rows.filter(x=>String(x.vendor).toUpperCase()===OWN).map(x=>x.bucket))].sort();
+  if(!VIEW.rkB||!bks.includes(VIEW.rkB))VIEW.rkB=bks[0]||'';
+  const mode=VIEW.rkMode||'daily';
+  return `<div class="tabs2 noprint">${bks.map(b=>`<button class="${b===VIEW.rkB?'on':''}" onclick="VIEW.rkB='${escH(b)}';render()">${escH(b)}</button>`).join('')}
+      <span style="margin-left:auto" class="seg"><button class="${mode==='daily'?'on':''}" onclick="VIEW.rkMode='daily';render()">Daily</button><button class="${mode==='monthly'?'on':''}" onclick="VIEW.rkMode='monthly';render()">Monthly (akumulasi)</button></span></div>
+    <div id="rkStrip"></div><div style="position:relative;height:300px;margin-top:8px"><canvas id="cRank"></canvas></div>
+    <div class="vnote">Sumber: <b>Rank Board</b> (sheet DATA RANK, input SPV) — rate per vendor per tanggal untuk aplikasi Pinjamin. ${mode==='daily'?'Daily = rate hari itu saja.':'Monthly = akumulasi sejak awal bulan s/d tanggal tsb.'} Kotak di atas grafik = peringkat EDN tiap tanggal.</div>`;
+}
+function rankCharts(){
+  RCH.forEach(c=>c.destroy());RCH=[];
+  const rows=rankRows();if(!rows||!rows.length||!VIEW.rkB)return;
+  const R=rows.filter(x=>x.bucket===VIEW.rkB);const dates=[...new Set(R.map(x=>x.tanggal))].sort();
+  const vend=[...new Set(R.map(x=>x.vendor))].sort((a,b)=>a===OWN?-1:b===OWN?1:a.localeCompare(b));
+  const pal=['#1d60c8','#64748b','#a855f7','#0d9488','#d97706','#db2777'];
+  const st=document.getElementById('rkStrip');
+  if(st)st.innerHTML=`<div class="rankstrip">${dates.map(d=>{const day=R.filter(x=>x.tanggal===d);const e=day.find(x=>String(x.vendor).toUpperCase()===OWN);const n=day.length;
+    const col=!e?'var(--surface2)':e.rank===1?'var(--success-bg)':e.rank===n?'var(--danger-bg)':'var(--warning-bg)', tc=!e?'var(--text3)':e.rank===1?'var(--success)':e.rank===n?'var(--danger)':'var(--warning)';
+    return `<div class="d" style="background:${col}" title="${dLabel(d)} · EDN ${e?fmtPct(e.rate*100,3):'—'}"><div class="x">${dShort(d)}</div><div class="y" style="color:${tc}">${e?'#'+e.rank:'—'}<span style="font-size:10px;color:var(--text3)">/${n}</span></div></div>`;}).join('')}</div>`;
+  const c=document.getElementById('cRank');if(!c)return;
+  RCH.push(new Chart(c,{type:'line',data:{labels:dates.map(dShort),datasets:vend.map((v,i)=>({label:v,data:dates.map(d=>{const x=R.find(y=>y.tanggal===d&&y.vendor===v);return x?x.rate*100:null;}),
+    borderColor:String(v).toUpperCase()===OWN?'#1d60c8':pal[(i%(pal.length-1))+1],backgroundColor:'transparent',borderWidth:String(v).toUpperCase()===OWN?3.5:2,pointRadius:String(v).toUpperCase()===OWN?4:2.5,tension:.25,spanGaps:true}))},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>{const r=R.find(y=>y.tanggal===dates[x.dataIndex]&&y.vendor===x.dataset.label);return `${x.dataset.label}: ${fmtPct(x.parsed.y,3)}${r?' · #'+r.rank:''}`;}}}},scales:{y:{ticks:{callback:v=>v.toFixed(2)+'%'}}}}}));
 }
 let TCH=null;
 function trendChart(dates,groups){
