@@ -422,6 +422,7 @@ function doGet(e) {
       case 'klien':     result = endpointKlien_(e);     break;
       case 'databayar': result = endpointDataBayar_(e); break;
       case 'pinj':      result = endpointPinj_(e);      break;
+      case 'jam':       result = endpointJam_(e);       break;
       case 'qccheck':   result = endpointQcCheck_(e);   break;
       case 'kelengkapan': result = endpointKelengkapan_(e); break;
       default: result = { success: false, message: 'Unknown action: ' + action };
@@ -1202,6 +1203,7 @@ function doPost(e) {
       case 'klien_save': result = klienSave_(body); break;
       case 'klien_kategori_save': result = klienKategoriSave_(body); break;
       case 'pinj_save': result = pinjSave_(body); break;
+      case 'jam_save':  result = jamSave_(body);  break;
       default: result = { success: false, message: 'Unknown action: ' + body.action };
     }
   } catch (err) {
@@ -1527,4 +1529,55 @@ function endpointPinj_(e) {
     .map(r => r.slice(0, 24).map((v, i) => i < PINJ_SHEET.textCols ? _klienTxt_(v) : (Number(v) || 0)));
   const dates = [...new Set(rows.map(r => r[0]))].sort();
   return { success: true, action: 'pinj', periode, prevLast, dates, cols: PINJ_SHEET.head.slice(0, 24), rows };
+}
+
+
+/*** ============ PERGERAKAN PER JAM (worker_performance_record) ============ ***
+ * File "worker_performance_record_YYYY-MM-DD_HHMMSS.xlsx" (tarikan sistem klien, akumulasi
+ * hari itu s/d jam tarik). 1 upload = 1 snapshot per (TANGGAL, JAM, BUCKET).
+ * Simpan: POST {action:'jam_save', tanggal, jam:'HH:MM', rows:[[BUCKET,ROLE,STAFF_ID,NAMA,OS,REPAY,TARGET,
+ *          HANDLE_TIMES,HANDLE_NUM,COMPLETE,LOAD,NEW_ASSIGN,CALLOUT,RANK]]}
+ *   → baris lama dgn TANGGAL+JAM sama & BUCKET yg ada di upload diganti.
+ * Baca: GET ?action=jam&tanggal=yyyy-mm-dd → {tanggal, dates, cols, rows}
+ ***********************************************************/
+const JAM_SHEET = { name: 'KLIEN_JAM',
+  head: ['TANGGAL','JAM','BUCKET','ROLE','STAFF_ID','NAMA','OS','REPAY','TARGET_RATE','HANDLE_TIMES','HANDLE_NUM',
+         'COMPLETE','LOAD','NEW_ASSIGN','CALLOUT_RATE','RANK','DIUPLOAD'],
+  textCols: 6 };
+function jamSave_(body) {
+  const tanggal = String(body.tanggal || '').slice(0, 10);
+  const jam = String(body.jam || '').slice(0, 5);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(tanggal)) throw new Error('Tanggal tidak valid: ' + tanggal);
+  if (!/^\d{2}:\d{2}$/.test(jam)) throw new Error('Jam tidak valid: ' + jam);
+  const rows = body.rows || [];
+  if (!rows.length) throw new Error('Tidak ada baris data.');
+  const lock = LockService.getScriptLock(); lock.waitLock(20000);
+  try {
+    const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+    const sh = _klienSheet_(ss, JAM_SHEET);
+    const now = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm');
+    const num = v => Number(v) || 0, txt = v => v === null || v === undefined ? '' : String(v).trim();
+    const out = rows.map(r => [tanggal, jam].concat(r.slice(0, 4).map(txt), r.slice(4, 14).map(num), [now]));
+    const bk = {}; out.forEach(r => bk[r[2]] = 1);
+    const res = _klienReplace_(sh, JAM_SHEET,
+      r => _klienTxt_(r[0]) === tanggal && _jamTxt_(r[1]) === jam && !!bk[_klienTxt_(r[2])], out);
+    return { success: true, action: 'jam_save', tanggal, jam, buckets: Object.keys(bk), result: res };
+  } finally { lock.releaseLock(); }
+}
+function _jamTxt_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, Session.getScriptTimeZone(), 'HH:mm');
+  return String(v || '').trim().slice(0, 5);
+}
+function endpointJam_(e) {
+  const p = (e && e.parameter) || {};
+  const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+  const sh = ss.getSheetByName(JAM_SHEET.name);
+  const all = sh ? _klienReadAll_(sh, JAM_SHEET.head.length) : [];
+  const dset = {};
+  all.forEach(r => { const t = _klienTxt_(r[0]); if (t) dset[t] = 1; });
+  const dates = Object.keys(dset).sort();
+  const tanggal = /^\d{4}-\d{2}-\d{2}$/.test(String(p.tanggal || '')) ? String(p.tanggal) : (dates[dates.length - 1] || '');
+  const rows = all.filter(r => _klienTxt_(r[0]) === tanggal)
+    .map(r => r.slice(0, 16).map((v, i) => i === 1 ? _jamTxt_(v) : i < JAM_SHEET.textCols ? _klienTxt_(v) : (Number(v) || 0)));
+  return { success: true, action: 'jam', tanggal, dates, cols: JAM_SHEET.head.slice(0, 16), rows };
 }
