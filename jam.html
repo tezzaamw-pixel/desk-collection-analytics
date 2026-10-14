@@ -164,6 +164,9 @@ table.t tr.clk{cursor:pointer;}table.t tr.clk:hover td{background:var(--surface2
 .ib{display:inline-block;padding:1px 7px;border-radius:999px;font-size:10.5px;font-weight:700;white-space:nowrap;}
 .ib-idle{background:var(--warning-bg);color:var(--warning);}
 .ib-new{background:var(--success-bg);color:var(--success);}
+.ib-vend{background:#fef3c7;color:#92400e;font-size:10px;}
+[data-theme="dark"] .ib-vend{background:#3a2e0a;color:#fcd34d;}
+table.t tr.vend td{background:rgba(250,204,21,.10);}
 .fsbtn{border:1px solid var(--border);background:var(--surface);color:var(--text2);border-radius:6px;padding:3px 9px;font-size:13px;cursor:pointer;}
 .fsbtn:hover{color:var(--accent);border-color:var(--accent);}
 .fsmode{position:fixed!important;inset:0!important;z-index:800!important;margin:0!important;border-radius:0!important;overflow:auto!important;max-width:none!important;padding:22px 28px!important;}
@@ -264,11 +267,16 @@ const API_URL='https://script.google.com/macros/s/AKfycbzLOdo9BWLLMMxzRoFaPYVYCl
 const BLN3=['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Ags','Sep','Okt','Nov','Des'];
 const HARI=['Min','Sen','Sel','Rab','Kam','Jum','Sab'];
 // Role di sistem klien → nama pemimpin (sesuai laporan klien). Role yang tidak ada di sini tampil apa adanya.
+// Role di sistem klien → nama TL internal (sesuai laporan TL). AKUN = nama TL di laporan klien (akun TL).
+// VENDOR = tim vendor lain yang ikut terbaca di sistem (ditandai kuning, seperti di laporan TL).
 const ROLE_NAME={
-  'M1-3-C':'BAIQ SRI EVIPAH','M1-3-H':'APRIAN NIKO PRASETYO 2','M1-3-I':'MIRNA OKTAVIA 2','M1-3-B':'ADI HIDAYAT',
-  'M1-3-PREDICT':'SAFITRI DEWI HARYADI PUTRI','M1-3-G':'Vendor DKU','M1-3-T':'Vendor SSS',
-  'NPA-C':'SABIRIN ASRI','NPA-F':'SRI WAHYUNI','NPA-G':'YENNY APRILIA','NPA-E':'MARWAN HADI','NPA-H':'MARWAN HADI'
+  'M1-3-B':'ADI HIDAYAT','M1-3-C':'BQ SRI EVIPAH','M1-3-G':'SITI','M1-3-H':'SATIA SANJAYA','M1-3-I':'MIRNA OKTAVIA',
+  'M1-3-PREDICT':'SAFITRI DEWI','M1-3-T':'MOCH WILDAN',
+  'NPA-C':'TONI','NPA-E':'ADISTA PUTRI','NPA-F':'DWI SILANTARA','NPA-G':'SRI WAHYUNI','NPA-H':'WAHYU DIANTO'
 };
+const ROLE_AKUN={'M1-3-B':'ADI HIDAYAT','M1-3-C':'BAIQ SRI EVIPAH','M1-3-H':'APRIAN NIKO PRASETYO 2','M1-3-I':'MIRNA OKTAVIA 2','M1-3-PREDICT':'SAFITRI DEWI HARYADI PUTRI',
+  'NPA-C':'SABIRIN ASRI','NPA-F':'SRI WAHYUNI','NPA-G':'YENNY APRILIA'};
+const ROLE_VENDOR={'M1-3-G':'DKU','M1-3-T':'SSS','NPA-E':'MPT','NPA-H':'MPT'};
 const BUCKETS=[['C03','CO3 (M1-3)'],['NPA','NPA (M30+)']];
 const PALETTE=['#1d60c8','#e11d48','#059669','#d97706','#7c3aed','#0891b2','#64748b','#db2777','#65a30d','#ea580c'];
 const C={tgl:0,jam:1,bk:2,role:3,id:4,nm:5,os:6,rp:7,tgt:8,ht:9,hn:10,cp:11,load:12,nw:13,co:14,rank:15};
@@ -327,6 +335,7 @@ function leadersAt(j){
   agentsAt(j).forEach(a=>{const L=m[a.lead]||(m[a.lead]={lead:a.lead,roles:new Set(),n:0,os:0,rp:0,tgtRp:0,ht:0,hn:0,cp:0,agents:[]});
     L.roles.add(a.role);L.n++;L.os+=a.os;L.rp+=a.rp;L.tgtRp+=a.tgt/100*a.os;L.ht+=a.ht;L.hn+=a.hn;L.cp+=a.cp;L.agents.push(a);});
   const arr=Object.values(m);arr.forEach(L=>{L.rate=L.os?L.rp/L.os*100:0;L.tgtRate=L.os?L.tgtRp/L.os*100:0;});
+  arr.forEach(L=>{const rs=[...L.roles].map(r=>String(r).toUpperCase());L.vendor=rs.map(r=>ROLE_VENDOR[r]).find(Boolean)||'';L.akun=[...new Set(rs.map(r=>ROLE_AKUN[r]).filter(Boolean))].join(', ');});
   arr.sort((a,b)=>b.rate-a.rate);arr.forEach((L,i)=>L.pos=i+1);return arr;
 }
 let COLORS={};
@@ -395,8 +404,8 @@ function render(){
       <th class="n" title="Repay tambahan supaya rate-nya sama dengan pemimpin #1 (dengan OS sekarang)">Kurang ke #1</th>
       ${hasTgt?`<th class="n">Kurang ke target</th><th class="n">Butuh / jam s/d ${tutup}</th>`:''}</tr></thead>
     <tbody>${cur.map(L=>{const g1=L===top?0:(top.rate-L.rate)/100*L.os, gt=Math.max(0,L.tgtRp-L.rp);
-      return `<tr class="clk" onclick="openLead('${escH(L.lead).replace(/'/g,"\\'")}')"><td>${L.pos}${L.dPos?` <span class="${L.dPos>0?'up':'dn'}">${L.dPos>0?'▲'+L.dPos:'▼'+(-L.dPos)}</span>`:''}</td>
-      <td style="font-weight:700;white-space:normal;min-width:170px"><span class="dot" style="background:${colorOf(L.lead)}"></span>${escH(L.lead)}<div class="muted" style="font-weight:400;font-size:10.5px;margin-left:16px">${[...L.roles].map(escH).join(', ')}</div></td>
+      return `<tr class="clk ${L.vendor?'vend':''}" onclick="openLead('${escH(L.lead).replace(/'/g,"\\'")}')"><td>${L.pos}${L.dPos?` <span class="${L.dPos>0?'up':'dn'}">${L.dPos>0?'▲'+L.dPos:'▼'+(-L.dPos)}</span>`:''}</td>
+      <td style="font-weight:700;white-space:normal;min-width:170px"><span class="dot" style="background:${colorOf(L.lead)}"></span>${escH(L.lead)}${L.vendor?` <span class="ib ib-vend">vendor ${escH(L.vendor)}</span>`:''}<div class="muted" style="font-weight:400;font-size:10.5px;margin-left:16px">${[...L.roles].map(escH).join(', ')}${L.akun?' · akun klien: '+escH(L.akun):''}</div></td>
       <td class="n">${L.n}</td><td class="n">${fmtRp(L.os)}</td><td class="n">${fmtRp(L.rp)}</td><td class="n" style="font-weight:800">${fmtPct(L.rate)}</td>
       <td class="n ${L.dRp>0?'up':'eq'}">${L.dRp===null?'—':L.dRp>0?fmtSRp(L.dRp):'Rp 0'}</td>
       <td class="n">${L.dHt===null?'—':fmtNum(L.dHt)}</td>
