@@ -403,11 +403,13 @@ function render(){
     <div class="story" style="white-space:pre-line">${escH(story)}</div>
     <div class="kpis" style="margin-bottom:0">
       <div class="kpi"><div class="l">Gross EDN hari ini</div><div class="v">${fmtRp(so.gross)}</div><div class="s">${so.n} agent · payment ${fmtRp(so.paid)} · rate ${fmtPct(so.rate)}</div></div>
-      <div class="kpi"><div class="l">Agent EDN belum ada hasil</div><div class="v ${so.nol?'bad':'good'}">${so.nol} <span style="font-size:13px;color:var(--text3)">/ ${so.n}</span></div><div class="s">gross = 0 ${isFinal?'sepanjang hari':'sampai jam '+VIEW.jam}</div></div>
+      <div class="kpi" style="cursor:pointer" onclick="document.getElementById('secNol').scrollIntoView({behavior:'smooth'})" title="Lihat daftar"><div class="l">Agent EDN belum ada hasil ↓</div><div class="v ${so.nol?'bad':'good'}">${so.nol} <span style="font-size:13px;color:var(--text3)">/ ${so.n}</span></div><div class="s">gross = 0 ${isFinal?'sepanjang hari':'sampai jam '+VIEW.jam}</div></div>
       <div class="kpi"><div class="l">Call EDN</div><div class="v">${fmtNum(so.call)}</div><div class="s">${fmtNum(so.callPer)}/agent · tersambung ${fmtPct(so.connR,1)}</div></div>
       <div class="kpi"><div class="l">Durasi call EDN</div><div class="v">${fmtDur(so.dur)}</div><div class="s">${fmtDur(so.durPer)}/agent · WA ${fmtNum(so.wabaPer)}/agent</div></div>
     </div>
   </div>
+
+  ${nolCard(G)}
 
   <div class="card sec" id="secScore">
     <div class="card-head"><div><div class="card-title">🏁 Papan Skor Harian per Bucket</div><div class="card-sub">Format laporan TL: rate = payment (daily repaid principal) ÷ OS hari ini, urut rate · ${prevJ?`angka hijau kecil = tambahan payment sejak tarikan ${jamLabel(prevJ)}`:'tiap kartu bisa disalin sebagai gambar (📋 Gambar)'}</div></div>
@@ -448,6 +450,25 @@ function render(){
   trendChart();
 }
 
+function nolCard(G){
+  const rows=[];
+  G.forEach(g=>{if(!g.own)return;const calls=g.vend.flatMap(v=>v.list.map(a=>a.call)).sort((x,y)=>x-y), med=calls.length?calls[Math.floor(calls.length/2)]:0;
+    g.own.list.filter(a=>!a.gross).forEach(a=>rows.push({...a,grp:g.group,med,rajin:a.call>=med}));});
+  if(!rows.length)return `<div class="card sec" id="secNol"><div class="card-head"><div><div class="card-title">✅ Semua agent EDN sudah ada hasil</div><div class="card-sub">${VIEW.jam==='FINAL'?'FINAL':'s/d jam '+escH(VIEW.jam)}</div></div></div></div>`;
+  rows.sort((a,b)=>(GORDER.indexOf(a.grp)-GORDER.indexOf(b.grp))||a.tl.localeCompare(b.tl)||a.call-b.call);
+  const when=VIEW.jam==='FINAL'?'FINAL':'s/d jam '+VIEW.jam;
+  const byTl={};rows.forEach(a=>(byTl[a.tl+'|'+a.grp]=byTl[a.tl+'|'+a.grp]||[]).push(a));
+  window._nolText=`Agent EDN Pinjamin belum ada hasil — ${dLabel(VIEW.tanggal)} ${when} (${rows.length} agent)\n`+
+    Object.values(byTl).map(L=>`\n${L[0].grp} · TL ${L[0].tl} (${L.length}):\n`+L.map((a,i)=>`${i+1}. ${a.ag} — ${fmtNum(a.call)} call, ${fmtNum(a.conn)} tersambung${a.rajin?'':' ⚠ call di bawah median'}`).join('\n')).join('\n');
+  return `<div class="card sec" id="secNol">
+    <div class="card-head"><div><div class="card-title">🚩 Agent EDN Belum Ada Hasil · ${rows.length} agent</div><div class="card-sub">Gross = 0 ${escH(when)} · ${escH(dLabel(VIEW.tanggal))} · <b>rajin, belum bayar</b> = call ≥ median bucket (semua vendor) · <b>kurang gerak</b> = di bawah median</div></div>
+      <div><button class="btn btn-ghost noprint" onclick="copyNol(this)">📋 Salin teks</button></div></div>
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>#</th><th>Bucket</th><th>TL</th><th>Agent</th><th class="n">OS</th><th class="n">Call</th><th class="n">Tersambung</th><th class="n">Durasi</th><th class="n">WA</th><th class="n">Median call bucket</th><th>Status</th></tr></thead><tbody>
+    ${rows.map((a,i)=>`<tr><td>${i+1}</td><td>${escH(a.grp)}</td><td>${escH(a.tl)}</td><td style="font-weight:700">${escH(a.ag)} <span class="muted" style="font-size:10.5px;font-weight:400">${escH(a.agno)}</span></td><td class="n">${fmtRp(a.pok)}</td><td class="n" style="font-weight:700">${fmtNum(a.call)}</td><td class="n">${fmtNum(a.conn)} <span class="muted">(${a.call?fmtPct(a.conn/a.call*100,1):'—'})</span></td><td class="n">${fmtDur(a.dur)}</td><td class="n">${fmtNum(a.waba)}</td><td class="n muted">${fmtNum(a.med)}</td>
+      <td>${a.rajin?'<span class="ib" style="background:var(--warning-bg);color:var(--warning)">rajin, belum bayar</span>':'<span class="ib" style="background:var(--danger-bg);color:var(--danger)">kurang gerak</span>'}</td></tr>`).join('')}</tbody></table></div>
+  </div>`;
+}
+function copyNol(btn){const t=window._nolText||'';(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{btn.textContent='✅ Tersalin';setTimeout(()=>btn.textContent='📋 Salin teks',1500);}).catch(()=>prompt('Salin teks ini:',t));}
 function scoreCard(g,pg){
   // format laporan TL: OS · PAYMENT (dailyRepaidPrincipal) · RATE · RANK · GAP (rupiah)
   const maxR=Math.max(...g.vend.map(v=>v.rate),1e-9), R=g.byRate, best=R[0], multi=g.vend.length>1;
