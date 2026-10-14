@@ -145,7 +145,8 @@ body.fs-open{overflow:hidden;}
 .projsw a.on{background:var(--navy);color:#fff;}
 .sec{scroll-margin-top:70px;}
 .sec-title{font-size:17px;font-weight:800;margin-bottom:4px;}
-.vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(620px,1fr));gap:14px;}
+.vcards{display:grid;grid-template-columns:repeat(auto-fill,minmax(560px,1fr));gap:12px;}
+.trk{height:6px!important;}
 .vcard{border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--surface);}
 .vcard-h{display:flex;justify-content:space-between;align-items:flex-start;gap:10px;padding:12px 14px;background:var(--surface2);}
 .vcard-h .sub{font-size:11.5px;color:var(--text3);font-weight:600;margin-top:2px;white-space:nowrap;}
@@ -153,7 +154,7 @@ body.fs-open{overflow:hidden;}
 .fsbtn.ico{float:none;margin:0;padding:3px 8px;font-size:13px;line-height:1;}
 .vcard-h .g{font-weight:800;font-size:15px;}
 .vcard-b{padding:10px 14px;}
-.vrow{display:grid;grid-template-columns:100px minmax(24px,1fr) 58px 66px 38px 118px 108px;gap:10px;align-items:center;font-size:12.5px;padding:6px 0;border-top:1px dashed var(--border);}
+.vrow{display:grid;grid-template-columns:100px minmax(40px,80px) 58px 66px 38px 118px 108px;gap:10px;align-items:center;font-size:12.5px;padding:6px 0;border-top:1px dashed var(--border);}
 .vrow>*{white-space:nowrap;}
 .vrow .gp{font-size:11.5px;}
 .vrow.hd{font-size:10.5px;color:var(--text3);font-weight:700;letter-spacing:.03em;border-top:none;padding-top:0;}
@@ -688,5 +689,6 @@ function doUnlockPage(){
 }
 loadData();
 </script>
+<script src="copyimg.js"></script>
 </body>
 </html>

@@ -218,7 +218,10 @@ body.present .sec.cur{display:block;}
 body.present .pnav{display:flex;position:fixed;left:0;right:0;bottom:0;justify-content:space-between;align-items:center;padding:10px 24px;background:var(--surface);border-top:1px solid var(--border);z-index:300;}
 @media print{.sidebar,.navbar,.filters,.projsw,.pnav,.noprint,.lock-overlay{display:none!important;}.main{margin:0!important;padding:0!important;}.card{break-inside:avoid;box-shadow:none;}body{background:#fff;}}
 @media(max-width:768px){.vcards{grid-template-columns:1fr;}.vrow{grid-template-columns:70px 0 48px 54px 30px 1fr 1fr;gap:5px;font-size:10.5px;}.vrow .trk{display:none;}}
-.vrow{grid-template-columns:96px minmax(24px,1fr) 52px 108px 108px 118px 112px;}
+.vcards{grid-template-columns:repeat(auto-fill,minmax(560px,1fr));gap:12px;}
+.vrow{grid-template-columns:var(--vcols,92px minmax(40px,80px) 56px 108px 112px 108px);gap:8px;font-size:12.5px;padding:5px 0;}
+.vcard-h{padding:10px 14px;}.vcard-b{padding:6px 14px 10px;}.vnote{margin-top:6px;}
+.trk{height:6px;}
 .dpick{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);border-radius:8px;padding:2px 8px;background:var(--surface);font-size:13px;}
 .dpick input{border:0;padding:5px 0;background:transparent;}
 [data-theme="dark"] input[type=date],[data-theme="dark"] input[type=time]{color-scheme:dark;}
@@ -380,7 +383,7 @@ function render(){
   if(!J.length){sj.innerHTML='';box.innerHTML=`<div class="card"><div class="empty">${DATA.dates.length?'Tidak ada data tanggal '+dLabel(VIEW.tanggal)+'.':'Belum ada data harian Pinjamin.'}<br><span class="muted">Klik <b>⬆ Upload File Harian</b>.</span></div></div>`;return;}
   if(!J.includes(VIEW.jam))VIEW.jam=J[J.length-1];
   sj.innerHTML=J.slice().reverse().map(j=>`<option value="${j}" ${j===VIEW.jam?'selected':''}>${j==='FINAL'?'FINAL (lengkap)':'jam '+j}</option>`).join('');
-  const ji=J.indexOf(VIEW.jam), prevJ=ji>0?J[ji-1]:null;
+  const ji=J.indexOf(VIEW.jam), prevJ=ji>0?J[ji-1]:null;VIEW._prevJ=prevJ;
   const G=groupsAt(VIEW.jam).filter(g=>VIEW.all||g.own);
   const PG=prevJ?Object.fromEntries(groupsAt(prevJ).map(g=>[g.group,g])):{};
   const isFinal=VIEW.jam==='FINAL';
@@ -406,7 +409,7 @@ function render(){
   </div>
 
   <div class="card sec" id="secScore">
-    <div class="card-head"><div><div class="card-title">🏁 Papan Skor Harian per Bucket</div><div class="card-sub">Urut rate (terbayar pokok ÷ pokok hari ini) · ${prevJ?`Δ dibanding tarikan ${jamLabel(prevJ)}`:'Δ muncul kalau ada tarikan sebelumnya di hari yang sama'}</div></div>
+    <div class="card-head"><div><div class="card-title">🏁 Papan Skor Harian per Bucket</div><div class="card-sub">Urut rate (terbayar pokok ÷ pokok hari ini) · ${prevJ?`angka hijau kecil = tambahan gross total vendor sejak tarikan ${jamLabel(prevJ)}`:'tiap kartu bisa disalin sebagai gambar (📋 Gambar)'}</div></div>
       <button class="fsbtn noprint" onclick="fsToggle('secScore')">⛶ Layar penuh</button></div>
     <div class="vcards">${G.map(g=>scoreCard(g,PG[g.group])).join('')}</div>
   </div>
@@ -450,18 +453,19 @@ function scoreCard(g,pg){
   const badge=!g.own?'<span class="ib" style="background:var(--surface);color:var(--text3)">tanpa EDN</span>':g.vend.length<2?'<span class="ib" style="background:var(--surface);color:var(--text3)">EDN saja</span>':
     `<span class="ib" style="background:${posR===1?'var(--success-bg)':'var(--danger-bg)'};color:${posR===1?'var(--success)':'var(--danger)'}">Rate #${posR}/${g.vend.length}</span> <span class="ib" style="background:${posG===1?'var(--success-bg)':'var(--warning-bg)'};color:${posG===1?'var(--success)':'var(--warning)'}">Gross #${posG}/${g.vend.length}</span>`;
   const pv=pg?Object.fromEntries(pg.vend.map(v=>[v.comp,v])):{};
+  const hasD=!!pg;
   const row=v=>{const rm=(bR.rate-v.rate)/100*v.pok, gm=(bG.grossPer-v.grossPer);const p=pv[v.comp];const dG=p?v.gross-p.gross:null;
     return `<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span>
     <div class="trk"><span style="width:${v.rate/maxR*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div>
-    <span class="n" style="${v===bR&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n" title="${fmtRp(v.grossPer)}">${fmtRp(v.grossPer)}</span>
-    <span class="n" title="Tambahan gross sejak tarikan sebelumnya">${dG===null?'<span class="muted">—</span>':dG>0?`<span class="good">+${fmtRp(dG)}</span>`:'<span class="muted">0</span>'}</span>
+    <span class="n" style="${v===bR&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n" title="${hasD&&dG!==null?'Tambahan gross sejak tarikan '+jamLabel(VIEW._prevJ)+': '+fmtRp(dG):''}">${fmtRp(v.grossPer)}${hasD&&dG>0?'<div class="good" style="font-size:10px;font-weight:600;line-height:1.1">+'+fmtRp(dG)+'</div>':''}</span>
     <span class="n gp">${g.vend.length<2?'<span class="muted">—</span>':v===bR?'<span class="good">🏆 terbaik</span>':rm<1?'<span class="muted">setara</span>':`<span class="bad">-${fmtRp(rm)}</span>`}</span>
     <span class="n gp">${g.vend.length<2?'<span class="muted">—</span>':v===bG?'<span class="good">🏆 terbaik</span>':`<span class="bad">-${fmtRp(gm)}</span>`}</span></div>`;};
   let note='';
   if(g.own&&g.vend.length>1&&bG!==g.own)note=`Supaya gross/agent EDN menyamai ${escH(bG.comp)}, tiap agent butuh tambahan <b>${fmtRp(bG.grossPer-g.own.grossPer)}</b> (total ${fmtRp((bG.grossPer-g.own.grossPer)*g.own.n)} untuk ${g.own.n} agent).`;
   if(g.own&&g.own.nol)note+=` ${g.own.nol} dari ${g.own.n} agent EDN belum ada hasil.`;
-  return `<div class="vcard" id="vc-${escH(g.group)}"><div class="vcard-h"><div><div class="g">${escH(g.group)}</div><div class="sub">${g.n} agent · pokok hari ini ${fmtRp(g.vend.reduce((s,v)=>s+v.pok,0))}</div></div><div class="rt">${badge}</div></div><div class="vcard-b">
-    <div class="vrow hd"><span>VENDOR</span><span></span><span class="n">RATE</span><span class="n">GROSS/AGENT</span><span class="n" title="Tambahan gross sejak tarikan sebelumnya hari ini">Δ</span><span class="n" title="Terbayar tambahan supaya rate sama dengan vendor rate terbaik: selisih rate × pokok vendor ini">KURANG RATE</span><span class="n" title="Selisih gross per agent dengan vendor gross/agent tertinggi">KURANG GROSS/AG</span></div>
+  const cols='86px minmax(30px,70px) 54px 112px minmax(96px,1fr) minmax(96px,1fr)';
+  return `<div class="vcard" id="vc-${escH(g.group)}" style="--vcols:${cols}"><div class="vcard-h"><div><div class="g">${escH(g.group)} <span style="font-size:11.5px;font-weight:600;color:var(--text3)">Pinjamin · ${escH(dShort(VIEW.tanggal))} ${VIEW.jam==='FINAL'?'FINAL':'s/d '+escH(VIEW.jam)}</span></div><div class="sub">${g.n} agent · pokok hari ini ${fmtRp(g.vend.reduce((s,v)=>s+v.pok,0))}</div></div><div class="rt">${badge}</div></div><div class="vcard-b">
+    <div class="vrow hd"><span>VENDOR</span><span></span><span class="n">RATE</span><span class="n">GROSS/AGENT</span><span class="n" title="Terbayar tambahan supaya rate sama dengan vendor rate terbaik: selisih rate × pokok vendor ini">KURANG RATE</span><span class="n" title="Selisih gross per agent dengan vendor gross/agent tertinggi">KURANG GROSS</span></div>
     ${g.byRate.map(row).join('')}${note?`<div class="vnote">${note}</div>`:''}</div></div>`;
 }
 
@@ -609,5 +613,6 @@ function doUnlockPage(){
 }
 loadData();
 </script>
+<script src="copyimg.js"></script>
 </body>
 </html>
