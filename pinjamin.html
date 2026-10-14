@@ -512,8 +512,8 @@ function gapLadder(r,g){
   // target band: agent terbawah di band yg lebih baik
   const goals=[];
   if(above.length){const nb=above.filter(x=>x.band>=0&&x.band<r.band);
-    [[r.band-1,'Naik 1 tingkat persentil'],[1,'Masuk Top 25%'],[0,'Masuk Top 5%']].forEach(([b,l])=>{if(b<0||b>=r.band)return;const t=nb.filter(x=>x.band<=b).sort((a,c)=>a.gross-c.gross)[0];if(t&&!goals.some(x=>x.t===t))goals.push({l:l+` (${BANDS[b]})`,t});});
-    goals.push({l:'Jadi #1 bucket',t:above[0]});}
+    [...new Set([r.band-1,1,0])].forEach(b=>{if(b<0||b>=r.band)return;const t=nb.filter(x=>x.band<=b).sort((a,c)=>a.gross-c.gross)[0];if(t&&!goals.some(x=>x.t===t))goals.push({l:'Masuk persentil '+BANDS[b],t});});
+    if(!goals.some(x=>x.t===above[0]))goals.push({l:'Jadi #1 bucket',t:above[0]});else goals.find(x=>x.t===above[0]).l+=' = #1 bucket';}
   const goalHtml=above.length?`<div class="goal">
       <div><div class="l">Naik 1 peringkat (kejar ${escH(above[above.length-1].ag)})</div><div class="v">${fmtRp(above[above.length-1].gross-r.gross)}</div><div class="s">${perDay(above[above.length-1].gross-r.gross)}</div></div>
       ${goals.map(x=>`<div><div class="l">${x.l}</div><div class="v">${fmtRp(x.t.gross-r.gross)}</div><div class="s">kejar ${escH(x.t.ag)} (#${x.t.rank}) · ${perDay(x.t.gross-r.gross)}</div></div>`).join('')}
