@@ -342,7 +342,7 @@ function fillCmp(){
 /* ── olah data ── */
 function rowsAt(d){return (DATA.rows||[]).filter(r=>r[C.date]===d).map(r=>({group:r[C.group],asset:r[C.asset],dpd:r[C.dpd],comp:r[C.comp]||'?',tl:r[C.tl],agno:r[C.agno],ag:r[C.ag],baru:/YES|Y/i.test(r[C.baru]),masuk:r[C.masuk],
   band:bandIdx(r[C.intv]),intv:r[C.intv],os:r[C.os],paid:r[C.paid],rate:r[C.rate]*100,days:r[C.days],gross:r[C.gross],rank:r[C.rank]}));}
-function groupStats(R){
+function groupStats(R,nOver){
   // agent dgn pokok tidak wajar (>5× median bucket, mis. salah alokasi) tidak dihitung di total vendor
   const byG={};R.forEach(r=>(byG[r.group]=byG[r.group]||[]).push(r.os));
   const medOs={};Object.entries(byG).forEach(([g,a])=>{a.sort((x,y)=>x-y);medOs[g]=a[Math.floor(a.length/2)]||0;});
@@ -356,15 +356,23 @@ function groupStats(R){
     g.own=g.vend.find(v=>v.comp===OWN)||null;
     const gs=g.rows.map(r=>r.gross).sort((a,b)=>a-b);g.median=gs.length?gs[Math.floor(gs.length/2)]:0;
     g.days=Math.max(...g.rows.map(r=>r.days));});
+  // file EDN saja: jumlah agent bucket diambil dari laporan lengkap / rank tertinggi
+  if(nOver)Object.values(G).forEach(g=>{const n=Math.max(g.n,nOver[g.group]||0,...g.rows.map(r=>r.rank));if(n!==g.n){g.n=n;g.nEst=true;g.vend.forEach(v=>v.pctl=v.avgRank/n*100);}});
   return G;
 }
+// tanggal yg berisi lebih dari 1 vendor = laporan lengkap
+function isFull(d){return new Set((DATA.rows||[]).filter(r=>r[C.date]===d).map(r=>r[C.comp])).size>1;}
+function fullDateFor(d){const f=DATA.dates.filter(isFull);return f.filter(x=>x<=d).pop()||f.find(x=>x>d)||'';}
 function key(r){return r.group+'|'+(r.agno||normKey(r.ag));}
 
 /* ── render ── */
 function render(){
   const box=document.getElementById('content');
   if(!DATA||!VIEW.date){box.innerHTML=`<div class="card"><div class="empty">📭 Belum ada laporan Pinjamin untuk ${escH(document.getElementById('selBulan').value)} ${escH(document.getElementById('selTahun').value)}.<br>Klik <b>⬆ Upload Laporan</b> lalu pilih file Performance_ranking dari klien.</div></div>`;return;}
-  const R=rowsAt(VIEW.date), P=VIEW.cmp?rowsAt(VIEW.cmp):[], G=groupStats(R), PG=P.length?groupStats(P):{};
+  const R=rowsAt(VIEW.date), P=VIEW.cmp?rowsAt(VIEW.cmp):[];
+  const ednOnly=new Set(R.map(r=>r.comp)).size<2, FD=ednOnly?fullDateFor(VIEW.date):'', FG=FD?groupStats(rowsAt(FD)):null;
+  const nOver={};if(ednOnly&&FG)Object.values(FG).forEach(g=>nOver[g.group]=g.n);
+  const G=groupStats(R,ednOnly?nOver:null), PG=P.length?groupStats(P,isFull(VIEW.cmp)?null:nOver):{};
   const pmap={};P.forEach(r=>pmap[key(r)]=r);
   const own=R.filter(r=>r.comp===OWN), hasOther=new Set(R.map(r=>r.comp)).size>1;
   const ownGroups=Object.values(G).filter(g=>g.own).sort((a,b)=>a.group.localeCompare(b.group));
@@ -379,10 +387,10 @@ function render(){
     hasOther&&lead.length?`EDN <b>unggul rate</b> di ${lead.join(', ')}.`:'',
     hasOther&&behind.length?`Tertinggal di ${behind.map(g=>`<b>${g.group}</b> (EDN ${fmtPct(g.own.rate)} vs ${escH(g.byRate[0].comp)} ${fmtPct(g.byRate[0].rate)})`).join(', ')}.`:'',
     `Sebaran agent EDN: <b>${bandOwn[0]+bandOwn[1]}</b> di Top 25%, <b>${bandOwn[2]+bandOwn[3]}</b> di tengah, <b>${bandOwn[4]+bandOwn[5]}</b> di zona bawah (70%–Bottom 10%).`,
-    !hasOther?'<span class="muted">File ini hanya berisi EDN — perbandingan vendor butuh file lengkap.</span>':''].filter(Boolean).join(' ');
+    ednOnly?`<br><span style="font-size:13px">ℹ️ Laporan tanggal ini <b>versi EDN saja</b>. Peringkat & persentil agent tetap dibanding <b>seluruh bucket</b> (sudah dihitung klien)${FD?`; jumlah agent per bucket & angka vendor lain diambil dari laporan lengkap <b>${dLabel(FD)}</b>`:'; jumlah agent per bucket diperkirakan dari peringkat tertinggi'}.</span>`:''].filter(Boolean).join(' ');
   S.push({id:'ringkas',t:'Ringkasan',h:`<div class="story">${story}</div>
     <div class="kpis">
-      <div class="kpi"><div class="l">Agent EDN</div><div class="v">${own.length}</div><div class="s">${own.filter(r=>r.baru).length} agent baru · ${R.length} agent total</div></div>
+      <div class="kpi"><div class="l">Agent EDN</div><div class="v">${own.length}</div><div class="s">${own.filter(r=>r.baru).length} agent baru · ${ednOnly?Object.values(G).reduce((x,g)=>x+(g.own?g.n:0),0)+' agent di bucket yg sama':R.length+' agent total'}</div></div>
       <div class="kpi"><div class="l">Bucket dipegang</div><div class="v">${ownGroups.length}</div><div class="s">${ownGroups.map(g=>g.group+' ('+g.dpd+')').join(' · ')}</div></div>
       <div class="kpi"><div class="l">Top 25%</div><div class="v good">${bandOwn[0]+bandOwn[1]}</div><div class="s">Top 5%: ${bandOwn[0]} · 5–25%: ${bandOwn[1]}</div></div>
       <div class="kpi"><div class="l">Zona bawah</div><div class="v bad">${bandOwn[4]+bandOwn[5]}</div><div class="s">70–90%: ${bandOwn[4]} · Bottom 10%: ${bandOwn[5]}</div></div>
@@ -395,7 +403,7 @@ function render(){
   const showG=VIEW.allGroups?Object.values(G).sort((a,b)=>a.group.localeCompare(b.group)):ownGroups;
   S.push({id:'skor',t:'Papan Skor per Bucket',h:`
     <div class="noprint" style="margin-bottom:10px"><label class="chip2"><input type="checkbox" ${VIEW.allGroups?'checked':''} onchange="VIEW.allGroups=this.checked;render()"> tampilkan juga bucket yang tidak dipegang EDN</label></div>
-    <div class="vcards">${showG.map(g=>scoreCard(g,PG[g.group])).join('')}</div>
+    <div class="vcards">${showG.map(g=>scoreCard(g,PG[g.group],FG&&FG[g.group],FD)).join('')}</div>
     <div class="vnote"><b>Rate</b> = pokok terbayar ÷ pokok dibagikan. <b>Gross/agent</b> = rata-rata total uang masuk per agent (dasar ranking klien). <b>Rank</b> = rata-rata peringkat agent vendor itu (makin kecil makin baik). Δ dibanding laporan ${VIEW.cmp?dLabel(VIEW.cmp):'—'}.</div>`});
   // 3. Sebaran persentil
   S.push({id:'sebaran',t:'Sebaran Peringkat',h:`<div class="vcards">${showG.map(g=>`<div class="vcard"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)}</span></span><span class="muted" style="font-size:12px">${g.n} agent</span></div><div class="vcard-b">
@@ -422,13 +430,13 @@ function render(){
   // 6. Tim TL EDN
   const tls={};own.forEach(r=>{const k=r.group+'|'+r.tl;const t=tls[k]=tls[k]||{tl:r.tl,group:r.group,n:0,os:0,paid:0,gross:0,rank:0,top:0,low:0,baru:0};t.n++;t.os+=r.os;t.paid+=r.paid;t.gross+=r.gross;t.rank+=r.rank/G[r.group].n*100;if(r.band<=1&&r.band>=0)t.top++;if(r.band>=4)t.low++;if(r.baru)t.baru++;});
   S.push({id:'tl',t:'Tim TL EDN',h:`<div class="tbl-wrap"><table class="t"><thead><tr><th>TL (versi klien)</th><th>Bucket</th><th class="n">Agent</th><th class="n">Rate</th><th class="n">Gross/agent</th><th class="n">vs median bucket</th><th class="n" title="0% = paling atas bucket">Posisi rata²</th><th class="n">Top 25%</th><th class="n">Zona bawah</th></tr></thead><tbody>
-    ${Object.values(tls).sort((a,b)=>a.group.localeCompare(b.group)).map(t=>{const gp=t.gross/t.n, md=G[t.group].median;return `<tr><td><b>${escH(t.tl)}</b></td><td>${escH(t.group)}</td><td class="n">${t.n}${t.baru?` <span class="muted">(${t.baru} baru)</span>`:''}</td><td class="n">${fmtPct(t.paid/t.os*100)}</td><td class="n">${fmtRp(gp)}</td><td class="n ${gp<md?'bad':'good'}">${gp>=md?'+':''}${fmtJt(gp-md)}</td><td class="n ${t.rank/t.n>50?'bad':'good'}">${fmtPct(Math.min(t.rank/t.n,100),0)}</td><td class="n good">${t.top}</td><td class="n ${t.low?'bad':''}">${t.low}</td></tr>`;}).join('')}
+    ${Object.values(tls).sort((a,b)=>a.group.localeCompare(b.group)).map(t=>{const gp=t.gross/t.n, md=ednOnly?null:G[t.group].median;return `<tr><td><b>${escH(t.tl)}</b></td><td>${escH(t.group)}</td><td class="n">${t.n}${t.baru?` <span class="muted">(${t.baru} baru)</span>`:''}</td><td class="n">${fmtPct(t.paid/t.os*100)}</td><td class="n">${fmtRp(gp)}</td><td class="n ${md===null?'':gp<md?'bad':'good'}">${md===null?'<span class="muted" title="Butuh file lengkap">—</span>':(gp>=md?'+':'')+fmtJt(gp-md)}</td><td class="n ${t.rank/t.n>50?'bad':'good'}">${fmtPct(Math.min(t.rank/t.n,100),0)}</td><td class="n good">${t.top}</td><td class="n ${t.low?'bad':''}">${t.low}</td></tr>`;}).join('')}
     </tbody></table></div><div class="vnote">"Posisi rata²" = rata-rata posisi agent tim di bucket (0% = paling atas, 100% = paling bawah; di atas 50% = separuh bawah). Median bucket = gross agent ke-tengah di bucket itu (semua vendor).</div>`});
   // 7. Daftar perhatian
   const watch=own.filter(r=>r.band>=4||(p=>p&&r.rank-p.rank>=5)(pmap[key(r)])).sort((a,b)=>b.band-a.band||(b.rank/G[b.group].n)-(a.rank/G[a.group].n));
   S.push({id:'watch',t:'Agent Perlu Perhatian',h:watch.length?`<div class="tbl-wrap"><table class="t"><thead><tr><th>Agent</th><th>Bucket</th><th>TL</th><th class="n">Rank</th><th class="n">Δ</th><th>Persentil</th><th class="n">Gross</th><th class="n">Kurang dari median</th><th class="n">Hari</th><th>Catatan</th></tr></thead><tbody>
-    ${watch.map(r=>{const gg=G[r.group],p=pmap[key(r)],gap=gg.median-r.gross;const notes=[r.baru?'agent baru (masuk '+escH(r.masuk)+')':'',r.days<gg.days?`baru ${r.days} hari kerja`:'',p&&r.rank-p.rank>=5?`turun ${r.rank-p.rank} peringkat`:''].filter(Boolean).join(' · ');
-      return `<tr class="clk" onclick="openAgent('${escH(key(r))}')"><td><b>${escH(r.ag)}</b></td><td>${escH(r.group)}</td><td>${escH(r.tl)}</td><td class="n">${r.rank}<span class="muted">/${gg.n}</span></td><td class="n">${dRank(r,p)}</td><td>${bandPill(r.band)}</td><td class="n">${fmtRp(r.gross)}</td><td class="n bad">${gap>0?fmtRp(gap):'—'}</td><td class="n">${r.days}</td><td class="muted" style="white-space:normal;min-width:160px">${notes}</td></tr>`;}).join('')}
+    ${watch.map(r=>{const gg=G[r.group],p=pmap[key(r)],gap=ednOnly?0:gg.median-r.gross;const notes=[r.baru?'agent baru (masuk '+escH(r.masuk)+')':'',r.days<gg.days?`baru ${r.days} hari kerja`:'',p&&r.rank-p.rank>=5?`turun ${r.rank-p.rank} peringkat`:''].filter(Boolean).join(' · ');
+      return `<tr class="clk" onclick="openAgent('${escH(key(r))}')"><td><b>${escH(r.ag)}</b></td><td>${escH(r.group)}</td><td>${escH(r.tl)}</td><td class="n">${r.rank}<span class="muted">/${gg.n}</span></td><td class="n">${dRank(r,p)}</td><td>${bandPill(r.band)}</td><td class="n">${fmtRp(r.gross)}</td><td class="n bad">${gap>0?fmtRp(gap):'<span class="muted">—</span>'}</td><td class="n">${r.days}</td><td class="muted" style="white-space:normal;min-width:160px">${notes}</td></tr>`;}).join('')}
     </tbody></table></div><div class="vnote">Masuk daftar kalau persentil 70–90% / Bottom 10%, atau turun ≥5 peringkat dibanding laporan pembanding. Klik untuk melihat aktivitas internalnya.</div>`:'<div class="issues ok">Tidak ada agent EDN di zona bawah 👍</div>'});
 
   box.innerHTML=S.map((s,i)=>`<section class="sec card" id="sec-${s.id}" data-i="${i}"><div class="sec-title">${i+1}. ${s.t}</div><div class="card-sub" style="margin-bottom:12px">Laporan ${dLabel(VIEW.date)}${VIEW.cmp?' · pembanding '+dLabel(VIEW.cmp):''}</div>${s.h}</section>`).join('');
@@ -437,7 +445,7 @@ function render(){
 }
 function dRank(r,p){if(!p)return '<span class="d-eq">baru</span>';const d=p.rank-r.rank;return d>0?`<span class="d-up">▲${d}</span>`:d<0?`<span class="d-dn">▼${-d}</span>`:'<span class="d-eq">=</span>';}
 function bandPill(i){return i<0?'—':`<span class="ib" style="background:${BAND_COLOR[i]}26;color:${i===3?'#a16207':BAND_COLOR[i]}">${BANDS[i]}</span>`;}
-function scoreCard(g,pg){
+function scoreCard(g,pg,fg,fd){
   const maxG=Math.max(...g.vend.map(v=>v.grossPer),1), lead=g.byGross[0], rl=g.byRate[0];
   const posR=g.own?g.byRate.indexOf(g.own)+1:null, posG=g.own?g.byGross.indexOf(g.own)+1:null;
   const pOwn=pg&&pg.own;
@@ -451,6 +459,10 @@ function scoreCard(g,pg){
   return `<div class="vcard"><div class="vcard-h"><span class="g">${escH(g.group)} <span class="muted" style="font-size:12px;font-weight:600">DPD ${escH(g.dpd)} · ${g.days} hari</span></span><span>${badge}</span></div><div class="vcard-b">
     <div class="vrow" style="font-size:10.5px;color:var(--text3);font-weight:700"><span>VENDOR</span><span>GROSS / AGENT</span><span class="n">RATE</span><span class="n">GROSS/AG</span><span class="n">RANK</span></div>
     ${g.byGross.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.grossPer/maxG*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===rl&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span></div>`).join('')}
+    ${g.own&&g.vend.length<2?`<div class="vnote">Posisi rata² agent EDN: peringkat <b>${g.own.avgRank.toFixed(1)}</b> dari ${g.n}${g.nEst&&!fg?' (perkiraan)':''} agent di bucket → <b>${fmtPct(g.own.pctl,0)}</b> dari atas · ${g.own.top} agent Top 25%, ${g.own.low} di zona bawah.</div>`:''}
+    ${g.vend.length<2&&fg&&fg.vend.length>1?`<div class="vnote" style="margin-top:10px;font-weight:700">Vendor lain — laporan lengkap ${dShort(fd)}</div>
+      ${fg.byGross.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}" style="opacity:.6"><span class="nm">${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.grossPer/Math.max(...fg.vend.map(x=>x.grossPer),1)*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span></div>`).join('')}
+      <div class="vnote muted">Angka di atas dari tanggal ${dShort(fd)} (hari kerja berbeda), dipakai sebagai acuan posisi vendor.</div>`:''}
     ${note?`<div class="vnote">${note}</div>`:''}
     ${g.vend.some(v=>v.outl.length)?`<div class="vnote muted">Tidak dihitung (pokok tidak wajar, >5× median bucket): ${g.vend.flatMap(v=>v.outl.map(r=>`${escH(r.ag)} (${escH(v.comp)}, ${fmtJt(r.os)})`)).join(', ')}.</div>`:''}</div></div>`;
 }
@@ -543,7 +555,7 @@ function renderUp(){
   document.getElementById('upList').innerHTML=UP.map((u,i)=>`<div class="upitem"><div class="row"><b>${escH(u.name)}</b>
     ${u.status==='baca'?'<span class="muted">membaca…</span>':u.status==='gagal'?`<span class="bad">❌ ${escH(u.msg)}</span>`:u.status==='ok'?`<span class="good">✅ tersimpan (${escH(u.msg)})</span>`:u.status==='simpan'?'<span class="muted">menyimpan…</span>':''}</div>
     ${u.rows?`<div class="row" style="margin-top:6px"><span>${u.rows.length} agent · ${u.own} EDN · vendor: ${u.comps.map(escH).join(', ')} · bucket: ${u.groups.map(escH).join(', ')}</span></div>
-    ${u.comps.length===1?`<div class="issues warn" style="margin:6px 0 0">File ini hanya berisi ${escH(u.comps[0])} — hanya baris ${escH(u.comps[0])} di tanggal tsb yang diganti; perbandingan vendor tetap pakai data file lengkap kalau sudah ada.</div>`:''}
+    ${u.comps.length===1?`<div class="issues ok" style="margin:6px 0 0">Versi ${escH(u.comps[0])} saja — tidak masalah. Peringkat & persentil di file ini sudah dihitung klien terhadap seluruh bucket, jadi posisi agent tetap terbaca. Angka vendor lain diambil dari laporan lengkap terakhir (kalau ada). Kalau file lengkap tanggal yang sama menyusul, upload saja — datanya digabung.</div>`:''}
     ${u.status==='siap'||u.status==='gagal-simpan'?`<div class="row" style="margin-top:8px"><label>Tanggal data <input type="date" value="${u.tanggal}" onchange="UP[${i}].tanggal=this.value"></label><button class="btn btn-primary" onclick="saveUp(${i})">💾 Simpan</button>${u.status==='gagal-simpan'?`<span class="bad">${escH(u.msg)}</span>`:''}</div>`:''}`:''}</div>`).join('');
 }
 async function saveUp(i){
