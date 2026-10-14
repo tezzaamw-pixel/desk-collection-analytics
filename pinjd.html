@@ -358,7 +358,7 @@ function pickDate(v){if(!DATA||!DATA.dates.length)return;const ds=DATA.dates;loa
 
 /* ── turunan ── */
 function jams(){return [...new Set(DATA.rows.map(r=>r[C.jam]))].sort((a,b)=>jamKey(a).localeCompare(jamKey(b)));}
-function agents(j){return DATA.rows.filter(r=>r[C.jam]===j).map(r=>({grp:r[C.grp],vend:r[C.vend],tl:r[C.tl],ag:r[C.ag],agno:r[C.agno],pok:r[C.pok],paid:r[C.paid],gross:r[C.gross],
+function agents(j){return DATA.rows.filter(r=>r[C.jam]===j).map(r=>({grp:r[C.grp],vend:r[C.vend],tl:r[C.tl],ag:r[C.ag],agno:r[C.agno],pok:r[C.pok],paid:r[C.paidD],paidNew:r[C.paid],gross:r[C.gross],
   call:r[C.call],conn:r[C.conn],dur:r[C.dur],sms:r[C.sms],waba:r[C.waba],cs:r[C.cs],csIn:r[C.csIn],callCase:r[C.callCase],covIn:r[C.covIn],depth:r[C.depth]}));}
 function sumUp(list){const s={n:list.length,pok:0,paid:0,gross:0,call:0,conn:0,dur:0,sms:0,waba:0,csIn:0,callCase:0,nol:0};
   list.forEach(a=>{['pok','paid','gross','call','conn','dur','sms','waba','csIn','callCase'].forEach(k=>s[k]+=a[k]||0);if(!a.gross)s.nol++;});
@@ -390,7 +390,8 @@ function render(){
 
   // ringkasan teks
   const lines=G.filter(g=>g.own&&g.vend.length>1).map(g=>{const pr=g.byRate.indexOf(g.own)+1, pgx=g.byGross.indexOf(g.own)+1, best=g.byGross[0];
-    return `${g.group}: EDN rate ${fmtPct(g.own.rate)} (#${pr}/${g.vend.length}), gross/agent ${fmtRp(g.own.grossPer)} (#${pgx})`+(best!==g.own?` — kurang ${fmtRp(best.grossPer-g.own.grossPer)}/agent ke ${best.comp}`:' — terbaik')+(g.own.nol?`, ${g.own.nol}/${g.own.n} agent belum ada hasil`:'');});
+    const R=g.byRate, b1=R[0];
+    return `${g.group}: EDN #${pr}/${g.vend.length} · payment ${fmtRp(g.own.paid)} · rate ${fmtPct(g.own.rate)}`+(pr===1?` — unggul ${fmtRp((g.own.rate-R[1].rate)/100*g.own.pok)} dari ${R[1].comp}`:` — kurang ${fmtRp((b1.rate-g.own.rate)/100*g.own.pok)} ke ${b1.comp} (${fmtPct(b1.rate)})`)+(g.own.nol?`, ${g.own.nol}/${g.own.n} agent belum ada hasil`:'');});
   const story=`Pinjamin ${dLabel(VIEW.tanggal)} ${isFinal?'(FINAL)':'s/d jam '+VIEW.jam}\n`+lines.join('\n');
   window._story=story;
 
@@ -401,7 +402,7 @@ function render(){
       <button class="btn btn-ghost noprint" onclick="copyStory(this)">📋 Salin</button></div>
     <div class="story" style="white-space:pre-line">${escH(story)}</div>
     <div class="kpis" style="margin-bottom:0">
-      <div class="kpi"><div class="l">Gross EDN hari ini</div><div class="v">${fmtRp(so.gross)}</div><div class="s">${so.n} agent · terbayar pokok ${fmtRp(so.paid)}</div></div>
+      <div class="kpi"><div class="l">Gross EDN hari ini</div><div class="v">${fmtRp(so.gross)}</div><div class="s">${so.n} agent · payment ${fmtRp(so.paid)} · rate ${fmtPct(so.rate)}</div></div>
       <div class="kpi"><div class="l">Agent EDN belum ada hasil</div><div class="v ${so.nol?'bad':'good'}">${so.nol} <span style="font-size:13px;color:var(--text3)">/ ${so.n}</span></div><div class="s">gross = 0 ${isFinal?'sepanjang hari':'sampai jam '+VIEW.jam}</div></div>
       <div class="kpi"><div class="l">Call EDN</div><div class="v">${fmtNum(so.call)}</div><div class="s">${fmtNum(so.callPer)}/agent · tersambung ${fmtPct(so.connR,1)}</div></div>
       <div class="kpi"><div class="l">Durasi call EDN</div><div class="v">${fmtDur(so.dur)}</div><div class="s">${fmtDur(so.durPer)}/agent · WA ${fmtNum(so.wabaPer)}/agent</div></div>
@@ -409,7 +410,7 @@ function render(){
   </div>
 
   <div class="card sec" id="secScore">
-    <div class="card-head"><div><div class="card-title">🏁 Papan Skor Harian per Bucket</div><div class="card-sub">Urut rate (terbayar pokok ÷ pokok hari ini) · ${prevJ?`angka hijau kecil = tambahan gross total vendor sejak tarikan ${jamLabel(prevJ)}`:'tiap kartu bisa disalin sebagai gambar (📋 Gambar)'}</div></div>
+    <div class="card-head"><div><div class="card-title">🏁 Papan Skor Harian per Bucket</div><div class="card-sub">Format laporan TL: rate = payment (daily repaid principal) ÷ OS hari ini, urut rate · ${prevJ?`angka hijau kecil = tambahan payment sejak tarikan ${jamLabel(prevJ)}`:'tiap kartu bisa disalin sebagai gambar (📋 Gambar)'}</div></div>
       <button class="fsbtn noprint" onclick="fsToggle('secScore')">⛶ Layar penuh</button></div>
     <div class="vcards">${G.map(g=>scoreCard(g,PG[g.group])).join('')}</div>
   </div>
@@ -432,13 +433,13 @@ function render(){
   </div>
 
   ${J.length>1?`<div class="card sec" id="secIntra">
-    <div class="card-head"><div><div class="card-title">⏱️ Pergerakan Antar Tarikan Hari Ini</div><div class="card-sub">Gross per agent tiap vendor di setiap tarikan · pilih bucket</div></div>
+    <div class="card-head"><div><div class="card-title">⏱️ Pergerakan Antar Tarikan Hari Ini</div><div class="card-sub">Rate (payment ÷ OS) tiap vendor di setiap tarikan · pilih bucket</div></div>
       <div style="display:flex;gap:8px;align-items:center"><div class="tabs2" style="margin:0">${G.map(g=>`<button class="${(VIEW.intraG||G[0].group)===g.group?'on':''}" onclick="VIEW.intraG='${escH(g.group)}';render()">${escH(g.group)}</button>`).join('')}</div>
       <button class="fsbtn noprint" onclick="fsToggle('secIntra')">⛶</button></div></div>
     <div class="chart-wrap"><canvas id="chIntra"></canvas></div></div>`:''}
 
   <div class="card sec" id="secTrend">
-    <div class="card-head"><div><div class="card-title">📈 Tren Harian Bulan Ini</div><div class="card-sub">Gross per agent per hari (FINAL; kalau belum ada pakai tarikan terakhir) · pilih bucket</div></div>
+    <div class="card-head"><div><div class="card-title">📈 Tren Harian Bulan Ini</div><div class="card-sub">Rate harian (payment ÷ OS) per vendor (FINAL; kalau belum ada pakai tarikan terakhir) · pilih bucket</div></div>
       <div style="display:flex;gap:8px;align-items:center"><div class="tabs2" style="margin:0">${trendGroups().map(g=>`<button class="${trendG()===g?'on':''}" onclick="VIEW.trendG='${escH(g)}';render()">${escH(g)}</button>`).join('')}</div>
       <button class="fsbtn noprint" onclick="fsToggle('secTrend')">⛶</button></div></div>
     ${trendBlock()}
@@ -448,32 +449,41 @@ function render(){
 }
 
 function scoreCard(g,pg){
-  const maxR=Math.max(...g.vend.map(v=>v.rate),1e-9), bR=g.byRate[0], bG=g.byGross[0];
-  const posR=g.own?g.byRate.indexOf(g.own)+1:null, posG=g.own?g.byGross.indexOf(g.own)+1:null;
-  const badge=!g.own?'<span class="ib" style="background:var(--surface);color:var(--text3)">tanpa EDN</span>':g.vend.length<2?'<span class="ib" style="background:var(--surface);color:var(--text3)">EDN saja</span>':
-    `<span class="ib" style="background:${posR===1?'var(--success-bg)':'var(--danger-bg)'};color:${posR===1?'var(--success)':'var(--danger)'}">Rate #${posR}/${g.vend.length}</span> <span class="ib" style="background:${posG===1?'var(--success-bg)':'var(--warning-bg)'};color:${posG===1?'var(--success)':'var(--warning)'}">Gross #${posG}/${g.vend.length}</span>`;
+  // format laporan TL: OS · PAYMENT (dailyRepaidPrincipal) · RATE · RANK · GAP (rupiah)
+  const maxR=Math.max(...g.vend.map(v=>v.rate),1e-9), R=g.byRate, best=R[0], multi=g.vend.length>1;
+  const posR=g.own?R.indexOf(g.own)+1:null;
+  const badge=!g.own?'<span class="ib" style="background:var(--surface);color:var(--text3)">tanpa EDN</span>':!multi?'<span class="ib" style="background:var(--surface);color:var(--text3)">EDN saja</span>':
+    `<span class="ib" style="background:${posR===1?'var(--success-bg)':'var(--danger-bg)'};color:${posR===1?'var(--success)':'var(--danger)'}">EDN #${posR} dari ${g.vend.length}</span>`;
   const pv=pg?Object.fromEntries(pg.vend.map(v=>[v.comp,v])):{};
-  const hasD=!!pg;
-  const row=v=>{const rm=(bR.rate-v.rate)/100*v.pok, gm=(bG.grossPer-v.grossPer);const p=pv[v.comp];const dG=p?v.gross-p.gross:null;
+  const gapCell=(v,i)=>{
+    if(!multi)return '<span class="muted">—</span>';
+    if(i===0){const nx=R[1];const lead=(v.rate-nx.rate)/100*v.pok;
+      return `<span class="good" title="Unggul dari ${escH(nx.comp)}: selisih rate ${fmtPct(v.rate-nx.rate)} × OS ${escH(v.comp)}">+${fmtRp(lead)}</span>`;}
+    const need=(best.rate-v.rate)/100*v.pok;
+    return need<1?'<span class="muted">setara</span>':`<span class="bad" title="Payment tambahan supaya rate ${escH(v.comp)} = ${escH(best.comp)} (${fmtPct(best.rate)}): selisih rate × OS ${escH(v.comp)}">-${fmtRp(need)}</span>`;};
+  const row=(v,i)=>{const p=pv[v.comp];const dP=p?v.paid-p.paid:null;
     return `<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span>
-    <div class="trk"><span style="width:${v.rate/maxR*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div>
-    <span class="n" style="${v===bR&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n" title="${hasD&&dG!==null?'Tambahan gross sejak tarikan '+jamLabel(VIEW._prevJ)+': '+fmtRp(dG):''}">${fmtRp(v.grossPer)}${hasD&&dG>0?'<div class="good" style="font-size:10px;font-weight:600;line-height:1.1">+'+fmtRp(dG)+'</div>':''}</span>
-    <span class="n gp">${g.vend.length<2?'<span class="muted">—</span>':v===bR?'<span class="good">🏆 terbaik</span>':rm<1?'<span class="muted">setara</span>':`<span class="bad">-${fmtRp(rm)}</span>`}</span>
-    <span class="n gp">${g.vend.length<2?'<span class="muted">—</span>':v===bG?'<span class="good">🏆 terbaik</span>':`<span class="bad">-${fmtRp(gm)}</span>`}</span></div>`;};
+    <span class="n">${fmtRp(v.pok)}</span>
+    <span class="n" title="${dP!==null?'Tambahan payment sejak tarikan '+jamLabel(VIEW._prevJ)+': '+fmtRp(dP):''}">${fmtRp(v.paid)}${dP>0?'<div class="good" style="font-size:10px;font-weight:600;line-height:1.1">+'+fmtRp(dP)+'</div>':''}</span>
+    <span class="n" style="${i===0&&multi?'color:var(--success)':''}">${fmtPct(v.rate)}</span>
+    <span class="n">${i+1}</span>
+    <span class="n gp">${gapCell(v,i)}</span></div>`;};
   let note='';
-  if(g.own&&g.vend.length>1&&bG!==g.own)note=`Supaya gross/agent EDN menyamai ${escH(bG.comp)}, tiap agent butuh tambahan <b>${fmtRp(bG.grossPer-g.own.grossPer)}</b> (total ${fmtRp((bG.grossPer-g.own.grossPer)*g.own.n)} untuk ${g.own.n} agent).`;
+  if(g.own&&multi){const i=R.indexOf(g.own);
+    note=i===0?`EDN #1 — unggul <b>${fmtRp((g.own.rate-R[1].rate)/100*g.own.pok)}</b> payment dari ${escH(R[1].comp)} (selisih rate ${fmtPct(g.own.rate-R[1].rate)}).`
+      :`EDN butuh tambahan payment <b>${fmtRp((best.rate-g.own.rate)/100*g.own.pok)}</b> untuk menyamai ${escH(best.comp)} (${fmtPct(best.rate)}).`;}
   if(g.own&&g.own.nol)note+=` ${g.own.nol} dari ${g.own.n} agent EDN belum ada hasil.`;
-  const cols='86px minmax(30px,70px) 54px 112px minmax(96px,1fr) minmax(96px,1fr)';
-  return `<div class="vcard" id="vc-${escH(g.group)}" style="--vcols:${cols}"><div class="vcard-h"><div><div class="g">${escH(g.group)} <span style="font-size:11.5px;font-weight:600;color:var(--text3)">Pinjamin · ${escH(dShort(VIEW.tanggal))} ${VIEW.jam==='FINAL'?'FINAL':'s/d '+escH(VIEW.jam)}</span></div><div class="sub">${g.n} agent · pokok hari ini ${fmtRp(g.vend.reduce((s,v)=>s+v.pok,0))}</div></div><div class="rt">${badge}</div></div><div class="vcard-b">
-    <div class="vrow hd"><span>VENDOR</span><span></span><span class="n">RATE</span><span class="n">GROSS/AGENT</span><span class="n" title="Terbayar tambahan supaya rate sama dengan vendor rate terbaik: selisih rate × pokok vendor ini">KURANG RATE</span><span class="n" title="Selisih gross per agent dengan vendor gross/agent tertinggi">KURANG GROSS</span></div>
-    ${g.byRate.map(row).join('')}${note?`<div class="vnote">${note}</div>`:''}</div></div>`;
+  const cols='86px minmax(110px,1fr) minmax(104px,1fr) 56px 40px minmax(110px,1fr)';
+  return `<div class="vcard" id="vc-${escH(g.group)}" style="--vcols:${cols}"><div class="vcard-h"><div><div class="g">${escH(g.group)} <span style="font-size:11.5px;font-weight:600;color:var(--text3)">Pinjamin · ${escH(dShort(VIEW.tanggal))} ${VIEW.jam==='FINAL'?'FINAL':'s/d '+escH(VIEW.jam)}</span></div><div class="sub">${g.n} agent · gross ${fmtRp(g.vend.reduce((s,v)=>s+v.gross,0))}</div></div><div class="rt">${badge}</div></div><div class="vcard-b">
+    <div class="vrow hd"><span>VENDOR</span><span class="n">OS</span><span class="n" title="Daily repaid principal">PAYMENT</span><span class="n">RATE</span><span class="n">RANK</span><span class="n" title="#1: keunggulan (Rp) dari peringkat 2. Lainnya: payment tambahan supaya rate sama dengan #1">GAP</span></div>
+    ${R.map(row).join('')}${note?`<div class="vnote">${note}</div>`:''}</div></div>`;
 }
 
 function tlTable(G){
   const T={};G.forEach(g=>{if(!g.own)return;g.own.list.forEach(a=>{(T[a.tl+'|'+g.group]=T[a.tl+'|'+g.group]||{tl:a.tl,grp:g.group,list:[]}).list.push(a);});});
   const rows=Object.values(T).map(t=>Object.assign(t,sumUp(t.list))).sort((a,b)=>b.grossPer-a.grossPer);
   if(!rows.length)return '<div class="empty">Tidak ada agent EDN di tarikan ini.</div>';
-  return `<div class="tbl-wrap"><table class="t"><thead><tr><th>TL</th><th>Bucket</th><th class="n">Agent</th><th class="n">Pokok</th><th class="n">Terbayar</th><th class="n">Rate</th><th class="n">Gross</th><th class="n">Gross/agent</th><th class="n">Call/agent</th><th class="n">Tersambung</th><th class="n">Durasi/agent</th><th class="n">Belum ada hasil</th></tr></thead><tbody>
+  return `<div class="tbl-wrap"><table class="t"><thead><tr><th>TL</th><th>Bucket</th><th class="n">Agent</th><th class="n">OS</th><th class="n">Payment</th><th class="n">Rate</th><th class="n">Gross</th><th class="n">Gross/agent</th><th class="n">Call/agent</th><th class="n">Tersambung</th><th class="n">Durasi/agent</th><th class="n">Belum ada hasil</th></tr></thead><tbody>
   ${rows.map(t=>`<tr class="clk" onclick="openTl('${escH(t.tl).replace(/'/g,"\\'")}','${escH(t.grp)}')"><td style="font-weight:700">${escH(t.tl)}</td><td>${escH(t.grp)}</td><td class="n">${t.n}</td><td class="n">${fmtRp(t.pok)}</td><td class="n">${fmtRp(t.paid)}</td><td class="n" style="font-weight:700">${fmtPct(t.rate)}</td><td class="n">${fmtRp(t.gross)}</td><td class="n" style="font-weight:700">${fmtRp(t.grossPer)}</td><td class="n">${fmtNum(t.callPer)}</td><td class="n">${fmtPct(t.connR,1)}</td><td class="n">${fmtDur(t.durPer)}</td><td class="n">${t.nol?`<span class="ib" style="background:var(--danger-bg);color:var(--danger)">${t.nol}/${t.n}</span>`:'0'}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
@@ -488,7 +498,7 @@ function openTl(tl,grp){
   const s=sumUp(own);
   document.getElementById('tlTitle').textContent=`${tl} · ${grp}`;
   document.getElementById('tlSub').textContent=`${own.length} agent EDN · ${VIEW.jam==='FINAL'?'FINAL':'s/d jam '+VIEW.jam} · gross ${fmtRp(s.gross)} · median call bucket ${fmtNum(med)}`;
-  document.getElementById('tlBody').innerHTML=`<div class="tbl-wrap"><table class="t"><thead><tr><th class="n" title="Peringkat gross di bucket (semua vendor)">Rank</th><th>Agent</th><th class="n">Pokok</th><th class="n">Terbayar</th><th class="n">Rate</th><th class="n">Gross</th>${prevJ?'<th class="n">+Gross</th><th class="n">+Call</th>':''}<th class="n">Call</th><th class="n">Tersambung</th><th class="n">Durasi</th><th class="n">WA</th><th>Status</th></tr></thead><tbody>
+  document.getElementById('tlBody').innerHTML=`<div class="tbl-wrap"><table class="t"><thead><tr><th class="n" title="Peringkat gross di bucket (semua vendor)">Rank</th><th>Agent</th><th class="n">OS</th><th class="n">Payment</th><th class="n">Rate</th><th class="n">Gross</th>${prevJ?'<th class="n">+Gross</th><th class="n">+Call</th>':''}<th class="n">Call</th><th class="n">Tersambung</th><th class="n">Durasi</th><th class="n">WA</th><th>Status</th></tr></thead><tbody>
   ${rows.map(a=>{const st=a.gross>0?'<span class="ib" style="background:var(--success-bg);color:var(--success)">ada hasil</span>':a.call>=med?'<span class="ib" style="background:var(--warning-bg);color:var(--warning)">rajin, belum bayar</span>':'<span class="ib" style="background:var(--danger-bg);color:var(--danger)">kurang gerak</span>';
     return `<tr><td class="n">${a.rank}/${A.length}</td><td style="font-weight:600">${escH(a.ag)} <span class="muted" style="font-size:10.5px;font-weight:400">${escH(a.agno)}</span></td><td class="n">${fmtRp(a.pok)}</td><td class="n">${fmtRp(a.paid)}</td><td class="n">${fmtPct(a.rate)}</td><td class="n" style="font-weight:700">${fmtRp(a.gross)}</td>
     ${prevJ?`<td class="n ${a.dG>0?'good':''}">${a.dG===null?'—':a.dG>0?'+'+fmtRp(a.dG):'0'}</td><td class="n">${a.dC===null?'—':fmtNum(a.dC)}</td>`:''}<td class="n">${fmtNum(a.call)}</td><td class="n">${a.call?fmtPct(a.conn/a.call*100,1):'—'}</td><td class="n">${fmtDur(a.dur)}</td><td class="n">${fmtNum(a.waba)}</td><td>${st}</td></tr>`;}).join('')}</tbody></table></div>
@@ -502,34 +512,34 @@ function intraChart(J,G){
   const snaps=J.map(j=>groupsAt(j).find(x=>x.group===g));
   const comps=[...new Set(snaps.flatMap(s=>s?s.vend.map(v=>v.comp):[]))];
   const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
-  CH.intra=new Chart(el,{type:'line',data:{labels:J.map(jamLabel),datasets:comps.map(c=>({label:c,data:snaps.map(s=>{const v=s&&s.vend.find(x=>x.comp===c);return v?v.grossPer:null;}),
+  CH.intra=new Chart(el,{type:'line',data:{labels:J.map(jamLabel),datasets:comps.map(c=>({label:c,data:snaps.map(s=>{const v=s&&s.vend.find(x=>x.comp===c);return v?v.rate:null;}),
     borderColor:vColor(c),backgroundColor:vColor(c),borderWidth:c===OWN?3.5:1.8,pointRadius:3,tension:.2,borderDash:c===OWN?[]:[4,3]}))},
-    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12}},tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${fmtRp(x.parsed.y)}/agent`}}},
-      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>(v/1e6).toLocaleString('id-ID')+' jt'}}}}});
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12}},tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${fmtPct(x.parsed.y)}`}}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>fmtPct(v)}}}}});
 }
 function trendGroups(){const s=new Set(DATA.trend.filter(r=>VIEW.all||r[3]===OWN).map(r=>r[2]));return GORDER.filter(g=>s.has(g)).concat([...s].filter(g=>!GORDER.includes(g)));}
 function trendG(){const gs=trendGroups();return gs.includes(VIEW.trendG)?VIEW.trendG:gs[0];}
 function trendData(){
   const g=trendG(), R=DATA.trend.filter(r=>r[2]===g);
   const dates=[...new Set(R.map(r=>r[0]))].sort(), comps=[...new Set(R.map(r=>r[3]))];
-  const m={};R.forEach(r=>{const k=r[0]+'|'+r[3];const o=m[k]||(m[k]={n:0,gross:0,pok:0,paid:0,jam:r[1]});o.n+=r[5];o.gross+=r[8];o.pok+=r[6];o.paid+=r[7];});
+  const m={};R.forEach(r=>{const k=r[0]+'|'+r[3];const o=m[k]||(m[k]={n:0,gross:0,pok:0,paid:0,jam:r[1]});o.n+=r[5];o.gross+=r[8];o.pok+=r[6];o.paid+=(r.length>13?r[13]:r[7]);});
   return {g,dates,comps,m};
 }
 function trendBlock(){
   if(!DATA.trend.length)return '<div class="empty">Belum ada data.</div>';
   const {dates,comps,m}=trendData();
-  const strip=dates.map(d=>{const arr=comps.map(c=>({c,v:m[d+'|'+c]})).filter(x=>x.v&&x.v.n).sort((a,b)=>b.v.gross/b.v.n-a.v.gross/a.v.n);const i=arr.findIndex(x=>x.c===OWN);
+  const strip=dates.map(d=>{const arr=comps.map(c=>({c,v:m[d+'|'+c]})).filter(x=>x.v&&x.v.n).sort((a,b)=>(b.v.pok?b.v.paid/b.v.pok:0)-(a.v.pok?a.v.paid/a.v.pok:0));const i=arr.findIndex(x=>x.c===OWN);
     return `<div class="d" style="background:var(--surface2)" title="${dLabel(d)} · ${m[d+'|'+OWN]?escH(m[d+'|'+OWN].jam):''}"><div class="x">${dShort(d)}${m[d+'|'+(arr[0]||{}).c]&&m[d+'|'+arr[0].c].jam!=='FINAL'?'*':''}</div><div class="y ${i===0?'good':i===arr.length-1&&i>0?'bad':''}">${i>=0?'#'+(i+1):'—'}</div></div>`;}).join('');
-  return `<div class="chart-wrap"><canvas id="chTrend"></canvas></div><div class="rankstrip" style="margin-top:12px">${strip}</div><div class="legend2"><span>Peringkat EDN per hari (gross/agent). * = belum FINAL.</span></div>`;
+  return `<div class="chart-wrap"><canvas id="chTrend"></canvas></div><div class="rankstrip" style="margin-top:12px">${strip}</div><div class="legend2"><span>Peringkat EDN per hari (rate payment ÷ OS). * = belum FINAL.</span></div>`;
 }
 function trendChart(){
   const el=document.getElementById('chTrend');if(!el)return;
   const {dates,comps,m}=trendData();
   const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
-  CH.trend=new Chart(el,{type:dates.length>1?'line':'bar',data:{labels:dates.map(dShort),datasets:comps.map(c=>({label:c,data:dates.map(d=>{const o=m[d+'|'+c];return o&&o.n?o.gross/o.n:null;}),
+  CH.trend=new Chart(el,{type:dates.length>1?'line':'bar',data:{labels:dates.map(dShort),datasets:comps.map(c=>({label:c,data:dates.map(d=>{const o=m[d+'|'+c];return o&&o.pok?o.paid/o.pok*100:null;}),
     borderColor:vColor(c),backgroundColor:vColor(c),borderWidth:c===OWN?3.5:1.8,pointRadius:3,tension:.2,borderDash:c===OWN?[]:[4,3]}))},
-    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12}},tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${fmtRp(x.parsed.y)}/agent`}}},
-      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>(v/1e6).toLocaleString('id-ID')+' jt'}}}}});
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12}},tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${fmtPct(x.parsed.y)}`}}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>fmtPct(v)}}}}});
 }
 
 function fsToggle(id){const el=document.getElementById(id);if(!el)return;const on=!el.classList.contains('fsmode');

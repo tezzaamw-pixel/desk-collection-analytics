@@ -1639,15 +1639,15 @@ function endpointPinjD_(e) {
     const k = r[1] === 'FINAL' ? '99:99' : r[1];
     if (!best[r[0]] || k > best[r[0]]) best[r[0]] = k; });
   const ci = name => PINJD_SHEET.head.indexOf(name);
-  const I = { pokok: ci('POKOK'), paid: ci('TERBAYAR'), gross: ci('GROSS'), call: ci('CALL'), conn: ci('CALL_TERSAMBUNG'), dur: ci('DURASI_DETIK') };
+  const I = { pokok: ci('POKOK'), paidD: ci('TERBAYAR_HARIAN'), paid: ci('TERBAYAR'), gross: ci('GROSS'), call: ci('CALL'), conn: ci('CALL_TERSAMBUNG'), dur: ci('DURASI_DETIK') };
   const agg = {};
   all.forEach(r => { if (r[0].slice(0, 7) !== per) return;
     const k = r[1] === 'FINAL' ? '99:99' : r[1]; if (k !== best[r[0]]) return;
     const key = [r[0], r[1], r[2], r[3], r[5]].join('|');
-    const a = agg[key] || (agg[key] = [r[0], r[1], r[2], r[3], r[5], 0, 0, 0, 0, 0, 0, 0, 0]);
+    const a = agg[key] || (agg[key] = [r[0], r[1], r[2], r[3], r[5], 0, 0, 0, 0, 0, 0, 0, 0, 0]);
     a[5]++; a[6] += r[I.pokok]; a[7] += r[I.paid]; a[8] += r[I.gross]; a[9] += r[I.call]; a[10] += r[I.conn]; a[11] += r[I.dur];
-    if (!r[I.gross]) a[12]++; });
+    if (!r[I.gross]) a[12]++; a[13] += r[I.paidD]; });
   return { success: true, action: 'pinjd', tanggal, dates, cols: PINJD_SHEET.head.slice(0, W), rows,
-    trendCols: ['TANGGAL','JAM','GROUP','VENDOR','TL','AGENT','POKOK','TERBAYAR','GROSS','CALL','CALL_TERSAMBUNG','DURASI_DETIK','AGENT_NOL'],
+    trendCols: ['TANGGAL','JAM','GROUP','VENDOR','TL','AGENT','POKOK','TERBAYAR','GROSS','CALL','CALL_TERSAMBUNG','DURASI_DETIK','AGENT_NOL','TERBAYAR_HARIAN'],
     trend: Object.keys(agg).sort().map(k => agg[k]) };
 }
