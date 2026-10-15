@@ -934,6 +934,27 @@ tr.bsm-moved .agent-link{color:var(--text3)!important;}
     </div>
   </div>
 </div>
+<div id="bsmColsPanel" class="bsmc-panel">
+  <div class="bsmc-head"><div style="font-weight:800;font-size:14px">🎯 Poin yang Ditampilkan</div><button class="bsmc-x" onclick="toggleBsmColsPanel(false)">✕</button></div>
+  <div class="bsmc-body">
+    <div style="font-size:11px;color:var(--text3);margin-bottom:8px;line-height:1.5">Centang poin yang mau tampil di Summary Bucket (mode 👤 Individual, juga ikut ke Export Excel/PDF). Disimpan per bucket di browser ini. Urutan = urutan centang.</div>
+    <div class="bsmc-sec"><div class="bsmc-lbl">Kolom tetap</div>
+      <label class="bsmc-ck"><input type="checkbox" data-fixed="hadir" onchange="bsmColsFixed(this)"> Hadir</label>
+      <label class="bsmc-ck"><input type="checkbox" data-fixed="rate" onchange="bsmColsFixed(this)"> Rate</label>
+      <label class="bsmc-ck"><input type="checkbox" data-fixed="payment" onchange="bsmColsFixed(this)"> Payment</label>
+    </div>
+    <div class="bsmc-sec"><div class="bsmc-lbl">Poin aktivitas <span style="float:right"><button class="bsmc-mini" onclick="bsmColsAll(true)">Semua</button> <button class="bsmc-mini" onclick="bsmColsAll(false)">Hapus</button></span></div>
+      <div id="bsmColsList"></div>
+    </div>
+    <div class="bsmc-sec"><div class="bsmc-lbl">Preset cepat</div>
+      <button class="bsmc-mini" onclick="bsmColsPreset(['jmlDataBayar','callManual','callTerhubung','sentuhWA','responWA'])">Call & WA</button>
+      <button class="bsmc-mini" onclick="bsmColsPreset(['jmlDataBayar','ptp','ptpBayar','dailyPayment'])">PTP & Bayar</button>
+      <button class="bsmc-mini" onclick="bsmColsPreset(['jmlDataBayar','callManual','callTerhubung','sentuhWA','responWA','sentuhGojek','responGojek','sentuhWABA','responWABA','smsManual','autocall'])">Semua kanal</button>
+    </div>
+    <div class="bsmc-sec"><label class="bsmc-ck"><input type="checkbox" id="bsmMeeting" onchange="bsmMeetingMode(this.checked)"> 🖥️ Mode meeting (layar penuh + huruf besar)</label></div>
+    <button class="bsmc-reset" onclick="bsmColsReset()">↺ Kembali ke setup bawaan</button>
+  </div>
+</div>
 <div id="modalBucketSummary" onclick="if(event.target===this)closeBucketSummary()">
   <div class="bsm-modal">
     <div class="bsm-head">
@@ -943,6 +964,7 @@ tr.bsm-moved .agent-link{color:var(--text3)!important;}
         <button class="bsm-mode-btn" data-mode="individual" onclick="setBsmMode('individual')" style="padding:5px 14px;font-size:12px;font-weight:600;background:var(--surface2);color:var(--text2);border:none;cursor:pointer">👤 Individual</button>
       </div>
       <button class="btn-cmp-bulan-bsm" onclick="openCmpBulanFromBsm()" title="Bandingkan bucket ini dengan bulan lalu (apple-to-apple)">📅 vs Bln Lalu</button>
+      <button class="btn-cmp-bulan-bsm" id="bsmColsBtn" onclick="toggleBsmColsPanel()" title="Pilih poin/kolom yang ditampilkan (mode presentasi/meeting)" style="background:#7c3aed;margin-left:6px">🎯 Poin Tampil</button>
       <button class="bsm-fs-btn" id="bsmFsBtn" onclick="toggleBsmFullscreen()" title="Fullscreen">⛶</button>
       <div style="display:flex;gap:4px">
         <button onclick="exportBsmExcel()" title="Export Excel" style="padding:3px 10px;font-size:11px;font-weight:600;background:#16a34a;color:#fff;border:none;border-radius:var(--radius-sm);cursor:pointer">⬇ Excel</button>
@@ -3064,9 +3086,9 @@ function _getBsmExportData() {
     const activeIdx = parseInt(localStorage.getItem('dca_active_setup_'+spv)||'0');
     const {setup: bkSetup} = getBucketSetup(spv, bucket);
     const effectiveSetup = bkSetup || setups[activeIdx] || null;
-    const setupCols = effectiveSetup
+    const setupCols = bsmApplyCols(effectiveSetup
       ? effectiveSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean)
-      : ALL_METRICS.slice(0,8);
+      : ALL_METRICS.slice(0,8));
     const headers = ['Rank','Team Leader','Agent','Hadir','Rate','Payment',...setupCols.map(m=>m.label)];
     const dataRows = agents.map((a,i) => {
       const _abs = calcAbsensi(a._rows);
@@ -3354,6 +3376,49 @@ function renderBsmChart() {
   _fitChartWrap(document.getElementById('bsmChartCanvasWrap'), _bsmPayChart);
 }
 
+/* ── Pilih poin tampil (mode presentasi/meeting) Summary Bucket ── */
+(function(){const st=document.createElement('style');st.textContent=`
+.bsmc-panel{position:fixed;top:0;right:-360px;width:340px;height:100vh;background:var(--surface);border-left:1px solid var(--border);box-shadow:-8px 0 30px rgba(0,0,0,.25);z-index:10050;transition:right .2s;display:flex;flex-direction:column}
+.bsmc-panel.open{right:0}
+.bsmc-head{display:flex;justify-content:space-between;align-items:center;padding:14px 16px;border-bottom:1px solid var(--border)}
+.bsmc-x{border:none;background:none;font-size:16px;cursor:pointer;color:var(--text2)}
+.bsmc-body{padding:12px 16px;overflow-y:auto;flex:1}
+.bsmc-sec{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px}
+.bsmc-lbl{font-size:11px;font-weight:800;color:var(--text3);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px}
+.bsmc-ck{display:flex;align-items:center;gap:8px;font-size:13px;padding:4px 0;cursor:pointer;color:var(--text)}
+.bsmc-ck .ord{margin-left:auto;font-size:10px;color:#7c3aed;font-weight:800}
+.bsmc-mini{border:1px solid var(--border);background:var(--surface2);color:var(--text2);border-radius:5px;font-size:11px;padding:2px 8px;cursor:pointer;margin:2px 2px 2px 0}
+.bsmc-reset{width:100%;border:1px dashed var(--border);background:none;color:var(--text2);border-radius:8px;padding:8px;cursor:pointer;font-size:12px}
+.bsm-modal.bsm-meeting table{font-size:15px!important}
+.bsm-modal.bsm-meeting table th{font-size:13px!important}
+.bsm-modal.bsm-meeting table td{padding-top:10px!important;padding-bottom:10px!important}
+.bsm-hide-hadir .bsmc-col-hadir,.bsm-hide-rate .bsmc-col-rate,.bsm-hide-payment .bsmc-col-payment{display:none!important}
+#bsmColsBtn.on{box-shadow:0 0 0 2px #c4b5fd}`;document.head.appendChild(st);})();
+function _bsmColsKey(){const {spv,bucket}=_bsmState||{};return 'tz_bsm_cols_'+(spv||'')+'_'+(bucket||'');}
+function bsmColsGet(){try{const v=JSON.parse(localStorage.getItem(_bsmColsKey())||'null');return v&&Array.isArray(v.cols)?v:null;}catch(e){return null;}}
+function bsmColsSet(v){try{if(v)localStorage.setItem(_bsmColsKey(),JSON.stringify(v));else localStorage.removeItem(_bsmColsKey());}catch(e){}}
+// dipakai di render tabel & export: pilihan user (kalau ada) menggantikan kolom setup
+function bsmApplyCols(defaultCols){const v=bsmColsGet();if(!v)return defaultCols;return v.cols.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean);}
+function bsmHiddenFixed(){const v=bsmColsGet();return (v&&v.hide)||[];}
+function _bsmDefaultCols(){const {spv,bucket}=_bsmState;const {setup:bk}=getBucketSetup(spv,bucket);const setups=getSetups(spv);const eff=bk||setups[parseInt(localStorage.getItem('dca_active_setup_'+spv)||'0')]||null;
+  return (eff?eff.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean):ALL_METRICS.slice(0,8)).map(m=>m.key);}
+function toggleBsmColsPanel(force){const p=document.getElementById('bsmColsPanel');const open=force===undefined?!p.classList.contains('open'):force;p.classList.toggle('open',open);if(open)_bsmColsBuild();}
+function _bsmColsBuild(){
+  const v=bsmColsGet(), cur=v?v.cols:_bsmDefaultCols(), hide=v?(v.hide||[]):[];
+  document.getElementById('bsmColsList').innerHTML=ALL_METRICS.map(m=>{const i=cur.indexOf(m.key);return `<label class="bsmc-ck"><input type="checkbox" data-k="${m.key}" ${i>=0?'checked':''} onchange="bsmColsToggle(this)"> ${m.label}${i>=0?`<span class="ord">#${i+1}</span>`:''}</label>`;}).join('');
+  document.querySelectorAll('#bsmColsPanel [data-fixed]').forEach(cb=>cb.checked=!hide.includes(cb.dataset.fixed));
+  document.getElementById('bsmMeeting').checked=document.querySelector('.bsm-modal').classList.contains('bsm-meeting');
+  document.getElementById('bsmColsBtn').classList.toggle('on',!!v);
+}
+function _bsmColsSave(cols,hide){bsmColsSet({cols,hide});_bsmColsBuild();_bsmApplyFixed();if(_bsmState.mode!=='individual')setBsmMode('individual');else _renderBucketSummary();}
+function bsmColsToggle(cb){const v=bsmColsGet();let cols=v?v.cols.slice():_bsmDefaultCols();const k=cb.dataset.k;cols=cols.filter(x=>x!==k);if(cb.checked)cols.push(k);_bsmColsSave(cols,v?v.hide||[]:[]);}
+function bsmColsAll(on){const v=bsmColsGet();_bsmColsSave(on?ALL_METRICS.map(m=>m.key):[],v?v.hide||[]:[]);}
+function bsmColsPreset(keys){const v=bsmColsGet();_bsmColsSave(keys.filter(k=>ALL_METRICS.some(m=>m.key===k)),v?v.hide||[]:[]);}
+function bsmColsFixed(cb){const v=bsmColsGet();const cols=v?v.cols:_bsmDefaultCols();let hide=(v&&v.hide||[]).filter(x=>x!==cb.dataset.fixed);if(!cb.checked)hide.push(cb.dataset.fixed);_bsmColsSave(cols,hide);}
+function bsmColsReset(){bsmColsSet(null);_bsmColsBuild();_bsmApplyFixed();_renderBucketSummary();}
+function _bsmApplyFixed(){const m=document.querySelector('.bsm-modal');if(!m)return;const h=bsmHiddenFixed();['hadir','rate','payment'].forEach(k=>m.classList.toggle('bsm-hide-'+k,h.includes(k)));
+  const b=document.getElementById('bsmColsBtn');if(b)b.classList.toggle('on',!!bsmColsGet());}
+function bsmMeetingMode(on){const m=document.querySelector('.bsm-modal');m.classList.toggle('bsm-meeting',on);if(on!==m.classList.contains('fullscreen'))toggleBsmFullscreen();}
 function setBsmMode(mode) {
   _bsmState.mode = mode;
   document.querySelectorAll('.bsm-mode-btn').forEach(b =>
@@ -3788,9 +3853,10 @@ function _renderBucketSummary() {
     const activeSetup = setups[activeIdx]||null;
     const effectiveSetup = bkSetup || activeSetup; // bucket setup takes priority
     // Fix 1: pakai urutan dari setup (activeSetup.metrics), bukan sort ulang
-    const setupCols = effectiveSetup
+    const setupCols = bsmApplyCols(effectiveSetup
       ? effectiveSetup.metrics.map(k=>ALL_METRICS.find(m=>m.key===k)).filter(Boolean)
-      : ALL_METRICS.slice(0,8);
+      : ALL_METRICS.slice(0,8));
+    _bsmApplyFixed();
     const setupLabel = bkSetup ? `${escH(bkSetup.name)} <span style="font-size:9px;background:#d1fae5;color:#065f46;padding:1px 5px;border-radius:3px">Bucket</span>`
       : effectiveSetup ? `${escH(effectiveSetup.name)} <span style="font-size:9px;background:var(--surface2);color:var(--text3);padding:1px 5px;border-radius:3px">SPV</span>`
       : 'Default';
@@ -3831,9 +3897,9 @@ function _renderBucketSummary() {
       return `<tr class="${a._movedOut?'bsm-moved':''}">
         <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(i)}">${i+1}</span></td>
         ${tlAgentCell}
-        <td style="text-align:center;width:52px">${_abs.hadir}/${_abs.hariKerja}</td>
-        <td style="text-align:center;width:64px;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
-        <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
+        <td class="bsmc-col-hadir" style="text-align:center;width:52px">${_abs.hadir}/${_abs.hariKerja}</td>
+        <td class="bsmc-col-rate" style="text-align:center;width:64px;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
+        <td class="bsmc-col-payment" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
         ${metricCells}
       </tr>${_buildBsmAgentPreviewRow(a, agId, bsmColspanIndividual, setupCols, bsmRotasiInfo, bulan, tahun)}`;
     }).join('');
@@ -3856,9 +3922,9 @@ function _renderBucketSummary() {
             <span class="bsm-rank-badge ${tlRankCls(gi)}" style="margin-right:6px">${gi+1}</span>
             <span style="font-weight:700;font-size:12px;color:var(--accent)">${escH(g.tl)}</span>
           </td>
-          <td style="width:52px;border-bottom:2px solid var(--accent)"></td>
-          <td style="width:64px;border-bottom:2px solid var(--accent)"></td>
-          <td style="text-align:center;font-weight:700;border-right:2px solid var(--border);border-bottom:2px solid var(--accent);color:var(--accent)">${tlTotal}</td>
+          <td class="bsmc-col-hadir" style="width:52px;border-bottom:2px solid var(--accent)"></td>
+          <td class="bsmc-col-rate" style="width:64px;border-bottom:2px solid var(--accent)"></td>
+          <td class="bsmc-col-payment" style="text-align:center;font-weight:700;border-right:2px solid var(--border);border-bottom:2px solid var(--accent);color:var(--accent)">${tlTotal}</td>
           ${setupCols.map(()=>`<td style="border-bottom:2px solid var(--accent)"></td>`).join('')}
         </tr>`;
 
@@ -3885,9 +3951,9 @@ function _renderBucketSummary() {
           return `<tr class="${a._movedOut?'bsm-moved':''}">
             <td style="text-align:center"><span class="bsm-rank-badge ${rankCls(ai)}">${ai+1}</span></td>
             ${tlAgentCellInd}
-            <td style="text-align:center;width:52px">${_abs.hadir}/${_abs.hariKerja}</td>
-            <td style="text-align:center;width:64px;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
-            <td style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
+            <td class="bsmc-col-hadir" style="text-align:center;width:52px">${_abs.hadir}/${_abs.hariKerja}</td>
+            <td class="bsmc-col-rate" style="text-align:center;width:64px;font-weight:600;color:${agentRate>0?'var(--success)':'var(--text3)'}">${rateDisplay}</td>
+            <td class="bsmc-col-payment" style="text-align:center;font-weight:700;border-right:2px solid var(--border)">Rp ${Math.round(applyView(a.total,a)).toLocaleString('id-ID')}</td>
             ${metricCells}
           </tr>${_buildBsmAgentPreviewRow(a, agId, 5+setupCols.length, setupCols, bsmRotasiInfo, bulan, tahun)}`;
         }).join('');
@@ -3901,9 +3967,9 @@ function _renderBucketSummary() {
         <thead><tr>
           <th style="text-align:center">Rank</th>
           <th>TL / ${_bsmState.nameMode==='akun'?'Akun':'Agent'}</th>
-          <th style="text-align:center;width:52px;min-width:52px">Hadir</th>
-          <th style="text-align:center;width:64px;min-width:64px">Rate</th>
-          <th style="text-align:center;border-right:2px solid rgba(255,255,255,.2)">Payment${escH(viewLabel)}</th>
+          <th class="bsmc-col-hadir" style="text-align:center;width:52px;min-width:52px">Hadir</th>
+          <th class="bsmc-col-rate" style="text-align:center;width:64px;min-width:64px">Rate</th>
+          <th class="bsmc-col-payment" style="text-align:center;border-right:2px solid rgba(255,255,255,.2)">Payment${escH(viewLabel)}</th>
           ${colHeaders}
         </tr></thead><tbody>${indBodyHtml}</tbody></table>`;
   }
