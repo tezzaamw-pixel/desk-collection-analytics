@@ -650,7 +650,7 @@ select:focus{border-color:var(--accent);}
           <button class="chart-label-btn" id="lblBtn-violRateApp" onclick="toggleLabels('violRateApp')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
         </div>
         <div style="font-size:11px;color:var(--text3);margin:-4px 0 6px" id="subViolRateApp"></div>
-        <div class="chart-wrap" style="height:320px"><canvas id="chartViolRateApp"></canvas></div>
+        <div class="chart-wrap" style="height:360px"><canvas id="chartViolRateApp"></canvas></div>
       </div>
       <div class="chart-card" data-chart="aplikasi">
         <div class="chart-header">
@@ -2078,12 +2078,13 @@ async function buildViolRateAppChart(data, cc) {
       { type:'line', label:'Violation Rate (%)', data:rate, borderColor:'#f59e0b', backgroundColor:'#f59e0b', yAxisID:'y2', tension:.25, pointRadius:4, borderWidth:2.5, order:1, spanGaps:true,
         datalabels: lbl ? {anchor:'end', align:'top', offset:4, color:'#b45309', font:{size:10,weight:'bold'}, formatter:v=>v==null?'':v+'%'} : {display:false} },
     ]},
-    options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+    options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false}, layout:{padding:{top:22, right:6}},
       plugins: { legend:{position:'bottom', labels:{color:cc.text2, font:{size:11}}},
         tooltip:{callbacks:{label:c => c.dataset.yAxisID==='y2' ? ` Rate: ${c.parsed.y==null?'—':c.parsed.y+'%'}` : ` ${c.dataset.label}: ${c.parsed.y}`}} },
       scales: { x:{ticks:{color:cc.text3}, grid:{display:false}},
-        y:{beginAtZero:true, ticks:{color:cc.text3}, grid:{color:cc.border}, title:{display:true, text:'Akun / Pelanggaran', color:cc.text3, font:{size:10}}},
-        y2:{beginAtZero:true, position:'right', ticks:{color:'#b45309', callback:v=>v+'%'}, grid:{display:false}, title:{display:true, text:'Rate %', color:'#b45309', font:{size:10}}} } }
+        // ruang kosong di atas (±20%) supaya angka label batang & garis tidak terpotong
+        y:{beginAtZero:true, suggestedMax:Math.ceil(Math.max(1,...akun,...kasus)*1.2), grace:'10%', ticks:{color:cc.text3}, grid:{color:cc.border}, title:{display:true, text:'Akun / Pelanggaran', color:cc.text3, font:{size:10}}},
+        y2:{beginAtZero:true, suggestedMax:Math.ceil(Math.max(1,...rate.filter(v=>v!=null))*1.25), grace:'10%', position:'right', ticks:{color:'#b45309', callback:v=>v+'%'}, grid:{display:false}, title:{display:true, text:'Rate %', color:'#b45309', font:{size:10}}} } }
   });
 }
 
