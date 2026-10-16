@@ -228,6 +228,9 @@ body.present .pnav{display:flex;position:fixed;left:0;right:0;bottom:0;justify-c
 input[type=time]{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:6px 8px;color:var(--text);font-size:13px;}
 .legend2 span{display:block;}
 @media(max-width:768px){.vrow{grid-template-columns:70px 0 48px 1fr 40px 1fr 1fr;}}
+.basisbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 12px;padding:8px 10px;background:var(--surface2);border-radius:8px}
+.basisbar .bb{display:inline-flex;align-items:center;gap:2px;font-size:12px}
+.basisbar .seg button{padding:3px 9px;font-size:11px}
 </style>
 </head>
 <body>
@@ -412,8 +415,9 @@ function render(){
   ${nolCard(G)}
 
   <div class="card sec" id="secScore">
-    <div class="card-head"><div><div class="card-title">🏁 Papan Skor Harian per Bucket</div><div class="card-sub">A2 &amp; B1: rank pakai rate payment (daily repaid ÷ OS) · M2 &amp; M3: rank pakai gross per agent · ${prevJ?`angka hijau kecil = tambahan payment sejak tarikan ${jamLabel(prevJ)}`:'tiap kartu bisa disalin sebagai gambar (📋 Gambar)'}</div></div>
+    <div class="card-head"><div><div class="card-title">🏁 Papan Skor Harian per Bucket</div><div class="card-sub">Principal = rank pakai rate payment (daily repaid ÷ OS) · Gross = rank pakai gross per agent · ${prevJ?`angka hijau kecil = tambahan payment sejak tarikan ${jamLabel(prevJ)}`:'tiap kartu bisa disalin sebagai gambar (📋 Gambar)'}</div></div>
       <button class="fsbtn noprint" onclick="fsToggle('secScore')">⛶ Layar penuh</button></div>
+    ${basisBar(G.map(g=>g.group))}
     <div class="vcards">${G.map(g=>scoreCard(g,PG[g.group])).join('')}</div>
   </div>
 
@@ -469,9 +473,14 @@ function nolCard(G){
   </div>`;
 }
 function copyNol(btn){const t=window._nolText||'';(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>{btn.textContent='✅ Tersalin';setTimeout(()=>btn.textContent='📋 Salin teks',1500);}).catch(()=>prompt('Salin teks ini:',t));}
-// Bucket yang peringkatnya pakai GROSS per agent (bukan rate payment)
-const GROSS_GROUPS=['M2','M3'];
-function rankBasis(g){const gr=GROSS_GROUPS.includes(g.group);return {gross:gr,R:gr?g.byGross:g.byRate,
+// ── Dasar ranking per bucket (bisa diubah lewat tombol, disimpan di browser) ──
+// 'gross' = urut gross per agent · 'principal' = urut rate (rate payment = daily repaid ÷ OS)
+const BASIS_SCOPE='harian', BASIS_DEFAULT={M2:'gross',M3:'gross'};
+function basisMap(){let all={};try{all=JSON.parse(localStorage.getItem('tz_pinj_basis')||'{}');}catch(e){}return Object.assign({},BASIS_DEFAULT,all[BASIS_SCOPE]||{});}
+function isGross(group){return basisMap()[group]==='gross';}
+function setBasis(group,v){let all={};try{all=JSON.parse(localStorage.getItem('tz_pinj_basis')||'{}');}catch(e){}all[BASIS_SCOPE]=Object.assign({},basisMap(),{[group]:v});try{localStorage.setItem('tz_pinj_basis',JSON.stringify(all));}catch(e){}render();}
+function basisBar(groups){return `<div class="noprint basisbar"><span class="muted" style="font-size:11.5px;font-weight:700">⚙️ Dasar ranking (harian):</span>${groups.map(g=>{const gr=isGross(g);return `<span class="bb"><b>${escH(g)}</b><span class="seg" style="margin-left:4px"><button class="${gr?'':'on'}" onclick="setBasis('${escH(g)}','principal')" title="rate payment = daily repaid ÷ OS">Principal</button><button class="${gr?'on':''}" onclick="setBasis('${escH(g)}','gross')" title="Urut gross per agent">Gross</button></span></span>`;}).join('')}</div>`;}
+function rankBasis(g){const gr=isGross(g.group);return {gross:gr,R:gr?g.byGross:g.byRate,
   val:v=>gr?v.grossPer:v.rate, fmtV:v=>gr?fmtRp(v.grossPer)+'/agent':fmtPct(v.rate),
   // rupiah tambahan supaya v menyamai b (gross: selisih gross/agent × jumlah agent v; rate: selisih rate × OS v)
   need:(v,b)=>gr?(b.grossPer-v.grossPer)*v.n:(b.rate-v.rate)/100*v.pok,
@@ -550,10 +559,10 @@ function intraChart(J,G){
   const snaps=J.map(j=>groupsAt(j).find(x=>x.group===g));
   const comps=[...new Set(snaps.flatMap(s=>s?s.vend.map(v=>v.comp):[]))];
   const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
-  CH.intra=new Chart(el,{type:'line',data:{labels:J.map(jamLabel),datasets:comps.map(c=>({label:c,data:snaps.map(s=>{const v=s&&s.vend.find(x=>x.comp===c);return v?(GROSS_GROUPS.includes(g)?v.grossPer:v.rate):null;}),
+  CH.intra=new Chart(el,{type:'line',data:{labels:J.map(jamLabel),datasets:comps.map(c=>({label:c,data:snaps.map(s=>{const v=s&&s.vend.find(x=>x.comp===c);return v?(isGross(g)?v.grossPer:v.rate):null;}),
     borderColor:vColor(c),backgroundColor:vColor(c),borderWidth:c===OWN?3.5:1.8,pointRadius:3,tension:.2,borderDash:c===OWN?[]:[4,3]}))},
-    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12}},tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${GROSS_GROUPS.includes(g)?fmtRp(x.parsed.y)+'/agent':fmtPct(x.parsed.y)}`}}},
-      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>GROSS_GROUPS.includes(g)?(v/1e6).toLocaleString('id-ID')+' jt':fmtPct(v)}}}}});
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12}},tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${isGross(g)?fmtRp(x.parsed.y)+'/agent':fmtPct(x.parsed.y)}`}}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>isGross(g)?(v/1e6).toLocaleString('id-ID')+' jt':fmtPct(v)}}}}});
 }
 function trendGroups(){const s=new Set(DATA.trend.filter(r=>VIEW.all||r[3]===OWN).map(r=>r[2]));return GORDER.filter(g=>s.has(g)).concat([...s].filter(g=>!GORDER.includes(g)));}
 function trendG(){const gs=trendGroups();return gs.includes(VIEW.trendG)?VIEW.trendG:gs[0];}
@@ -565,14 +574,14 @@ function trendData(){
 }
 function trendBlock(){
   if(!DATA.trend.length)return '<div class="empty">Belum ada data.</div>';
-  const {g,dates,comps,m}=trendData();const gr=GROSS_GROUPS.includes(g);const sc=o=>gr?(o.n?o.gross/o.n:0):(o.pok?o.paid/o.pok:0);
+  const {g,dates,comps,m}=trendData();const gr=isGross(g);const sc=o=>gr?(o.n?o.gross/o.n:0):(o.pok?o.paid/o.pok:0);
   const strip=dates.map(d=>{const arr=comps.map(c=>({c,v:m[d+'|'+c]})).filter(x=>x.v&&x.v.n).sort((a,b)=>sc(b.v)-sc(a.v));const i=arr.findIndex(x=>x.c===OWN);
     return `<div class="d" style="background:var(--surface2)" title="${dLabel(d)} · ${m[d+'|'+OWN]?escH(m[d+'|'+OWN].jam):''}"><div class="x">${dShort(d)}${m[d+'|'+(arr[0]||{}).c]&&m[d+'|'+arr[0].c].jam!=='FINAL'?'*':''}</div><div class="y ${i===0?'good':i===arr.length-1&&i>0?'bad':''}">${i>=0?'#'+(i+1):'—'}</div></div>`;}).join('');
   return `<div class="chart-wrap"><canvas id="chTrend"></canvas></div><div class="rankstrip" style="margin-top:12px">${strip}</div><div class="legend2"><span>Peringkat EDN per hari (${gr?'gross per agent':'rate payment ÷ OS'}). * = belum FINAL.</span></div>`;
 }
 function trendChart(){
   const el=document.getElementById('chTrend');if(!el)return;
-  const {g,dates,comps,m}=trendData();const gr=GROSS_GROUPS.includes(g);
+  const {g,dates,comps,m}=trendData();const gr=isGross(g);
   const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
   CH.trend=new Chart(el,{type:dates.length>1?'line':'bar',data:{labels:dates.map(dShort),datasets:comps.map(c=>({label:c,data:dates.map(d=>{const o=m[d+'|'+c];return o?(gr?(o.n?o.gross/o.n:null):(o.pok?o.paid/o.pok*100:null)):null;}),
     borderColor:vColor(c),backgroundColor:vColor(c),borderWidth:c===OWN?3.5:1.8,pointRadius:3,tension:.2,borderDash:c===OWN?[]:[4,3]}))},
