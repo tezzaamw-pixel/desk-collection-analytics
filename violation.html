@@ -2065,7 +2065,7 @@ async function buildViolRateAppChart(data, cc) {
   const akun = rows.map(r => r.akun || 0), kasus = rows.map(r => r.kasus), rate = rows.map(r => r.akun ? +(r.kasus / r.akun * 100).toFixed(1) : null);
   const totK = kasus.reduce((a,b)=>a+b,0), withAkun = rows.filter(r=>r.akun), avgAk = withAkun.length ? withAkun.reduce((a,r)=>a+r.akun,0)/withAkun.length : 0;
   document.getElementById('titleViolRateApp').textContent = 'Violation Rate ' + app + ' per Bulan';
-  document.getElementById('subViolRateApp').textContent = `Total ${totK} pelanggaran · rata-rata ${Math.round(avgAk)} akun/bulan · rate keseluruhan ${avgAk ? (totK/avgAk*100).toFixed(1) : '—'}%` +
+  document.getElementById('subViolRateApp').textContent = `Total ${totK} pelanggaran · rata-rata ${Math.round(avgAk)} akun/bulan · rate rata-rata per bulan ${(()=>{const v=rate.filter(x=>x!=null);return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—';})()}% · kumulatif (total pelanggaran ÷ rata-rata akun, sama dgn grafik per aplikasi) ${avgAk ? (totK/avgAk*100).toFixed(1) : '—'}%` +
     (rows.some(r=>!r.akun) ? ' · bulan tanpa data Jumlah Akun: rate tidak dihitung' : '');
   const DL = window.ChartDataLabels, lbl = DL && showLabels.violRateApp;
   charts.violRateApp = new Chart(document.getElementById('chartViolRateApp').getContext('2d'), {
