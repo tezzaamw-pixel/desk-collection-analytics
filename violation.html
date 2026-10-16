@@ -644,6 +644,14 @@ select:focus{border-color:var(--accent);}
         </div>
         <div class="chart-wrap"><canvas id="chartViolRate"></canvas></div>
       </div>
+      <div class="chart-card" data-chart="violRateApp" id="cardViolRateApp" style="display:none;grid-column:1/-1">
+        <div class="chart-header">
+          <div class="chart-title" id="titleViolRateApp">Violation Rate Aplikasi</div>
+          <button class="chart-label-btn" id="lblBtn-violRateApp" onclick="toggleLabels('violRateApp')" title="Tampilkan/sembunyikan angka">🔢 Angka</button>
+        </div>
+        <div style="font-size:11px;color:var(--text3);margin:-4px 0 6px" id="subViolRateApp"></div>
+        <div class="chart-wrap" style="height:320px"><canvas id="chartViolRateApp"></canvas></div>
+      </div>
       <div class="chart-card" data-chart="aplikasi">
         <div class="chart-header">
           <div class="chart-title">Kasus per Aplikasi</div>
@@ -832,7 +840,7 @@ select:focus{border-color:var(--accent);}
 
 <script>
 // ── State label angka per chart ──────────────────────────────
-const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true,harian:false,kanalStatus:true,violRate:true};
+const showLabels={tren:true,kanal:true,agent:true,aplikasi:true,punishment:true,durasi:true,harian:false,kanalStatus:true,violRate:true,violRateApp:true};
 
 function toggleLabels(key){
   showLabels[key]=!showLabels[key];
@@ -848,6 +856,7 @@ function toggleLabels(key){
   else if(key==='agent')buildAgentChart(filteredData,cc);
   else if(key==='kanalStatus')buildKanalStatusChart(filteredData,cc);
   else if(key==='violRate')buildViolRateChart(filteredData,cc);
+  else if(key==='violRateApp')buildViolRateAppChart(filteredData,cc);
   else if(key==='aplikasi')buildAplikasiChart(filteredData,cc);
   else if(key==='punishment')buildPunishmentChart(filteredData,cc);
   else if(key==='durasi')buildDurasiChart(filteredData,cc);
@@ -1721,6 +1730,7 @@ function buildCharts(data){
   buildAgentChart(data,cc);
   buildKanalStatusChart(data,cc);
   buildViolRateChart(data,cc);
+  buildViolRateAppChart(data,cc);
   buildAplikasiChart(data,cc);
   buildPunishmentChart(data,cc);
   buildDurasiChart(data,cc);
@@ -2023,6 +2033,58 @@ async function buildViolRateChart(data, cc) {
     document.getElementById('chartViolRate').getContext('2d'),
     chartCfg
   );
+}
+
+// ── Violation Rate 1 aplikasi (muncul kalau data terfilter hanya berisi 1 aplikasi) ──
+// Per bulan (ikut filter bulan/tahun aktif): Jumlah Akun, Jumlah Pelanggaran, Rate % = pelanggaran ÷ akun × 100
+async function buildViolRateAppChart(data, cc) {
+  destroyChart('violRateApp');
+  const card = document.getElementById('cardViolRateApp');
+  if (!card) return;
+  const apps = msState.Aplikasi.size === 1 ? [...msState.Aplikasi] : [...new Set(data.map(r => r.aplikasi).filter(Boolean))];
+  if (apps.length !== 1) { card.style.display = 'none'; return; }
+  const app = apps[0];
+  const jaData = await fetchJumlahAkun();
+  const BO = ['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
+  const activeBulan = [...msState.Bulan], activeTahun = [...msState.Tahun].map(String);
+  const tglAktif = !!(msState.Tanggal.from || msState.Tanggal.to);
+  const per = {};
+  const key = (b,t) => String(t)+'-'+String(BO.indexOf(b)+1).padStart(2,'0');
+  const norm = x => String(x||'').trim().toUpperCase();
+  data.forEach(r => { if (!r.bulanMasuk || !r.tahunMasuk) return; const k = key(r.bulanMasuk, r.tahunMasuk);
+    (per[k] = per[k] || {b:r.bulanMasuk, t:r.tahunMasuk, kasus:0, akun:0}).kasus++; });
+  jaData.forEach(row => { if (norm(row.aplikasi) !== norm(app) || !row.jumlahAkun) return;
+    if (activeBulan.length && !activeBulan.includes(row.bulan)) return;
+    if (activeTahun.length && !activeTahun.includes(String(row.tahun))) return;
+    const k = key(row.bulan, row.tahun); if (tglAktif && !per[k]) return; (per[k] = per[k] || {b:row.bulan, t:row.tahun, kasus:0, akun:0}).akun = row.jumlahAkun; });
+  const ks = Object.keys(per).filter(k => !k.includes('-00')).sort();
+  if (!ks.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  const rows = ks.map(k => per[k]);
+  const labels = rows.map(r => r.b.slice(0,3) + ' ' + String(r.t).slice(-2));
+  const akun = rows.map(r => r.akun || 0), kasus = rows.map(r => r.kasus), rate = rows.map(r => r.akun ? +(r.kasus / r.akun * 100).toFixed(1) : null);
+  const totK = kasus.reduce((a,b)=>a+b,0), withAkun = rows.filter(r=>r.akun), avgAk = withAkun.length ? withAkun.reduce((a,r)=>a+r.akun,0)/withAkun.length : 0;
+  document.getElementById('titleViolRateApp').textContent = 'Violation Rate ' + app + ' per Bulan';
+  document.getElementById('subViolRateApp').textContent = `Total ${totK} pelanggaran · rata-rata ${Math.round(avgAk)} akun/bulan · rate keseluruhan ${avgAk ? (totK/avgAk*100).toFixed(1) : '—'}%` +
+    (rows.some(r=>!r.akun) ? ' · bulan tanpa data Jumlah Akun: rate tidak dihitung' : '');
+  const DL = window.ChartDataLabels, lbl = DL && showLabels.violRateApp;
+  charts.violRateApp = new Chart(document.getElementById('chartViolRateApp').getContext('2d'), {
+    type: 'bar', plugins: DL ? [DL] : [],
+    data: { labels, datasets: [
+      { type:'bar', label:'Jumlah Akun', data:akun, backgroundColor:'#3b82f6cc', borderRadius:3, yAxisID:'y', order:2,
+        datalabels: lbl ? {anchor:'end', align:'top', color:cc.text2, font:{size:9,weight:'bold'}, formatter:v=>v||''} : {display:false} },
+      { type:'bar', label:'Jumlah Pelanggaran', data:kasus, backgroundColor:'#dc2626cc', borderRadius:3, yAxisID:'y', order:2,
+        datalabels: lbl ? {anchor:'end', align:'top', color:cc.text2, font:{size:9,weight:'bold'}, formatter:v=>v||''} : {display:false} },
+      { type:'line', label:'Violation Rate (%)', data:rate, borderColor:'#f59e0b', backgroundColor:'#f59e0b', yAxisID:'y2', tension:.25, pointRadius:4, borderWidth:2.5, order:1, spanGaps:true,
+        datalabels: lbl ? {anchor:'end', align:'top', offset:4, color:'#b45309', font:{size:10,weight:'bold'}, formatter:v=>v==null?'':v+'%'} : {display:false} },
+    ]},
+    options: { responsive:true, maintainAspectRatio:false, interaction:{mode:'index', intersect:false},
+      plugins: { legend:{position:'bottom', labels:{color:cc.text2, font:{size:11}}},
+        tooltip:{callbacks:{label:c => c.dataset.yAxisID==='y2' ? ` Rate: ${c.parsed.y==null?'—':c.parsed.y+'%'}` : ` ${c.dataset.label}: ${c.parsed.y}`}} },
+      scales: { x:{ticks:{color:cc.text3}, grid:{display:false}},
+        y:{beginAtZero:true, ticks:{color:cc.text3}, grid:{color:cc.border}, title:{display:true, text:'Akun / Pelanggaran', color:cc.text3, font:{size:10}}},
+        y2:{beginAtZero:true, position:'right', ticks:{color:'#b45309', callback:v=>v+'%'}, grid:{display:false}, title:{display:true, text:'Rate %', color:'#b45309', font:{size:10}}} } }
+  });
 }
 
 function buildAplikasiChart(data,cc){
