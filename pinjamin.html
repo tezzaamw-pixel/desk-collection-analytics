@@ -222,6 +222,9 @@ body.present .pnav{display:flex;position:fixed;left:0;right:0;bottom:0;justify-c
 .basisbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 12px;padding:8px 10px;background:var(--surface2);border-radius:8px}
 .basisbar .bb{display:inline-flex;align-items:center;gap:2px;font-size:12px}
 .basisbar .seg button{padding:3px 9px;font-size:11px}
+.dsel{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.dpk{display:inline-flex;align-items:center;gap:5px}
+.dpk input[type=date]{padding:3px 6px;font-size:12px}
 </style>
 </head>
 <body>
@@ -382,6 +385,18 @@ async function loadData(keepDate){
     box.innerHTML=`<div class="card"><div class="empty">⚠️ ${escH(old?'Code.gs di Apps Script belum diperbarui (fitur Pinjamin belum terpasang).':e.message)}<br><span class="muted">${old?'Tempel Code.gs terbaru lalu Kelola deployment → ✏️ → Versi baru.':'Klik Refresh untuk coba lagi.'}</span></div></div>`;
   }
 }
+// Kalender tanggal laporan & pembanding (di setiap kartu). Tanggal tanpa laporan → laporan terdekat sebelumnya.
+function monthDates(){return DATA.dates.filter(d=>d.slice(0,7)===DATA.periode);}
+function snapD(v,ds){if(!ds.length)return '';if(ds.includes(v))return v;const b=ds.filter(d=>d<=v);return b.length?b[b.length-1]:ds[0];}
+function datePickers(){
+  const ds=monthDates(), prev=DATA.dates.filter(d=>d<VIEW.date);
+  const tip=a=>'Tanggal yang ada laporannya: '+a.map(dShort).join(', ');
+  return `<span class="dpk">📅 Laporan <input type="date" value="${VIEW.date}" min="${ds[0]||''}" max="${ds[ds.length-1]||''}" title="${escH(tip(ds))}" onchange="pickPjDate(this.value)"> <span class="muted">${escH(dLabel(VIEW.date))}</span></span>
+    <span class="dpk">· pembanding <input type="date" value="${VIEW.cmp||''}" min="${prev[0]||''}" max="${prev[prev.length-1]||''}" title="${escH(tip(prev))}" onchange="pickPjCmp(this.value)" ${prev.length?'':'disabled'}> ${VIEW.cmp?`<span class="muted">${escH(dLabel(VIEW.cmp))}</span> <a href="javascript:void(0)" class="noprint" onclick="pickPjCmp('')" title="Tanpa pembanding">✕</a>`:'<span class="muted">tidak ada</span>'}</span>
+    ${VIEW._snap?`<span class="muted" style="margin-left:6px">(tidak ada laporan ${escH(dLabel(VIEW._snap))} — dipakai terdekat sebelumnya)</span>`:''}`;
+}
+function pickPjDate(v){const ds=monthDates();const d=snapD(v,ds);if(!d)return;VIEW._snap=(v&&v!==d)?v:'';VIEW.date=d;const sd=document.getElementById('selDate');if(sd)sd.value=d;fillCmp();render();VIEW._snap='';}
+function pickPjCmp(v){if(!v){VIEW.cmp='';}else{const prev=DATA.dates.filter(d=>d<VIEW.date);const d=snapD(v,prev);VIEW._snap=(v!==d)?v:'';VIEW.cmp=d;}const sc=document.getElementById('selCmp');if(sc)sc.value=VIEW.cmp;render();VIEW._snap='';}
 function fillCmp(){
   const sc=document.getElementById('selCmp');const prev=DATA.dates.filter(d=>d<VIEW.date);
   sc.innerHTML='<option value="">— tidak —</option>'+prev.slice().reverse().map(d=>`<option value="${d}">${dLabel(d)}</option>`).join('');
@@ -497,7 +512,7 @@ function render(){
     </tbody></table></div><div class="vnote">Masuk daftar kalau persentil 70–90% / Bottom 10%, atau turun ≥5 peringkat dibanding laporan pembanding. Klik untuk melihat aktivitas internalnya.</div>`:'<div class="issues ok">Tidak ada agent EDN di zona bawah 👍</div>'});
 
   CUR={G,ednOnly};
-  box.innerHTML=S.map((s,i)=>`<section class="sec card" id="sec-${s.id}" data-i="${i}"><button class="fsbtn noprint" onclick="fsToggle('sec-${s.id}')">⛶ Layar penuh</button><div class="sec-title">${i+1}. ${s.t}</div><div class="card-sub" style="margin-bottom:12px">Laporan ${dLabel(VIEW.date)}${VIEW.cmp?' · pembanding '+dLabel(VIEW.cmp):''}</div>${s.h}</section>`).join('');
+  box.innerHTML=S.map((s,i)=>`<section class="sec card" id="sec-${s.id}" data-i="${i}"><button class="fsbtn noprint" onclick="fsToggle('sec-${s.id}')">⛶ Layar penuh</button><div class="sec-title">${i+1}. ${s.t}</div><div class="card-sub dsel" style="margin-bottom:12px">${datePickers()}</div>${s.h}</section>`).join('');
   if(VIEW.fs){const el=document.getElementById(VIEW.fs);if(el){el.classList.add('fsmode');const b=el.querySelector('.fsbtn');if(b)b.textContent=b.classList.contains('ico')?'✕':'✕ Tutup layar penuh';}else{VIEW.fs='';document.body.classList.remove('fs-on');}}
   PRES.n=S.length;if(document.body.classList.contains('present'))pShow();
   S.forEach(s=>s.after&&s.after());
