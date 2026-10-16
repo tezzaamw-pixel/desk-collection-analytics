@@ -396,7 +396,7 @@ function datePickers(){
     ${VIEW._snap?`<span class="muted" style="margin-left:6px">(tidak ada laporan ${escH(dLabel(VIEW._snap))} — dipakai terdekat sebelumnya)</span>`:''}`;
 }
 function pickPjDate(v){const ds=monthDates();const d=snapD(v,ds);if(!d)return;VIEW._snap=(v&&v!==d)?v:'';VIEW.date=d;const sd=document.getElementById('selDate');if(sd)sd.value=d;fillCmp();render();VIEW._snap='';}
-function pickPjCmp(v){if(!v){VIEW.cmp='';}else{const prev=DATA.dates.filter(d=>d<VIEW.date);const d=snapD(v,prev);VIEW._snap=(v!==d)?v:'';VIEW.cmp=d;}const sc=document.getElementById('selCmp');if(sc)sc.value=VIEW.cmp;render();VIEW._snap='';}
+function pickPjCmp(v){if(!v){VIEW.cmp='';}else{const prev=DATA.dates.filter(d=>d<VIEW.date);const d=snapD(v,prev);VIEW._snap=(d&&v!==d)?v:'';VIEW.cmp=d;}const sc=document.getElementById('selCmp');if(sc)sc.value=VIEW.cmp;render();VIEW._snap='';}
 function fillCmp(){
   const sc=document.getElementById('selCmp');const prev=DATA.dates.filter(d=>d<VIEW.date);
   sc.innerHTML='<option value="">— tidak —</option>'+prev.slice().reverse().map(d=>`<option value="${d}">${dLabel(d)}</option>`).join('');
