@@ -600,7 +600,7 @@ function drawVendorChart(){
   if(charts.v){charts.v.destroy();charts.v=null;}
   const S=vendorSeries(), M=S.M;
   const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
-  const y={grid:{color:gc},ticks:{color:tc,callback:v=>M.fmt==='pct'?fmtPct(v,2):M.fmt==='rank'?'#'+v:M.fmt==='rp'?fmtRp(v):fmtNum(v)}};
+  const y={grid:{color:gc},ticks:{color:tc,callback:v=>M.fmt==='pct'?fmtPct(v,2):M.fmt==='rank'?'#'+v:M.fmt==='rp'?fmtRpFull(v):fmtNum(v)}};
   if(M.fmt==='rank')Object.assign(y,{reverse:true,min:.5,max:S.nComp+.5,afterBuildTicks:ax=>{ax.ticks=Array.from({length:S.nComp},(_,i)=>({value:i+1}));}});
   if(M.k==='kalah'||M.k==='akun')y.beginAtZero=true;
   charts.v=new Chart(cv,{type:'line',

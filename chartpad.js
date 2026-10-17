@@ -30,7 +30,11 @@
         if (!isFinite(min) || !isFinite(max)) return;
         const range = (max - min) || Math.abs(max) || 1;
         if (o.reverse) { if (o.min === undefined || o.min === null) s.min = min - range * pad; }
-        else if (o.max === undefined || o.max === null) s.max = max + range * pad;
+        else {
+          if (o.max === undefined || o.max === null) s.max = max + range * pad;
+          // sedikit ruang di bawah juga (titik terbawah tidak menempel garis), tanpa membuat sumbu jadi negatif
+          if ((o.min === undefined || o.min === null) && !o.beginAtZero && min > 0) s.min = Math.max(0, min - range * pad / 2);
+        }
       }
     });
     return true;
