@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Laporan Klien — System TZ Analytics</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="chartpad.js"></script>
 <style>
 :root{
   --navy:#1a2744;--bg:#f4f5f7;--surface:#ffffff;--surface2:#f0f2f5;
@@ -541,7 +542,9 @@ function renderVendor(){
   const gapLast=last.own!==undefined&&last.best?last.best[1]-last.own:null;
   el.innerHTML=`
     <div class="card-head"><div><div class="card-title">📊 Posisi EDN vs Vendor Lain</div>
-      <div class="card-sub">Repay rate harian per vendor · ${dates.length} hari · ${companies.length} vendor</div></div></div>
+      <div class="card-sub" id="vSub">${escH(vMetricOf().sub)} · ${dates.length} hari · ${companies.length} vendor</div></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="muted" style="font-size:12px;font-weight:600">Tampilkan grafik:</label>
+        <select id="vMetric" onchange="setVMetric(this.value)" title="Pilih data yang mau dibandingkan antar vendor per hari">${V_METRICS.map(x=>`<option value="${x.k}" ${x.k===vMetricOf().k?'selected':''}>${escH(x.l)}</option>`).join('')}</select></div></div>
     <div class="kpis">
       <div class="kpi"><div class="l">Rata-rata rate EDN bulan ini</div><div class="v">${fmtPct(ownAvg)}</div><div class="s">peringkat ${ownAvgRank||'—'} dari ${avgs.length} vendor · terbaik ${avgs[0]?escH(avgs[0].c)+' '+fmtPct(avgs[0].v):'—'}</div></div>
       <div class="kpi"><div class="l">Peringkat EDN ${dLabel(last.d)}</div><div class="v ${last.rank===1?'good':last.rank===last.n?'bad':''}">${last.rank?('#'+last.rank+' <span style="font-size:13px;color:var(--text3)">dari '+last.n+'</span>'):'—'}</div><div class="s">${gapLast!==null&&last.rank!==1?'tertinggal '+fmtPct(gapLast)+' dari '+escH(last.best[0])+(()=>{const os=DATA.tl.filter(t=>t.jenis==='DAILY'&&t.tanggal===last.d&&t.company===OWN).reduce((x,t)=>x+t.outstanding,0);return os?'<br>Kurang ±<b>'+fmtRpFull(gapLast/100*os)+'</b> repay hari itu untuk menyamai '+escH(last.best[0]):'';})():last.rank===1?'EDN terbaik hari ini':''}</div></div>
@@ -549,16 +552,69 @@ function renderVendor(){
       <div class="kpi"><div class="l">Hari EDN paling bawah</div><div class="v ${lasts?'bad':''}">${lasts} <span style="font-size:13px;color:var(--text3)">/ ${dates.length} hari</span></div><div class="s">peringkat terakhir</div></div>
     </div>
     <div class="chart-wrap"><canvas id="cVendor"></canvas></div>
+    <div id="vLegend"></div>
+    <div class="muted" id="vNote" style="font-size:11px;margin-top:6px;text-align:center"></div>
     <div class="rankstrip">${ranks.map(r=>`<div class="d" title="${dLabel(r.d)}: EDN ${fmtPct(r.own)}"><div class="x">${dShort(r.d)}</div><div class="y ${r.rank===1?'good':r.rank&&r.rank===r.n?'bad':''}">${r.rank?('#'+r.rank):'—'}</div></div>`).join('')}</div>`;
+  drawVendorChart();
+}
+
+// Pilihan data grafik "Posisi EDN vs Vendor" (per vendor per hari). Sumber:
+// rate = tabel vendor (atau Σrepay÷ΣOS tabel TL Daily); Rp & akun = tabel TL / agent laporan Daily.
+const V_METRICS=[
+  {k:'rate',l:'Rate repay (%)',sub:'Repay rate harian per vendor',fmt:'pct',hi:true},
+  {k:'kalah',l:'Kekalahan uang vs #1 (Rp)',sub:'Repay tambahan yang dibutuhkan tiap vendor hari itu supaya rate-nya sama dengan vendor #1 (0 = juara)',fmt:'rp',hi:false},
+  {k:'repay',l:'Repay (Rp)',sub:'Total repay harian per vendor',fmt:'rp',hi:true},
+  {k:'repayAkun',l:'Repay per akun (Rp)',sub:'Repay harian ÷ jumlah akun agent vendor itu',fmt:'rp',hi:true},
+  {k:'ht',l:'Handle time per akun',sub:'Rata-rata handle time per akun agent (laporan Daily)',fmt:'num',hi:true},
+  {k:'os',l:'Outstanding (Rp)',sub:'Total outstanding harian per vendor',fmt:'rp',hi:true},
+  {k:'akun',l:'Jumlah akun',sub:'Jumlah akun agent per vendor di laporan Daily',fmt:'num',hi:true},
+  {k:'rank',l:'Peringkat (rate)',sub:'Peringkat harian berdasarkan rate (1 = terbaik)',fmt:'rank',hi:false}];
+function vMetricOf(){let k='rate';try{k=localStorage.getItem('tz_klien_vmetric')||'rate';}catch(e){}return V_METRICS.find(x=>x.k===k)||V_METRICS[0];}
+function setVMetric(k){try{localStorage.setItem('tz_klien_vmetric',k);}catch(e){}const sub=document.getElementById('vSub');
+  if(sub){const {dates,companies}=vendorMatrix();sub.textContent=`${vMetricOf().sub} · ${dates.length} hari · ${companies.length} vendor`;}drawVendorChart();}
+function vendorSeries(){
+  const {m,dates,companies}=vendorMatrix();
+  const tl={},ag={};
+  DATA.tl.filter(t=>t.jenis==='DAILY').forEach(t=>{const o=(tl[t.tanggal+'|'+t.company]=tl[t.tanggal+'|'+t.company]||{os:0,rp:0,aht:0,n:0});o.os+=t.outstanding||0;o.rp+=t.repay||0;if(t.aht){o.aht+=t.aht;o.n++;}});
+  DATA.agents.filter(a=>a.jenis==='DAILY').forEach(a=>{const o=(ag[a.tanggal+'|'+a.company]=ag[a.tanggal+'|'+a.company]||{os:0,rp:0,ht:0,htN:0,n:0});o.os+=a.outstanding||0;o.rp+=a.repay||0;o.n++;if(a.handleTime){o.ht+=a.handleTime;o.htN++;}});
+  const M=vMetricOf();
+  const val=(d,c)=>{
+    const r=m[d]&&m[d][c], T=tl[d+'|'+c], A=ag[d+'|'+c];
+    const os=T&&T.os?T.os:A&&A.os?A.os:null, rp=T&&T.os?T.rp:A&&A.os?A.rp:null;
+    switch(M.k){
+      case 'rate':return r??null;
+      case 'kalah':{if(r===undefined||!os)return null;const best=Math.max(...Object.values(m[d]));return Math.max(0,(best-r)/100*os);}
+      case 'repay':return rp;
+      case 'repayAkun':return rp!==null&&A&&A.n?rp/A.n:null;
+      case 'ht':return A&&A.htN?A.ht/A.htN:T&&T.n?T.aht/T.n:null;
+      case 'os':return os;
+      case 'akun':return A&&A.n?A.n:null;
+      case 'rank':{if(r===undefined)return null;return 1+Object.values(m[d]).filter(x=>x>r+1e-12).length;}
+    }
+    return null;};
+  return {M,dates,companies,data:companies.map(c=>dates.map(d=>{const v=val(d,c);return v===null||v===undefined||isNaN(v)?null:v;})),nComp:Math.max(1,...dates.map(d=>Object.keys(m[d]).length))};
+}
+function vFmt(M,v,full){if(v===null||v===undefined)return '—';return M.fmt==='pct'?fmtPct(v):M.fmt==='rp'?(full?fmtRpFull(v):fmtRp(v)):M.fmt==='rank'?'#'+Math.round(v):fmtNum(v);}
+function drawVendorChart(){
+  const cv=document.getElementById('cVendor');if(!cv)return;
+  if(charts.v){charts.v.destroy();charts.v=null;}
+  const S=vendorSeries(), M=S.M;
   const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
-  charts.v=new Chart(document.getElementById('cVendor'),{type:'line',
-    data:{labels:dates.map(dShort),datasets:companies.map(c=>({label:c===OWN?'EDN (kita)':'Vendor '+c,data:dates.map(d=>m[d][c]??null),
+  const y={grid:{color:gc},ticks:{color:tc,callback:v=>M.fmt==='pct'?fmtPct(v,2):M.fmt==='rank'?'#'+v:M.fmt==='rp'?fmtRp(v):fmtNum(v)}};
+  if(M.fmt==='rank')Object.assign(y,{reverse:true,min:.5,max:S.nComp+.5,afterBuildTicks:ax=>{ax.ticks=Array.from({length:S.nComp},(_,i)=>({value:i+1}));}});
+  if(M.k==='kalah'||M.k==='akun')y.beginAtZero=true;
+  charts.v=new Chart(cv,{type:'line',
+    data:{labels:S.dates.map(dShort),datasets:S.companies.map((c,ci)=>({tzId:c,label:c===OWN?'EDN (kita)':'Vendor '+c,data:S.data[ci],
       borderColor:vColor(c),backgroundColor:vColor(c),borderWidth:c===OWN?3.5:1.5,pointRadius:c===OWN?4:2,tension:.25,spanGaps:true,order:c===OWN?0:1,
       borderDash:c===OWN?[]:[4,3]}))},
     options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
-      plugins:{legend:{position:'bottom',labels:{color:tc,boxWidth:12,font:{size:11}}},
-        tooltip:{itemSort:(a,b)=>(b.parsed.y||0)-(a.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${fmtPct(x.parsed.y)}`}}},
-      scales:{x:{grid:{color:gc},ticks:{color:tc}},y:{grid:{color:gc},ticks:{color:tc,callback:v=>fmtPct(v,2)}}}}});
+      plugins:{legend:{display:false},
+        tooltip:{itemSort:(a,b)=>M.hi?(b.parsed.y||0)-(a.parsed.y||0):(a.parsed.y||0)-(b.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${vFmt(M,x.parsed.y,true)}`}}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y}}});
+  tzLegend(charts.v,document.getElementById('vLegend'),{key:'klien_vendor',only:[{label:'Hanya EDN',ids:[OWN]}]});
+  const miss=S.data.reduce((n,arr)=>n+arr.filter(v=>v===null).length,0);
+  const note=document.getElementById('vNote');
+  if(note)note.textContent=(M.k==='kalah'?'Garis makin tinggi = makin banyak uang yang kurang dibanding vendor #1 hari itu. ':'')+(M.k==='rank'?'Atas = peringkat 1. ':'')+(miss&&M.k!=='rate'?'Titik kosong = tanggal tanpa tabel TL/agent Daily untuk vendor itu. ':'')+'Centang vendor di bawah grafik untuk membandingkan.';
 }
 
 /* ── 2. Ranking TL lintas vendor ── */
@@ -1142,14 +1198,14 @@ function renderAnalisa(){
         <div class="ana-bar" style="font-size:10.5px;color:var(--text3);font-weight:700;margin-bottom:2px"><span class="nm">VENDOR</span><span></span><b style="font-weight:700;text-align:right">RATE · KURANG KE #1</b></div>
         ${R.comp.map((c,i)=>{const gap=R.best&&i>0?(R.best.rate-c.rate)/100*c.os:0;return `<div class="ana-bar ${c.c===OWN?'own':''}" style="cursor:pointer" title="Klik untuk lihat TL ${escH(c.c)} & gap tiap peringkat" onclick="openVendorTl('${escH(c.c)}')"><span class="nm">${i+1}. ${escH(c.c)}</span><span class="track"><span style="width:${R.best&&R.best.rate?c.rate/R.best.rate*100:0}%"></span></span><b style="text-align:right">${fmtPct(c.rate)}<div style="font-size:11px;font-weight:${c.c===OWN?800:600};color:${i?'var(--danger)':'var(--success)'}" title="${i?`Repay tambahan supaya rate sama dengan ${escH(R.best.c)} (selisih ${fmtPct(R.best.rate-c.rate)} × outstanding ${fmtRpFull(c.os)})`:'Peringkat 1'}">${i?'-'+fmtRpFull(gap):'🏆 #1'}</div></b></div>`;}).join('')}
         ${R.need?`<div class="ana-note">EDN butuh ±<b>${fmtRpFull(R.need)}</b> repay tambahan (dengan outstanding ${fmtRpFull(R.edn.os)}) untuk menyamai ${escH(R.best.c)}.</div>`:''}</div>
-      <div><div class="ana-h3">Tren harian: EDN vs vendor terbaik</div><div style="position:relative;height:260px"><canvas id="anaTrend"></canvas></div>
+      <div><div class="ana-h3">Tren harian: EDN vs vendor terbaik</div><div style="position:relative;height:260px"><canvas id="anaTrend"></canvas></div><div id="anaTrendLg"></div>
         <div class="ana-note">Peringkat EDN per hari: ${R.trend.map(x=>`<span class="pill ${x.rank===1?'pill-ok':x.rank===x.n?'pill-red':'pill-warn'}" title="${dLabel(x.d)}">${dShort(x.d)}: #${x.rank??'—'}</span>`).join(' ')}</div></div>
     </div>`,after:()=>{
       const c=document.getElementById('anaTrend'); if(!c||!R.trend.length)return;
-      ANA.charts.push(new Chart(c,{type:'line',data:{labels:R.trend.map(x=>dShort(x.d)),datasets:[
+      const ch=new Chart(c,{type:'line',data:{labels:R.trend.map(x=>dShort(x.d)),datasets:[
         {label:'EDN',data:R.trend.map(x=>x.edn),borderColor:'#1d60c8',backgroundColor:'#1d60c833',borderWidth:3,tension:.25,pointRadius:3},
         {label:'Vendor terbaik',data:R.trend.map(x=>x.best),borderColor:'#16a34a',borderDash:[5,4],borderWidth:2,tension:.25,pointRadius:2}]},
-        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>`${x.dataset.label}: ${fmtPct(x.parsed.y)}${x.datasetIndex===1?' ('+R.trend[x.dataIndex].bestC+')':''}`}},datalabels:{display:false}},scales:{y:{ticks:{callback:v=>v.toFixed(2)+'%'}}}}}));}});
+        options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'bottom'},tooltip:{callbacks:{label:x=>`${x.dataset.label}: ${fmtPct(x.parsed.y)}${x.datasetIndex===1?' ('+R.trend[x.dataIndex].bestC+')':''}`}},datalabels:{display:false}},scales:{y:{ticks:{callback:v=>v.toFixed(2)+'%'}}}}});ANA.charts.push(ch);tzLegend(ch,document.getElementById('anaTrendLg'),{key:'klien_ana_trend'});}});
   // 3. Tim
   S.push({t:'Tim (TL)',h:`
     ${warnInt}
