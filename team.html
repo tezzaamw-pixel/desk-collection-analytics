@@ -10220,8 +10220,8 @@ document.addEventListener("DOMContentLoaded",()=>tzInit());
   // tetap layar penuh di dalam jendela; tombol ✕ menutup jendela di Laporan Klien
   const _fs=window.toggleBsmFullscreen;
   window.toggleBsmFullscreen=function(){const md=document.querySelector('#modalBucketSummary .bsm-modal');if(md&&md.classList.contains('fullscreen'))return;_fs();};
-  const _close=window.closeBucketSummary;
-  window.closeBucketSummary=function(){try{_close();}catch(e){}try{parent.postMessage({tzBsm:'close'},location.origin);}catch(e){}};
+  // ✕ / Esc / klik luar → tutup jendela di Laporan Klien (isi Summary tetap, jadi buka lagi langsung tampil)
+  window.closeBucketSummary=function(){try{parent.postMessage({tzBsm:'close'},location.origin&&location.origin!=='null'?location.origin:'*');}catch(e){}};
   function start(){
     if(authed()){run();return;}
     msg.style.display='none'; // tampilkan kunci password; mulai setelah terbuka
