@@ -467,7 +467,25 @@ function openLead(lead){
   const hasTgt=A.some(a=>a.tgt>0);
   document.getElementById('ldTitle').textContent=lead;
   document.getElementById('ldSub').textContent=`${L.n} agent · jam ${VIEW.jam}${prevJ?' · dibanding '+prevJ:''} · rate ${fmtPct(L.rate)} · repay ${fmtRp(L.rp)}`;
-  document.getElementById('ldBody').innerHTML=`<div class="tbl-wrap"><table class="t"><thead><tr><th class="n" title="Peringkat agent di bucket ini (urut rate)">Rank</th><th>Agent</th><th class="n">OS</th><th class="n">Repay</th><th class="n">Rate</th><th class="n">+Repay</th><th class="n">+Handle</th><th class="n">Handle times</th><th class="n">Call out</th>${hasTgt?'<th class="n">Kurang ke target</th>':''}</tr></thead><tbody>
+  // gap per jam ke #1 & ke 1 peringkat di atas (repay yang masih kurang = selisih rate × OS tim ini)
+  const nd=(t,x)=>Math.max(0,(t.rate-x.rate)/100*x.os);
+  let pg=null;
+  const GH=J.filter(j=>mins(j)<=mins(VIEW.jam)).map(j=>{const LS=leadersAt(j),me=LS.find(x=>x.lead===lead);if(!me)return null;const top=LS[0],up=LS[me.pos-2];
+    const g=me===top?0:nd(top,me),r={j,pos:me.pos,n:LS.length,rate:me.rate,top,g,up,gu:up?nd(up,me):0,dg:pg===null?null:g-pg};pg=g;return r;}).filter(Boolean);
+  const LSn=leadersAt(VIEW.jam), above=LSn.slice(0,L.pos-1), below=LSn[L.pos];
+  const gapHtml=`<div class="score-row" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin-bottom:10px">
+    ${[['Posisi jam '+VIEW.jam,'#'+L.pos+' dari '+LSn.length,''],['Kurang ke #1',L.pos===1?'🏆 #1':fmtRp(nd(LSn[0],L)),L.pos===1?'':'var(--danger)'],['Kurang ke 1 di atas',above.length?fmtRp(nd(above[above.length-1],L)):'—',''],['Unggul dari bawah',below?fmtRp(Math.max(0,(L.rate-below.rate)/100*below.os)):'—','var(--success)']]
+      .map(([k,v,c])=>`<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px"><div class="muted" style="font-size:11px">${k}</div><div style="font-weight:800;font-size:15px;${c?'color:'+c:''}">${v}</div></div>`).join('')}</div>
+  ${above.length?`<div class="card-sub" style="margin:4px 0">🪜 Tangga gap jam ${VIEW.jam} — repay tambahan yang dibutuhkan untuk menyamai tiap peringkat di atas</div>
+  <div class="tbl-wrap" style="margin-bottom:12px"><table class="t"><thead><tr><th>#</th><th>Pemimpin</th><th class="n">Rate</th><th class="n">Kurang repay</th><th class="n">Per agent</th><th class="n">+ dari anak tangga sebelumnya</th><th class="n">Per jam s/d ${tutup}</th></tr></thead><tbody>
+  ${above.slice().reverse().map((t,i,arr)=>{const g=nd(t,L),pv=i?nd(arr[i-1],L):0;return `<tr class="${t.vendor?'vend':''}"><td>${t.pos}</td><td style="font-weight:600">${escH(t.lead)}</td><td class="n">${fmtPct(t.rate)}</td><td class="n" style="color:var(--danger);font-weight:700">${fmtRp(g)}</td><td class="n">${fmtRp(g/(L.n||1))}</td><td class="n">${i?'+'+fmtRp(g-pv):'—'}</td><td class="n">${sisa>0?fmtRp(g/sisa):'—'}</td></tr>`;}).join('')}</tbody></table></div>`:''}
+  ${GH.length>1?`<div class="card-sub" style="margin:4px 0">⏱️ Gap ke #1 per jam — kelihatan di jam mana tertinggal / mengejar</div>
+  <div class="tbl-wrap" style="margin-bottom:12px"><table class="t"><thead><tr><th>Jam</th><th class="n">Posisi</th><th class="n">Rate</th><th>#1 saat itu</th><th class="n">Kurang ke #1</th><th class="n">Perubahan gap</th><th class="n">Kurang ke 1 di atas</th></tr></thead><tbody>
+  ${GH.map(r=>`<tr><td>${r.j}</td><td class="n">${r.pos}/${r.n}</td><td class="n">${fmtPct(r.rate)}</td><td>${r.pos===1?'🏆 sendiri':escH(r.top.lead)+' <span class="muted">'+fmtPct(r.top.rate)+'</span>'}</td>
+    <td class="n" style="font-weight:700">${r.g?fmtRp(r.g):'—'}</td><td class="n ${r.dg===null?'eq':r.dg>0?'dn':r.dg<0?'up':'eq'}">${r.dg===null?'—':r.dg>0?'▲ melebar '+fmtRp(r.dg):r.dg<0?'▼ mengejar '+fmtRp(-r.dg):'tetap'}</td>
+    <td class="n">${r.up?fmtRp(r.gu)+' <span class="muted">('+escH(r.up.lead)+')</span>':'—'}</td></tr>`).join('')}</tbody></table></div>`:''}
+  <div class="card-sub" style="margin:4px 0">👥 Agent</div>`;
+  document.getElementById('ldBody').innerHTML=gapHtml+`<div class="tbl-wrap"><table class="t"><thead><tr><th class="n" title="Peringkat agent di bucket ini (urut rate)">Rank</th><th>Agent</th><th class="n">OS</th><th class="n">Repay</th><th class="n">Rate</th><th class="n">+Repay</th><th class="n">+Handle</th><th class="n">Handle times</th><th class="n">Call out</th>${hasTgt?'<th class="n">Kurang ke target</th>':''}</tr></thead><tbody>
   ${A.map(a=>`<tr><td class="n">${a.rank}${a.dRank?` <span class="${a.dRank>0?'up':'dn'}">${a.dRank>0?'▲'+a.dRank:'▼'+(-a.dRank)}</span>`:''}</td><td style="font-weight:600">${escH(a.nm)} <span class="muted" style="font-weight:400;font-size:10.5px">${escH(a.id)}</span> ${a.idle?'<span class="ib ib-idle" title="Handle times tidak bertambah sejak tarikan sebelumnya">tidak telepon</span>':''}${a.dRp>0?' <span class="ib ib-new">bayar baru</span>':''}</td>
     <td class="n">${fmtRp(a.os)}</td><td class="n">${fmtRp(a.rp)}</td><td class="n" style="font-weight:700">${fmtPct(a.rate,2)}</td>
     <td class="n ${a.dRp>0?'up':'eq'}">${a.dRp===null?'—':a.dRp>0?fmtSRp(a.dRp):'Rp 0'}</td><td class="n">${a.dHt===null?'—':fmtNum(a.dHt)}</td><td class="n">${fmtNum(a.ht)}</td><td class="n">${(+a.co).toFixed(2).replace('.',',')}</td>

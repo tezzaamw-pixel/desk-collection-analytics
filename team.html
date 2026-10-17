@@ -3596,6 +3596,7 @@ function _buildBsmAgentPreviewRow(a, agId, colspanTotal, previewSetupCols, bsmRo
             </div>
           </div>
           <div class="preview-grid">${previewGridItems}</div>
+          ${_bsmGapBlock(a)}
           <div class="preview-daily">
             <table class="preview-daily-table">
               <thead><tr><th>Tanggal</th><th>Absensi</th><th>Catatan SPV</th><th style="text-align:center">Payment</th>${previewSetupCols.map(m=>`<th style="text-align:center">${m.label}</th>`).join('')}</tr></thead>
@@ -3606,6 +3607,31 @@ function _buildBsmAgentPreviewRow(a, agId, colspanTotal, previewSetupCols, bsmRo
       </div>
     </td>
   </tr>`;
+}
+
+// Gap agent di Summary Bucket: posisi (urut total payment), kurang ke #1 / 1 di atas, unggul dari bawah,
+// tangga ke 3 peringkat di atas, dan grafik batang payment harian (hari terbaik / hari kosong).
+function _bsmGapBlock(a){
+  const R=window._bsmRanked||[], i=R.indexOf(a);
+  const fr=n=>'Rp '+Math.round(Math.max(0,n)).toLocaleString('id-ID');
+  let gap='';
+  if(i>=0&&R.length>1){
+    const top=R[0], up=R[i-1], dn=R[i+1];
+    const card=(k,v,c)=>`<div class="preview-stat"><div class="lbl">${k}</div><div class="val" style="${c?'color:'+c:''}">${v}</div></div>`;
+    const ladder=R.slice(Math.max(0,i-3),i).reverse().map(t=>`<span style="display:inline-block;margin:2px 8px 2px 0;font-size:11px;color:var(--text2)">#${R.indexOf(t)+1} ${escH(t.ag)}: <b style="color:var(--danger)">-${fr(t.total-a.total)}</b></span>`).join('');
+    gap=`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--text3)">🎯 POSISI DI BUCKET (urut total payment)</div>
+    <div class="preview-grid">${card('Peringkat','#'+(i+1)+' dari '+R.length)}${card('Kurang ke #1',i?fr(top.total-a.total):'🏆 #1',i?'var(--danger)':'var(--success)')}${card('Kurang ke 1 di atas',up?fr(up.total-a.total):'—')}${card('Unggul dari bawah',dn?fr(a.total-dn.total):'—','var(--success)')}</div>
+    ${ladder?`<div style="margin:2px 0 6px">🪜 ${ladder}</div>`:''}`;
+  }
+  const d=a._rows.slice().sort((x,y)=>(x.tanggal||'').localeCompare(y.tanggal||''));
+  if(d.length<2)return gap;
+  const mx=Math.max(1,...d.map(r=>+r.dailyPayment||0)), best=d.reduce((b,r)=>(+r.dailyPayment||0)>(+b.dailyPayment||0)?r:b,d[0]);
+  const isOff=r=>/off|libur|cuti|izin|sakit|alpha?/i.test(r.absensi||'');
+  const nol=d.filter(r=>!(+r.dailyPayment)&&!isOff(r)).length;
+  const bars=d.map(r=>{const v=+r.dailyPayment||0,off=isOff(r);return `<div title="${escH(r.tanggal)} · ${escH(r.absensi||'')} · ${fr(v)}" style="flex:1;min-width:6px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:64px">
+    <div style="width:100%;height:${v?Math.max(3,v/mx*52):2}px;border-radius:2px 2px 0 0;background:${off?'var(--border)':v?(r===best?'var(--success)':'var(--accent)'):'var(--danger)'}"></div><div style="font-size:8.5px;color:var(--text3);margin-top:2px">${String(r.tanggal||'').slice(8)}</div></div>`;}).join('');
+  return gap+`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--text3)">📈 PAYMENT HARIAN · terbaik ${escH(String(best.tanggal||'').slice(5))} ${fr(best.dailyPayment)} · ${nol} hari masuk tanpa payment <span style="font-weight:500">(merah = 0, abu = off/izin)</span></div>
+  <div style="display:flex;gap:2px;align-items:flex-end;padding:4px 0 6px">${bars}</div>`;
 }
 
 function _renderBucketSummary() {
@@ -3703,6 +3729,7 @@ function _renderBucketSummary() {
     if (aLama !== bLama) return aLama - bLama;
     return b.total-a.total;
   });
+  window._bsmRanked = agents.filter(x=>!x._movedOut);
   function rankCls(i){ return i===0?'bsm-r1':i===1?'bsm-r2':i===2?'bsm-r3':'bsm-rn'; }
   const tlRankCls = i => i===0?'bsm-r1':i===1?'bsm-r2':i===2?'bsm-r3':'bsm-rn';
 

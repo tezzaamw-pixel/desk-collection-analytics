@@ -545,6 +545,7 @@ function openAgents(grp,vend,tl){
   document.getElementById('tlTitle').innerHTML=`${tl?escH(tl)+' · ':''}${escH(vend)} · ${escH(grp)}`;
   document.getElementById('tlSub').textContent=`${sel.length} agent · ${VIEW.jam==='FINAL'?'FINAL':'s/d jam '+VIEW.jam}${prevJ?' · progres dibanding '+jamLabel(prevJ):''} · payment ${fmtRp(s.paid)} · rate ${fmtPct(s.rate)} · gross ${fmtRp(s.gross)} · median call bucket ${fmtNum(med)}`;
   document.getElementById('tlBody').innerHTML=`<div class="tabs2 noprint">${vends.map(v=>`<button class="${v===vend&&!tl?'on':''}" onclick="openVend('${escH(grp)}','${escH(v)}')">${escH(v)} <span class="c">${A.filter(a=>a.vend===v).length}</span></button>`).join('')}</div>
+  ${tl?'':vendGap(grp,vend)}
   <div class="tbl-wrap"><table class="t"><thead><tr><th class="n" title="Peringkat gross di bucket (semua vendor)">Rank</th><th>Agent</th>${multiTl?'<th>TL</th>':''}<th class="n">OS</th><th class="n">Payment</th><th class="n">Rate</th><th class="n">Gross</th>${prevJ?'<th class="n">+Payment</th><th class="n">+Gross</th><th class="n">+Call</th>':''}<th class="n">Call</th><th class="n">Tersambung</th><th class="n">Durasi</th><th class="n">WA</th><th>Status</th></tr></thead><tbody>
   ${rows.map(a=>{const st=a.gross>0?'<span class="ib" style="background:var(--success-bg);color:var(--success)">ada hasil</span>':a.call>=med?'<span class="ib" style="background:var(--warning-bg);color:var(--warning)">rajin, belum bayar</span>':'<span class="ib" style="background:var(--danger-bg);color:var(--danger)">kurang gerak</span>';
     return `<tr class="${a.vend===OWN?'own':''}"><td class="n">${a.rank}/${A.length}${a.dRank?` <span class="${a.dRank>0?'d-up':'d-dn'}">${a.dRank>0?'▲'+a.dRank:'▼'+(-a.dRank)}</span>`:''}</td><td style="font-weight:600">${escH(a.ag)} <span class="muted" style="font-size:10.5px;font-weight:400">${escH(a.agno)}</span></td>${multiTl?`<td>${escH(a.tl)}</td>`:''}<td class="n">${fmtRp(a.pok)}</td><td class="n">${fmtRp(a.paid)}</td><td class="n">${fmtPct(a.rate)}</td><td class="n" style="font-weight:700">${fmtRp(a.gross)}</td>
@@ -553,6 +554,28 @@ function openAgents(grp,vend,tl){
   document.getElementById('mTl').classList.add('open');
 }
 
+// tangga gap vendor di bucket (ikut dasar ranking Principal/Gross) + gap ke #1 per tarikan jam
+function vendGap(grp,vend){
+  const g=groupsAt(VIEW.jam).find(x=>x.group===grp);if(!g||g.vend.length<2)return '';
+  const B=rankBasis(g),R=B.R,me=R.find(v=>v.comp===vend);if(!me)return '';
+  const pos=R.indexOf(me),above=R.slice(0,pos),below=R[pos+1];
+  const J=jams().filter(j=>jamKey(j)<=jamKey(VIEW.jam));let pg=null;
+  const H=J.map(j=>{const gg=groupsAt(j).find(x=>x.group===grp);if(!gg)return null;const b=rankBasis(gg),r=b.R,m=r.find(v=>v.comp===vend);if(!m)return null;
+    const i=r.indexOf(m),gap=i?Math.max(0,b.need(m,r[0])):0,res={j,pos:i+1,n:r.length,top:r[0],val:b.fmtV(m),gap,up:r[i-1],gu:i?Math.max(0,b.need(m,r[i-1])):0,dg:pg===null?null:gap-pg};pg=gap;return res;}).filter(Boolean);
+  const kpi=[['Posisi ('+(B.gross?'gross/agent':'rate payment')+')','#'+(pos+1)+' dari '+R.length,''],
+    ['Kurang ke #1',pos?fmtRp(B.need(me,R[0])):'🏆 #1',pos?'var(--danger)':'var(--success)'],
+    ['Kurang ke 1 di atas',pos?fmtRp(B.need(me,R[pos-1]))+' ('+R[pos-1].comp+')':'—',''],
+    ['Unggul dari bawah',below?fmtRp(Math.max(0,B.need(below,me)))+' ('+below.comp+')':'—','var(--success)']];
+  return `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:8px;margin:8px 0 10px">${kpi.map(([k,v,c])=>`<div style="border:1px solid var(--border);border-radius:8px;padding:8px 10px"><div class="muted" style="font-size:11px">${k}</div><div style="font-weight:800;font-size:14.5px;${c?'color:'+c:''}">${escH(v)}</div></div>`).join('')}</div>
+  ${above.length?`<div class="sub" style="font-size:12px;color:var(--text2);margin:2px 0 4px">🪜 Tangga gap — ${B.word} tambahan yang dibutuhkan ${escH(vend)} untuk menyamai tiap peringkat di atas</div>
+  <div class="tbl-wrap" style="margin-bottom:12px"><table class="t"><thead><tr><th class="n">#</th><th>Vendor</th><th class="n">${B.gross?'Gross/agent':'Rate'}</th><th class="n">Kurang ${B.word}</th><th class="n">Per agent</th><th class="n">+ dari anak tangga sebelumnya</th></tr></thead><tbody>
+  ${above.slice().reverse().map((t,i,arr)=>{const n=Math.max(0,B.need(me,t)),pv=i?Math.max(0,B.need(me,arr[i-1])):0;return `<tr class="${t.comp===OWN?'own':''}"><td class="n">${R.indexOf(t)+1}</td><td style="font-weight:600">${escH(t.comp)}</td><td class="n">${B.fmtV(t)}</td><td class="n bad" style="font-weight:700">${fmtRp(n)}</td><td class="n">${fmtRp(n/(me.n||1))}</td><td class="n">${i?'+'+fmtRp(n-pv):'—'}</td></tr>`;}).join('')}</tbody></table></div>`:''}
+  ${H.length>1?`<div class="sub" style="font-size:12px;color:var(--text2);margin:2px 0 4px">⏱️ Gap ke #1 per tarikan — kelihatan di jam mana tertinggal / mengejar</div>
+  <div class="tbl-wrap" style="margin-bottom:12px"><table class="t"><thead><tr><th>Jam</th><th class="n">Posisi</th><th class="n">${B.gross?'Gross/agent':'Rate'}</th><th>#1 saat itu</th><th class="n">Kurang ke #1</th><th class="n">Perubahan gap</th><th class="n">Kurang ke 1 di atas</th></tr></thead><tbody>
+  ${H.map(r=>`<tr><td>${jamLabel(r.j)}</td><td class="n">${r.pos}/${r.n}</td><td class="n">${r.val}</td><td>${r.pos===1?'🏆 sendiri':escH(r.top.comp)}</td><td class="n" style="font-weight:700">${r.gap?fmtRp(r.gap):'—'}</td>
+    <td class="n ${r.dg===null?'':r.dg>0?'bad':r.dg<0?'good':''}">${r.dg===null?'—':r.dg>0?'▲ melebar '+fmtRp(r.dg):r.dg<0?'▼ mengejar '+fmtRp(-r.dg):'tetap'}</td><td class="n">${r.up?fmtRp(r.gu)+' <span class="muted">('+escH(r.up.comp)+')</span>':'—'}</td></tr>`).join('')}</tbody></table></div>`:''}
+  <div class="sub" style="font-size:12px;color:var(--text2);margin:2px 0 4px">👥 Agent</div>`;
+}
 function intraChart(J,G){
   const el=document.getElementById('chIntra');if(!el)return;
   const g=VIEW.intraG&&G.find(x=>x.group===VIEW.intraG)?VIEW.intraG:G[0].group;
