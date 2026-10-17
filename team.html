@@ -10184,47 +10184,83 @@ function tzRetranslate() {
 document.addEventListener("DOMContentLoaded",()=>tzInit());
 </script>
 <script>
-/* ── MODE EMBED: team.html?embed=bsm&aplikasi=..&bucket=..&bulan=..&tahun=..
-   Dipakai tombol "📊 Summary Bucket" di Laporan Klien: halaman ini dibuka di dalam jendela
-   dan langsung menampilkan Summary Bucket (semua fitur) untuk aplikasi+bucket itu. ── */
+/* ── MODE EMBED (dipakai Laporan Klien) ──
+   team.html?embed=bsm&aplikasi=..&bucket=..&bulan=..&tahun=..
+     → langsung tampil Summary Bucket (semua fitur), di dalam jendela.
+   team.html?embed=cmp&aplikasi=..&bucket=..&bulan=..&tahun=..
+     → hanya bagian "⚖️ Compare" (Compare TL & Compare Agent) milik SPV bucket itu,
+       daftar TL/agent dibatasi ke aplikasi+bucket tsb. Tinggi halaman dikirim ke induk. ── */
 (function(){
   const P=new URLSearchParams(location.search);
-  if(P.get('embed')!=='bsm')return;
+  const MODE=P.get('embed');
+  if(MODE!=='bsm'&&MODE!=='cmp')return;
   const AP=P.get('aplikasi')||'', BK=P.get('bucket')||'';
+  const post=d=>{try{parent.postMessage(d,location.origin&&location.origin!=='null'?location.origin:'*');}catch(e){}};
   const st=document.createElement('style');
-  st.textContent=`.navbar,.sidebar,.main{display:none!important}body{overflow:hidden!important}
-#modalBucketSummary{background:var(--bg,#f3f4f6)!important;padding:0!important}#bsmFsBtn{display:none!important}
-#tzEmbedMsg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font:14px system-ui,sans-serif;color:var(--text2,#555);background:var(--bg,#f3f4f6);z-index:400;text-align:center;padding:20px}`;
+  st.textContent=`.navbar,.sidebar,.main{display:none!important}
+#tzEmbedMsg{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px;font:14px system-ui,sans-serif;color:var(--text2,#555);background:var(--bg,#f3f4f6);z-index:400;text-align:center;padding:20px}`+
+  (MODE==='bsm'?`body{overflow:hidden!important}#modalBucketSummary{background:var(--bg,#f3f4f6)!important;padding:0!important}#bsmFsBtn{display:none!important}`
+              :`html,body{background:transparent!important;overflow:hidden!important}#tzCmpHost{padding:2px 2px 6px}#tzCmpHost .compare-section{margin-top:0!important}`);
   document.head.appendChild(st);
-  const msg=document.createElement('div');msg.id='tzEmbedMsg';msg.innerHTML='<div class="spinner"></div><div>Memuat Summary Bucket '+BK+' …</div>';
+  const msg=document.createElement('div');msg.id='tzEmbedMsg';msg.innerHTML='<div class="spinner"></div><div>Memuat '+(MODE==='bsm'?'Summary Bucket ':'Compare TL & Agent ')+BK+' …</div>';
   document.body.appendChild(msg);
   const say=t=>{msg.style.display='flex';msg.innerHTML='<div>'+t+'</div>';};
   window.alert=t=>say('⚠️ '+String(t));
+  // tema ikut halaman induk (localStorage sama)
+  window.addEventListener('storage',e=>{if(e.key==='dca_theme'&&e.newValue)document.documentElement.setAttribute('data-theme',e.newValue);});
   const authed=()=>{try{return sessionStorage.getItem(PAGE_SESSION_KEY)==='1'||sessionStorage.getItem('tz_page_auth_klien')==='1';}catch(e){return false;}};
   async function run(){
     try{
       sessionStorage.setItem(PAGE_SESSION_KEY,'1');
       const ol=document.getElementById('lockOverlay');if(ol)ol.remove();
       await loadData();
-      if(!allRows.length){say('⚠️ Data bulan ini belum ada / gagal dimuat. Tutup lalu coba lagi.');return;}
+      if(!allRows.length){say('⚠️ Data bulan ini belum ada / gagal dimuat. Coba lagi nanti.');return;}
       const cnt={};allRows.forEach(r=>{if(r.aplikasi===AP&&r.bucket===BK){const k=r.supervisor||'(Tanpa SPV)';cnt[k]=(cnt[k]||0)+1;}});
       const spv=Object.keys(cnt).sort((a,b)=>cnt[b]-cnt[a])[0];
       if(!spv){say('⚠️ Tidak ada data '+AP+' bucket '+BK+' di All Data bulan ini.');return;}
+      if(MODE==='bsm'){
+        openSpvDetail(spv);
+        openBucketSummary(BK,spv,AP);
+        const md=document.querySelector('#modalBucketSummary .bsm-modal');
+        if(md&&!md.classList.contains('fullscreen'))toggleBsmFullscreen();
+        msg.style.display='none';
+        return;
+      }
+      // cmp: batasi ke aplikasi+bucket ini lewat filter halaman, lalu ambil bagian Compare saja
+      const sa=document.getElementById('selAplikasi'),sb=document.getElementById('selBucket');
+      sa.value=AP;populateBucket(AP);sb.value=BK;
       openSpvDetail(spv);
-      openBucketSummary(BK,spv,AP);
-      const md=document.querySelector('#modalBucketSummary .bsm-modal');
-      if(md&&!md.classList.contains('fullscreen'))toggleBsmFullscreen();
+      await new Promise(r=>setTimeout(r,60));
+      const sid=btoa(encodeURIComponent(spv)).replace(/[^a-zA-Z0-9]/g,'').substring(0,16);
+      const el=document.getElementById('cmp-'+sid);
+      if(!el){say('⚠️ Bagian Compare tidak ditemukan.');return;}
+      const host=document.createElement('div');host.id='tzCmpHost';document.body.appendChild(host);host.appendChild(el);
       msg.style.display='none';
+      // tinggi = isi Compare, ditambah ruang kalau daftar pilihan TL sedang terbuka (supaya tidak terpotong)
+      let lastH=0;
+      const send=()=>{const dd=document.querySelector('.cmp-ms-dropdown.open');
+        const h=Math.ceil(Math.max(host.getBoundingClientRect().height+8,dd?dd.getBoundingClientRect().bottom+12:0));
+        if(h!==lastH){lastH=h;post({tzEmbed:'cmp',h});}};
+      try{new ResizeObserver(send).observe(host);}catch(e){}
+      setInterval(send,500);
+      // daftar pilihan TL selalu membuka ke bawah (jendela ikut memanjang)
+      const _ms=window.toggleCmpMs;
+      window.toggleCmpMs=function(id,type){_ms(id,type);const tr=document.getElementById('cmpMsTrigTL-'+id),dd=document.getElementById('cmpMsDdTL-'+id);
+        if(tr&&dd&&dd.classList.contains('open')){dd.style.top=(tr.getBoundingClientRect().bottom+4)+'px';}send();};
+      send();
     }catch(e){say('⚠️ '+(e&&e.message||e));}
   }
-  // tetap layar penuh di dalam jendela; tombol ✕ menutup jendela di Laporan Klien
-  const _fs=window.toggleBsmFullscreen;
-  window.toggleBsmFullscreen=function(){const md=document.querySelector('#modalBucketSummary .bsm-modal');if(md&&md.classList.contains('fullscreen'))return;_fs();};
-  // ✕ / Esc / klik luar → tutup jendela di Laporan Klien (isi Summary tetap, jadi buka lagi langsung tampil)
-  window.closeBucketSummary=function(){try{parent.postMessage({tzBsm:'close'},location.origin&&location.origin!=='null'?location.origin:'*');}catch(e){}};
+  if(MODE==='bsm'){
+    // tetap layar penuh di dalam jendela; tombol ✕ menutup jendela di Laporan Klien
+    const _fs=window.toggleBsmFullscreen;
+    window.toggleBsmFullscreen=function(){const md=document.querySelector('#modalBucketSummary .bsm-modal');if(md&&md.classList.contains('fullscreen'))return;_fs();};
+    // ✕ / Esc / klik luar → tutup jendela di Laporan Klien (isi Summary tetap, jadi buka lagi langsung tampil)
+    window.closeBucketSummary=function(){post({tzBsm:'close'});};
+  }
   function start(){
     if(authed()){run();return;}
     msg.style.display='none'; // tampilkan kunci password; mulai setelah terbuka
+    if(MODE==='cmp')post({tzEmbed:'cmp',h:520});
     const t=setInterval(()=>{if(sessionStorage.getItem(PAGE_SESSION_KEY)==='1'){clearInterval(t);msg.style.display='flex';run();}},400);
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();

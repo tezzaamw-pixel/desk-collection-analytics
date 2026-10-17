@@ -759,7 +759,7 @@ let RED_LIST=[];
 
 /* ── 3b. Compare TL & Agent (+ tombol Summary Bucket dari panel Tim) ── */
 // Data: laporan klien Daily (per hari) atau Monthly (snapshot akumulasi per tanggal), semua vendor.
-let CMP={mode:'tl',per:'daily',metric:'rate',sel:{tl:[],agent:[]},q:'',vend:OWN,tlF:'',msg:''};
+let CMP={src:'int',mode:'tl',per:'daily',metric:'rate',sel:{tl:[],agent:[]},q:'',vend:OWN,tlF:'',msg:''};
 const CMP_MAX=12;
 const CMP_COLORS=['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#0f766e','#9333ea','#475569'];
 const CMP_M=[
@@ -803,9 +803,11 @@ function cmpDefaults(ents){
   if(CMP.mode==='tl')return own.slice(0,CMP_MAX).map(e=>e.key);
   const tl0=own.length?own[0].tl:'';return own.filter(e=>e.tl===tl0).slice(0,10).map(e=>e.key);
 }
+function cmpSrcSeg(){return `<div class="seg" title="Sumber data compare"><button class="${CMP.src==='int'?'on':''}" onclick="cmpSet('src','int')">⚖️ Penyentuhan tim (internal)</button><button class="${CMP.src==='klien'?'on':''}" onclick="cmpSet('src','klien')">📄 Hasil laporan klien</button></div>`;}
 function renderCmp(){
   const el=document.getElementById('secCmp');if(!el)return;
   if(charts.cmp){charts.cmp.destroy();charts.cmp=null;}
+  if(CMP.src==='int'){renderCmpInt(el);return;}
   const hasD=DATA.tl.some(t=>t.jenis==='DAILY')||DATA.agents.some(a=>a.jenis==='DAILY'), hasM=(DATA.monDates||[]).length>0;
   if(CMP.per==='monthly'&&!hasM)CMP.per='daily';
   if(CMP.per==='daily'&&!hasD&&hasM)CMP.per='monthly';
@@ -820,6 +822,7 @@ function renderCmp(){
     <div class="card-head"><div><div class="card-title">🆚 Compare TL &amp; Agent</div>
       <div class="card-sub">Bandingkan pergerakan TL atau agent (semua vendor) dari laporan klien ${CMP.per==='monthly'?'Bulanan (akumulasi per tanggal laporan)':'Harian'} · centang di daftar kiri (maks ${CMP_MAX})</div></div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${cmpSrcSeg()}
         <div class="seg"><button class="${CMP.mode==='tl'?'on':''}" onclick="cmpSet('mode','tl')">TL</button><button class="${CMP.mode==='agent'?'on':''}" onclick="cmpSet('mode','agent')">Agent</button></div>
         <div class="seg"><button class="${CMP.per==='daily'?'on':''}" ${hasD?'':'disabled'} onclick="cmpSet('per','daily')">Harian</button><button class="${CMP.per==='monthly'?'on':''}" ${hasM?'':'disabled'} onclick="cmpSet('per','monthly')">Bulanan</button></div>
         <select onchange="cmpSet('metric',this.value)" title="Data yang dibandingkan">${CMP_M.filter(m=>!(m.agentOnly&&CMP.mode==='tl')).map(m=>`<option value="${m.k}" ${m.k===M.k?'selected':''}>${escH(m.l)}</option>`).join('')}</select>
@@ -847,6 +850,33 @@ function renderCmp(){
   cmpPicker(); cmpDraw();
 }
 function cmpSet(k,v){CMP[k]=v;if(k==='mode'){CMP.q='';CMP.tlF='';}renderCmp();}
+// Compare TL & Agent versi panel Tim (data internal All Data: absensi, payment, rate, sentuh WA, respon WA,
+// PTP, call, dll.) — bagian "⚖️ Compare" halaman Tim ditampilkan di sini untuk bucket ini saja.
+// Dimuat saat kartu terlihat di layar; tinggi bingkai mengikuti isinya.
+function renderCmpInt(el){
+  const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value, bk=BUCKET==='C03'?'CO3':BUCKET;
+  const src=`team.html?embed=cmp&aplikasi=${encodeURIComponent('RUPIAH CEPAT')}&bucket=${encodeURIComponent(BUCKET)}&bulan=${encodeURIComponent(bulan)}&tahun=${encodeURIComponent(tahun)}`;
+  el.innerHTML=`
+    <div class="card-head"><div><div class="card-title">🆚 Compare TL &amp; Agent</div>
+      <div class="card-sub">Sama seperti Compare di panel Tim — penyentuhan tim ${escH(bk)} dari data internal (All Data) ${escH(bulan)} ${escH(tahun)}: absensi, payment, rate, sentuh/respon WA, PTP, call, dll.</div></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        ${cmpSrcSeg()}
+        <button class="btn btn-ghost noprint" onclick="cmpIntReload()" title="Muat ulang data compare">↻</button>
+        <button class="btn btn-primary noprint" onclick="openBsmEmbed()" title="Buka Summary Bucket ${escH(bk)} (panel Tim) — data baru dimuat saat tombol ditekan">📊 Summary Bucket ${escH(bk)}</button>
+      </div></div>
+    <div id="cmpIntHost" style="position:relative;min-height:120px"><div class="empty" id="cmpIntWait" style="padding:18px">Compare dimuat saat bagian ini terlihat…</div></div>`;
+  const host=document.getElementById('cmpIntHost');
+  const f=document.createElement('iframe');
+  f.id='cmpIntFrame';f.title='Compare TL & Agent';f.dataset.src=src;
+  f.style.cssText='width:100%;height:520px;border:0;display:block;background:transparent';
+  host.appendChild(f);
+  if(!window._cmpIntMsg){window._cmpIntMsg=true;
+    window.addEventListener('message',e=>{const fr=document.getElementById('cmpIntFrame');
+      if(fr&&e.source===fr.contentWindow&&e.data&&e.data.tzEmbed==='cmp'&&e.data.h>0){fr.style.height=Math.max(160,Math.min(6000,e.data.h))+'px';const w=document.getElementById('cmpIntWait');if(w)w.remove();}});}
+  const go=()=>{if(!f.src){f.src=src;const w=document.getElementById('cmpIntWait');if(w)w.textContent='Memuat data internal (±20–30 detik pertama kali)…';}};
+  if('IntersectionObserver' in window){const io=new IntersectionObserver(es=>{if(es.some(x=>x.isIntersecting)){io.disconnect();go();}},{rootMargin:'200px'});io.observe(host);}else go();
+}
+function cmpIntReload(){const f=document.getElementById('cmpIntFrame');if(f){f.removeAttribute('src');f.src=f.dataset.src;}}
 function cmpVisible(){
   const {ents}=window._CMP,q=normKey(CMP.q);
   return ents.filter(e=>(!CMP.vend||e.company===CMP.vend)&&(CMP.mode!=='agent'||!CMP.tlF||e.tl===CMP.tlF)&&(!q||normKey(e.name).includes(q)||normKey(e.kufi).includes(q)||normKey(e.tl).includes(q)));
