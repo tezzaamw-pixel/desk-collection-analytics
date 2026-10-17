@@ -727,7 +727,7 @@ function openTlDetail(i){
       <td class="n">${fmtRpFull(a.outstanding)}</td><td class="n">${fmtRpFull(a.repay)}</td><td class="n" style="font-weight:700;${a.rate<r.rate?'color:var(--danger)':''}">${fmtPct(a.rate)}</td>
       <td class="n">${ndT?'-'+fmtRpFull(ndT):'<span class="good">✓</span>'}</td><td class="n">${r===top?'—':nd?'-'+fmtRpFull(nd):'<span class="good">✓</span>'}</td></tr>`;}).join('');
   const below0=ag.filter(a=>a.rate<r.rate), sumBelow=below0.reduce((s,a)=>s+Math.max(0,(r.rate-a.rate)/100*a.outstanding),0);
-  m.innerHTML=`<div class="modal-box"><div class="modal-h"><div><div class="ttl">🏆 ${escH(r.tl)} <span class="muted" style="font-size:12px">${r.company===OWN?'EDN':'Vendor '+escH(r.company)}</span></div>
+  m.innerHTML=`<div class="modal-box"><div class="modal-h"><div><div class="ttl">🪜 ${escH(r.tl)} <span class="muted" style="font-size:12px">${r.company===OWN?'EDN':'Vendor '+escH(r.company)}</span></div>
       <div class="card-sub">${C.isMon?'Bulanan s/d':'Harian'} ${escH(dLabel(C.date))} · peringkat <b>#${r.rank||pos+1}</b> dari ${rows.length} · rate ${fmtPct(r.rate)} · repay ${fmtRpFull(r.repay)} · outstanding ${fmtRpFull(r.outstanding)} · ${n} akun</div></div>
       <button class="btn btn-ghost" onclick="document.getElementById('modalTl').classList.remove('open')">✕</button></div>
     <div class="modal-b">
