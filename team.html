@@ -3628,7 +3628,7 @@ function _bsmGapBlock(a){
   const mx=Math.max(1,...d.map(r=>+r.dailyPayment||0)), best=d.reduce((b,r)=>(+r.dailyPayment||0)>(+b.dailyPayment||0)?r:b,d[0]);
   const isOff=r=>/off|libur|cuti|izin|sakit|alpha?/i.test(r.absensi||'');
   const nol=d.filter(r=>!(+r.dailyPayment)&&!isOff(r)).length;
-  const bars=d.map(r=>{const v=+r.dailyPayment||0,off=isOff(r);return `<div title="${escH(r.tanggal)} · ${escH(r.absensi||'')} · ${fr(v)}" style="flex:1;min-width:6px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:64px">
+  const bars=d.map(r=>{const v=+r.dailyPayment||0,off=!v&&isOff(r);return `<div title="${escH(r.tanggal)} · ${escH(r.absensi||'')} · ${fr(v)}" style="flex:1;min-width:6px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:64px">
     <div style="width:100%;height:${v?Math.max(3,v/mx*52):2}px;border-radius:2px 2px 0 0;background:${off?'var(--border)':v?(r===best?'var(--success)':'var(--accent)'):'var(--danger)'}"></div><div style="font-size:8.5px;color:var(--text3);margin-top:2px">${String(r.tanggal||'').slice(8)}</div></div>`;}).join('');
   return gap+`<div style="margin:8px 0 4px;font-size:11px;font-weight:700;color:var(--text3)">📈 PAYMENT HARIAN · terbaik ${escH(String(best.tanggal||'').slice(5))} ${fr(best.dailyPayment)} · ${nol} hari masuk tanpa payment <span style="font-weight:500">(merah = 0, abu = off/izin)</span></div>
   <div style="display:flex;gap:2px;align-items:flex-end;padding:4px 0 6px">${bars}</div>`;
