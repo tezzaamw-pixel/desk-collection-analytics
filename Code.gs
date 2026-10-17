@@ -8,6 +8,8 @@ const CFG = {
   SPREADSHEET_ID: '1zcWzcEN_R1qClSKPsvp2Fica_j7iDwq_Qqcg3Mude3k',
   // Spreadsheet rekap pembayaran per TL (1 tab per TL) — dipakai Analisa Bucket
   DATABAYAR_ID: '17hlBKEJjh5UJJQQATcnr-nZl_n3zfjIxQaa7TCFx8wQ',
+  // File QC "RECORDING RUCEP" — sheet PRODUCTIVITY CALL (…) & DATA CALL TERHUBUNG dibaca langsung dari sini
+  QC_ID: '1ZSzmoFCd8-AAL9ZzBi1aV-o3Ama2iMK-8dc3IRwWIY8',
   SHEET_ALL_DATA: 'All Data',
   SHEET_REFERENSI: 'Referensi Akun',
   SHEET_VIOLATION: 'VIOLATION',
@@ -1249,36 +1251,75 @@ function _qcNum_(v) {
   return isNaN(n) ? null : n;
 }
 
-// → { key "NAMA|yyyy-mm-dd": {attempt, duration, off}, names: {NORM: {nama, akun}} }
+// Sheet jumlah call QC: semua tab "PRODUCTIVITY CALL (…)" di file QC (mis. 1-10 oct, 11-31 oct),
+// fallback ke "JUMLAH DATA CALL" (file QC / master). Layout boleh beda per tab:
+//   lama: NO | NAMA | AKUN | (kosong) | tgl…    baru: NO | NAMA | BUCKET | AKUN | tgl…
+// Baris 1 = tanggal di kolom Attempt (kolom berikutnya Duration). Kolom akun dideteksi otomatis.
+function _qcJumlahSheets_(ss) {
+  const list = [];
+  let qc = null;
+  try { if (CFG.QC_ID) qc = SpreadsheetApp.openById(CFG.QC_ID); } catch (err) { qc = null; }
+  [qc, ss].forEach(book => {
+    if (!book || list.length) return;
+    book.getSheets().forEach(sh => { if (/PRODUCTIVITY\s*CALL/i.test(sh.getName().trim())) list.push(sh); });
+    if (!list.length) { const j = book.getSheetByName(QC_SHEET_JUMLAH); if (j && j.getLastRow() >= 3) list.push(j); }
+  });
+  return list;
+}
+// → { key "NAMA|yyyy-mm-dd": {attempt, duration, off}, names: {NORM: {nama, akun, bucket}}, sheets: [...] }
 function _qcReadJumlah_(ss, periode) {
-  const sh = ss.getSheetByName(QC_SHEET_JUMLAH);
-  if (!sh) throw new Error('Sheet "' + QC_SHEET_JUMLAH + '" tidak ditemukan.');
-  const lr = sh.getLastRow(), lc = sh.getLastColumn();
-  if (lr < 3) return { map: {}, names: {} };
-  const v = sh.getRange(1, 1, lr, lc).getDisplayValues();
-  const dateCols = [];
-  for (let c = 3; c < lc; c++) {
-    const d = _qcDate_(v[0][c]);
-    if (d && (!periode || d.slice(0, 7) === periode)) dateCols.push({ c, d });
-  }
-  const map = {}, names = {};
-  for (let r = 2; r < lr; r++) {
-    const nama = String(v[r][1] || '').trim(); if (!nama) continue;
-    const k = _qcName_(nama);
-    names[k] = { nama, akun: String(v[r][2] || '').trim() };
-    dateCols.forEach(dc => {
-      const a = String(v[r][dc.c] || '').trim(), du = String(v[r][dc.c + 1] || '').trim();
-      if (a === '' && du === '') return;
-      const off = a.toUpperCase() === 'OFF';
-      map[k + '|' + dc.d] = { attempt: off ? 0 : _qcNum_(a), duration: off ? 0 : _qcNum_(du), off };
-    });
-  }
-  return { map, names };
+  const sheets = _qcJumlahSheets_(ss);
+  if (!sheets.length) throw new Error('Sheet "PRODUCTIVITY CALL" / "' + QC_SHEET_JUMLAH + '" tidak ditemukan.');
+  const map = {}, names = {}, used = [];
+  sheets.forEach(sh => {
+    const lr = sh.getLastRow(), lc = sh.getLastColumn();
+    if (lr < 3) return;
+    const v = sh.getRange(1, 1, lr, lc).getDisplayValues();
+    const h = v[0].map(x => String(x || '').trim().toUpperCase());
+    let nameCol = h.indexOf('NAMA'); if (nameCol < 0) nameCol = 1;
+    const bucketCol = h.indexOf('BUCKET');
+    let firstDate = -1;
+    const dateCols = [];
+    for (let c = nameCol + 1; c < lc; c++) {
+      const d = _qcDate_(v[0][c]);
+      if (!d) continue;
+      if (firstDate < 0) firstDate = c;
+      if (!periode || d.slice(0, 7) === periode) dateCols.push({ c, d });
+    }
+    if (firstDate < 0) return;
+    // kolom akun = kolom antara NAMA dan tanggal pertama yang paling banyak berisi angka panjang
+    let akunCol = -1, best = 0;
+    for (let c = nameCol + 1; c < firstDate; c++) {
+      if (c === bucketCol) continue;
+      let n = 0; for (let r = 2; r < lr; r++) if (/^\d{8,}$/.test(String(v[r][c] || '').trim())) n++;
+      if (n > best) { best = n; akunCol = c; }
+    }
+    used.push(sh.getName().trim());
+    for (let r = 2; r < lr; r++) {
+      const nama = String(v[r][nameCol] || '').trim();
+      if (!nama || /^NOTE\b/i.test(nama)) continue;
+      const k = _qcName_(nama);
+      const o = names[k] || (names[k] = { nama, akun: '', bucket: '' });
+      const ak = akunCol >= 0 ? String(v[r][akunCol] || '').trim() : '';
+      const bk = bucketCol >= 0 ? String(v[r][bucketCol] || '').trim() : '';
+      if (ak) o.akun = ak;
+      if (bk) o.bucket = bk;
+      dateCols.forEach(dc => {
+        const a = String(v[r][dc.c] || '').trim(), du = String(v[r][dc.c + 1] || '').trim();
+        if (a === '' && du === '') return; // kosong → jangan timpa isian tab lain
+        const off = a.toUpperCase() === 'OFF';
+        map[k + '|' + dc.d] = { attempt: off ? 0 : _qcNum_(a), duration: off ? 0 : _qcNum_(du), off };
+      });
+    }
+  });
+  return { map, names, sheets: used };
 }
 
 // → { key: {count, dup}, names: {NORM: true} }
 function _qcReadTerhubung_(ss, periode) {
-  const sh = ss.getSheetByName(QC_SHEET_TERHUBUNG);
+  let sh = null;
+  try { if (CFG.QC_ID) sh = SpreadsheetApp.openById(CFG.QC_ID).getSheetByName(QC_SHEET_TERHUBUNG); } catch (err) { sh = null; }
+  if (!sh) sh = ss.getSheetByName(QC_SHEET_TERHUBUNG);
   if (!sh) return { map: {}, names: {}, available: false };
   const lr = sh.getLastRow();
   if (lr < 2) return { map: {}, names: {}, available: true };
@@ -1348,7 +1389,7 @@ function endpointQcCheck_(e) {
   return {
     success: true, action: 'qccheck', periode,
     cols: ['tanggal','agent','tl','spv','aplikasi','bucket','absensi','tlCall','tlConn','qcAtt','qcDur','qcOff','qcConn','qcDup','qcAkun'],
-    rows: out, unmatched, terhubungTersedia: T.available,
+    rows: out, unmatched, terhubungTersedia: T.available, sumberQC: J.sheets,
     roster: Object.keys(ros).map(k => ros[k]) // [tl, agent, aplikasi, bucket, tglPertama, tglTerakhir, adaDiQC]
   };
 }

@@ -185,7 +185,7 @@ body.fs-open{overflow:hidden;}
 <main class="main">
   <div class="eyebrow">Data QC internal vs isian TL</div>
   <h1>Cek Call (QC)</h1>
-  <p class="lead">Call Manual yang diisi TL di All Data dibandingkan dengan Attempt di sheet <b>JUMLAH DATA CALL</b>, dan Call Terhubung dengan jumlah rekaman di sheet <b>DATA CALL TERHUBUNG</b>, per agent per tanggal.</p>
+  <p class="lead">Call Manual yang diisi TL di All Data dibandingkan dengan Attempt di sheet QC <b>PRODUCTIVITY CALL</b> (semua periode, mis. 1-10 &amp; 11-31 Okt — dibaca langsung dari file QC), dan Call Terhubung dengan jumlah rekaman di sheet <b>DATA CALL TERHUBUNG</b>, per agent per tanggal.</p>
 
   <div class="filters">
     <label for="selBulan">Bulan</label>
@@ -261,6 +261,7 @@ async function loadData(){
     sa.innerHTML='<option value="">Semua</option>'+apps.map(a=>`<option ${a===keep?'selected':''}>${escH(a)}</option>`).join('');
     if(!apps.includes(keep))VIEW.app='';
     analyze(); render();
+    if(res.sumberQC&&res.sumberQC.length){const n=document.createElement('div');n.className='muted';n.style.cssText='font-size:11.5px;margin:-4px 0 10px';n.textContent='📄 Sumber attempt QC: '+res.sumberQC.join(' + ');box.prepend(n);}
   }catch(e){
     const old=/Unknown action/i.test(e.message);
     box.innerHTML=`<div class="card"><div class="empty">⚠️ ${escH(old?'Code.gs di Apps Script belum diperbarui (fitur Cek Call belum terpasang).':e.message)}<br><span class="muted">${old?'Tempel Code.gs terbaru lalu Deploy → Versi baru.':'Klik Refresh untuk coba lagi.'}</span></div></div>`;
@@ -327,7 +328,7 @@ function scored(){return scoped().filter(r=>!r.qcEmpty);}
 function render(){
   const box=document.getElementById('content');
   const rows=scored();
-  if(!DATA.rows.length){box.innerHTML=`<div class="card"><div class="empty">Belum ada data yang bisa dicocokkan untuk bulan ini.<br><span class="muted">Pastikan nama di sheet JUMLAH DATA CALL sama dengan nama agent di All Data.</span></div></div>`+unmatchedHtml();return;}
+  if(!DATA.rows.length){box.innerHTML=`<div class="card"><div class="empty">Belum ada data yang bisa dicocokkan untuk bulan ini.<br><span class="muted">Pastikan nama di sheet PRODUCTIVITY CALL sama dengan nama agent di All Data.</span></div></div>`+unmatchedHtml();return;}
   const chk=rows.filter(r=>r.checked), bad=chk.filter(r=>r.beda);
   const over=bad.filter(r=>r.diff>0).length;
   const absen=rows.filter(r=>r.absen).length, copas=new Set(rows.filter(r=>r.copas).map(r=>r.agent)).size, asal=rows.filter(r=>r.asal).length;
