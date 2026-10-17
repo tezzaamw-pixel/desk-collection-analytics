@@ -927,7 +927,8 @@ function openBsmEmbed(){
       <div style="display:flex;gap:6px"><button class="btn btn-ghost" id="bsmFs" onclick="bsmFull()" title="Layar penuh">⛶ Layar penuh</button><button class="btn btn-ghost" onclick="closeBsmEmbed()">✕</button></div></div>
       <div style="flex:1;min-height:0;position:relative"><iframe id="bsmFrame" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0 0 var(--radius) var(--radius)"></iframe></div></div>`;
     document.body.appendChild(m);
-    window.addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.tzBsm==='close')closeBsmEmbed();});
+    window.addEventListener('message',e=>{const fr=document.getElementById('bsmFrame');if(fr&&e.source===fr.contentWindow&&e.data&&e.data.tzBsm==='close')closeBsmEmbed();});
+    document.addEventListener('keydown',e=>{if(e.key==='Escape'&&m.classList.contains('open'))closeBsmEmbed();});
   }
   document.getElementById('bsmTtl').textContent=`📊 Summary Bucket ${BUCKET==='C03'?'CO3':BUCKET} · Rupiah Cepat · ${bulan} ${tahun}`;
   const f=document.getElementById('bsmFrame');
