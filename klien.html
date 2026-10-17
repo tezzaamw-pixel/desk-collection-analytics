@@ -832,7 +832,7 @@ function renderCmp(){
           <select style="flex:1;min-width:0" onchange="CMP.vend=this.value;cmpPicker()"><option value="">Semua vendor</option>${vends.map(v=>`<option value="${escH(v)}" ${v===CMP.vend?'selected':''}>${v===OWN?'EDN':'Vendor '+escH(v)}</option>`).join('')}</select>
           ${CMP.mode==='agent'?`<select id="cmpTlF" style="flex:1;min-width:0" onchange="CMP.tlF=this.value;cmpPicker()"></select>`:''}
         </div>
-        <div style="display:flex;gap:10px;font-size:11.5px"><a href="javascript:void 0" onclick="cmpBulk(true)">✔ Centang yang tampil</a><a href="javascript:void 0" onclick="cmpBulk(false)">✕ Kosongkan</a></div>
+        <div style="display:flex;gap:10px;font-size:11.5px"><a href="javascript:void 0" style="color:var(--accent);font-weight:600;text-decoration:none" onclick="cmpBulk(true)">✔ Centang yang tampil</a><a href="javascript:void 0" style="color:var(--accent);font-weight:600;text-decoration:none" onclick="cmpBulk(false)">✕ Kosongkan</a></div>
         <div id="cmpMsg" class="muted" style="font-size:11px"></div>
         <div class="cmplist" id="cmpList"></div>
       </div>
