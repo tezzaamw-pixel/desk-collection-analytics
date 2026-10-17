@@ -691,6 +691,23 @@ let RED_LIST=[];
 
 // ── Detail 1 agent: versi klien per hari + versi internal per hari + perbandingan rata-rata tim ──
 // Detail TL (klik baris Ranking TL): tangga gap ke tiap peringkat di atasnya + agent TL itu
+// Klik vendor (Analisa → Hasil vs Vendor): daftar TL vendor itu di ranking TL Bulanan terakhir
+function openVendorTl(comp){
+  const mon=(DATA.monAll&&DATA.monAll.tl)||[];const dates=[...new Set(mon.map(t=>t.tanggal))].sort();const d=dates[dates.length-1];
+  const useMon=!!d, date=useMon?d:(tlDailyDates().slice(-1)[0]||'');
+  const rows=(useMon?mon.filter(t=>t.tanggal===d):DATA.tl.filter(t=>t.jenis==='DAILY'&&t.tanggal===date)).slice().sort((a,b)=>(a.rank||99)-(b.rank||99)||b.rate-a.rate);
+  window._TLCTX={rows,isMon:useMon,date};
+  const top=rows[0], mine=rows.filter(r=>r.company===comp);
+  let m=document.getElementById('modalTl');
+  if(!m){m=document.createElement('div');m.className='modal';m.id='modalTl';m.onclick=e=>{if(e.target===m)m.classList.remove('open');};document.body.appendChild(m);}
+  m.innerHTML=`<div class="modal-box"><div class="modal-h"><div><div class="ttl">${comp===OWN?'EDN':'Vendor '+escH(comp)} · TL di ranking ${useMon?'Bulanan s/d':'Harian'} ${escH(dLabel(date))}</div><div class="card-sub">${mine.length} TL · klik TL untuk lihat tangga gap & agent-nya</div></div>
+    <button class="btn btn-ghost" onclick="document.getElementById('modalTl').classList.remove('open')">✕</button></div><div class="modal-b">
+    <div class="tbl-wrap"><table class="t"><thead><tr><th>#</th><th>TL</th><th class="n">Outstanding</th><th class="n">Repay</th><th class="n">Rate</th><th class="n">Kurang ke #1</th><th class="n">Kurang ke 1 di atas</th></tr></thead><tbody>
+    ${mine.map(r=>{const i=rows.indexOf(r),up=rows[i-1];const nd=t=>Math.max(0,(t.rate-r.rate)/100*r.outstanding);
+      return `<tr class="${r.company===OWN?'edn':''}" style="cursor:pointer" onclick="openTlDetail(${i})"><td>${r.rank||i+1}</td><td style="font-weight:700">${escH(r.tl)}</td><td class="n">${fmtRp(r.outstanding)}</td><td class="n">${fmtRpFull(r.repay)}</td><td class="n" style="font-weight:700">${fmtPct(r.rate)}</td><td class="n" style="color:var(--danger)">${r===top?'🏆 #1':'-'+fmtRpFull(nd(top))}</td><td class="n">${up?'-'+fmtRpFull(nd(up))+' <span class="muted">('+escH(up.tl)+')</span>':'—'}</td></tr>`;}).join('')||'<tr><td colspan="7" class="muted">Tidak ada TL vendor ini di ranking.</td></tr>'}
+    </tbody></table></div></div></div>`;
+  m.classList.add('open');
+}
 function openTlDetail(i){
   const C=window._TLCTX; if(!C)return; const r=C.rows[i]; if(!r)return;
   let m=document.getElementById('modalTl');
@@ -1123,7 +1140,7 @@ function renderAnalisa(){
     <div class="ana-grid2">
       <div><div class="ana-h3">Rate ${R.isMonthly?'bulanan':'akumulasi'} per vendor</div>
         <div class="ana-bar" style="font-size:10.5px;color:var(--text3);font-weight:700;margin-bottom:2px"><span class="nm">VENDOR</span><span></span><b style="font-weight:700;text-align:right">RATE · KURANG KE #1</b></div>
-        ${R.comp.map((c,i)=>{const gap=R.best&&i>0?(R.best.rate-c.rate)/100*c.os:0;return `<div class="ana-bar ${c.c===OWN?'own':''}"><span class="nm">${i+1}. ${escH(c.c)}</span><span class="track"><span style="width:${R.best&&R.best.rate?c.rate/R.best.rate*100:0}%"></span></span><b style="text-align:right">${fmtPct(c.rate)}<div style="font-size:11px;font-weight:${c.c===OWN?800:600};color:${i?'var(--danger)':'var(--success)'}" title="${i?`Repay tambahan supaya rate sama dengan ${escH(R.best.c)} (selisih ${fmtPct(R.best.rate-c.rate)} × outstanding ${fmtRpFull(c.os)})`:'Peringkat 1'}">${i?'-'+fmtRpFull(gap):'🏆 #1'}</div></b></div>`;}).join('')}
+        ${R.comp.map((c,i)=>{const gap=R.best&&i>0?(R.best.rate-c.rate)/100*c.os:0;return `<div class="ana-bar ${c.c===OWN?'own':''}" style="cursor:pointer" title="Klik untuk lihat TL ${escH(c.c)} & gap tiap peringkat" onclick="openVendorTl('${escH(c.c)}')"><span class="nm">${i+1}. ${escH(c.c)}</span><span class="track"><span style="width:${R.best&&R.best.rate?c.rate/R.best.rate*100:0}%"></span></span><b style="text-align:right">${fmtPct(c.rate)}<div style="font-size:11px;font-weight:${c.c===OWN?800:600};color:${i?'var(--danger)':'var(--success)'}" title="${i?`Repay tambahan supaya rate sama dengan ${escH(R.best.c)} (selisih ${fmtPct(R.best.rate-c.rate)} × outstanding ${fmtRpFull(c.os)})`:'Peringkat 1'}">${i?'-'+fmtRpFull(gap):'🏆 #1'}</div></b></div>`;}).join('')}
         ${R.need?`<div class="ana-note">EDN butuh ±<b>${fmtRpFull(R.need)}</b> repay tambahan (dengan outstanding ${fmtRpFull(R.edn.os)}) untuk menyamai ${escH(R.best.c)}.</div>`:''}</div>
       <div><div class="ana-h3">Tren harian: EDN vs vendor terbaik</div><div style="position:relative;height:260px"><canvas id="anaTrend"></canvas></div>
         <div class="ana-note">Peringkat EDN per hari: ${R.trend.map(x=>`<span class="pill ${x.rank===1?'pill-ok':x.rank===x.n?'pill-red':'pill-warn'}" title="${dLabel(x.d)}">${dShort(x.d)}: #${x.rank??'—'}</span>`).join(' ')}</div></div>
