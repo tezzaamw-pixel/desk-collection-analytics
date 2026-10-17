@@ -88,6 +88,17 @@ table.t tr.edn td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
 .rankstrip .d{background:var(--surface2);border-radius:6px;padding:5px 8px;text-align:center;min-width:54px;}
 .rankstrip .d .x{font-size:10px;color:var(--text3);}
 .rankstrip .d .y{font-size:13px;font-weight:800;}
+.cmpgrid{display:grid;grid-template-columns:270px minmax(0,1fr);gap:16px;align-items:start}
+.cmppick{border:1px solid var(--border);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px}
+.cmppick input[type=search]{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:7px 10px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box}
+.cmplist{max-height:330px;overflow:auto;border-top:1px solid var(--border);padding-top:6px}
+.cmplist label{display:flex;align-items:center;gap:7px;padding:4px 2px;font-size:12.5px;cursor:pointer;border-radius:5px}
+.cmplist label:hover{background:var(--surface2)}
+.cmplist .sub{color:var(--text3);font-size:10.5px;margin-left:auto;white-space:nowrap}
+.cmplist i{display:inline-block;width:10px;height:10px;border-radius:3px;flex-shrink:0}
+.mfull .modal-box{max-width:none!important;width:100%;height:100vh!important;max-height:none!important;border-radius:0!important}
+.mfull{padding:0!important}
+@media(max-width:900px){.cmpgrid{grid-template-columns:1fr}}
 .tlgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;}
 .tlbox{border:1px solid var(--border);border-radius:8px;overflow:hidden;}
 .tlbox-h{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;background:var(--surface2);font-weight:700;font-size:12.5px;gap:8px;}
@@ -476,9 +487,10 @@ function render(){
     <div class="card" id="secVendor"></div>
     <div class="card" id="secTl"></div>
     <div class="card" id="secRed"></div>
+    <div class="card" id="secCmp"></div>
     <div class="card" id="secRec"></div>
     ${hasKat?'<div class="card" id="secKat"></div>':''}`;
-  renderVendor(); renderTl(); renderRed(); renderRec();
+  renderVendor(); renderTl(); renderRed(); renderCmp(); renderRec();
   if(hasKat)renderKategori();
 }
 
@@ -744,6 +756,186 @@ function renderRed(){
     </div>`).join('')}</div>`:'<div class="empty">Tidak ada agent EDN di laporan ini.</div>'}`;
 }
 let RED_LIST=[];
+
+/* ── 3b. Compare TL & Agent (+ tombol Summary Bucket dari panel Tim) ── */
+// Data: laporan klien Daily (per hari) atau Monthly (snapshot akumulasi per tanggal), semua vendor.
+let CMP={mode:'tl',per:'daily',metric:'rate',sel:{tl:[],agent:[]},q:'',vend:OWN,tlF:'',msg:''};
+const CMP_MAX=12;
+const CMP_COLORS=['#1d60c8','#dc2626','#16a34a','#d97706','#7c3aed','#0891b2','#db2777','#65a30d','#ea580c','#0f766e','#9333ea','#475569'];
+const CMP_M=[
+  {k:'rate',l:'Rate (%)',fmt:'pct',hi:true},
+  {k:'repay',l:'Repay (Rp)',fmt:'rp',hi:true},
+  {k:'kurang',l:'Kurang ke #1 (Rp)',fmt:'rp',hi:false,tip:'Repay tambahan supaya rate-nya sama dengan peringkat 1 hari itu (TL: #1 semua TL · agent: #1 semua agent)'},
+  {k:'rank',l:'Peringkat',fmt:'rank',hi:false},
+  {k:'os',l:'Outstanding (Rp)',fmt:'rp',hi:true},
+  {k:'ht',l:'Handle time',fmt:'num',hi:true},
+  {k:'load',l:'Load',fmt:'num',hi:true,agentOnly:true}];
+function cmpMetric(){const L=CMP_M.filter(m=>!(m.agentOnly&&CMP.mode==='tl'));return L.find(m=>m.k===CMP.metric)||L[0];}
+function cmpSrc(){
+  const mon=CMP.per==='monthly',M=DATA.monAll||{tl:[],agents:[]};
+  const src=CMP.mode==='tl'?(mon?M.tl:DATA.tl.filter(t=>t.jenis==='DAILY')):(mon?M.agents:DATA.agents.filter(a=>a.jenis==='DAILY'));
+  const by={};src.forEach(r=>{(by[r.tanggal]=by[r.tanggal]||[]).push(r);});
+  return {dates:Object.keys(by).sort(),by};
+}
+function cmpKey(r){return CMP.mode==='tl'?normKey(r.tl)+'|'+r.company:agentKey(r)+'|'+r.company;}
+function cmpEntities(S){
+  const E={};
+  S.dates.forEach(d=>S.by[d].forEach(r=>{const k=cmpKey(r);const e=E[k]||(E[k]={key:k,company:r.company,days:0});
+    e.name=CMP.mode==='tl'?r.tl:r.nama;e.tl=r.tl;e.kufi=r.kufiId||'';e.days++;e.last=d;}));
+  return Object.values(E).sort((a,b)=>(a.company===OWN?0:1)-(b.company===OWN?0:1)||String(a.company).localeCompare(b.company)||String(a.tl).localeCompare(b.tl)||String(a.name).localeCompare(b.name));
+}
+function cmpVal(r,day,M){
+  if(!r)return null;
+  switch(M.k){
+    case 'rate':return r.rate;
+    case 'repay':return r.repay;
+    case 'os':return r.outstanding;
+    case 'kurang':{const best=Math.max(...day.map(x=>x.rate||0));return Math.max(0,(best-(r.rate||0))/100*(r.outstanding||0));}
+    case 'rank':return CMP.mode==='tl'&&r.rank?r.rank:1+day.filter(x=>(x.rate||0)>(r.rate||0)+1e-12).length;
+    case 'ht':return CMP.mode==='tl'?(r.aht||null):(r.handleTime||null);
+    case 'load':return r.load||null;
+  }
+  return null;
+}
+function cmpFmt(M,v,full){if(v===null||v===undefined||isNaN(v))return '—';return M.fmt==='pct'?fmtPct(v):M.fmt==='rp'?(full?fmtRpFull(v):fmtRp(v)):M.fmt==='rank'?'#'+Math.round(v):fmtNum(v);}
+function cmpDefaults(ents){
+  const own=ents.filter(e=>e.company===OWN);
+  if(CMP.mode==='tl')return own.slice(0,CMP_MAX).map(e=>e.key);
+  const tl0=own.length?own[0].tl:'';return own.filter(e=>e.tl===tl0).slice(0,10).map(e=>e.key);
+}
+function renderCmp(){
+  const el=document.getElementById('secCmp');if(!el)return;
+  if(charts.cmp){charts.cmp.destroy();charts.cmp=null;}
+  const hasD=DATA.tl.some(t=>t.jenis==='DAILY')||DATA.agents.some(a=>a.jenis==='DAILY'), hasM=(DATA.monDates||[]).length>0;
+  if(CMP.per==='monthly'&&!hasM)CMP.per='daily';
+  if(CMP.per==='daily'&&!hasD&&hasM)CMP.per='monthly';
+  const S=cmpSrc(), ents=cmpEntities(S), keys=new Set(ents.map(e=>e.key));
+  let sel=(CMP.sel[CMP.mode]||[]).filter(k=>keys.has(k));
+  if(!sel.length)sel=cmpDefaults(ents);
+  CMP.sel[CMP.mode]=sel;
+  const M=cmpMetric(), bk=BUCKET==='C03'?'CO3':BUCKET;
+  const vends=[...new Set(ents.map(e=>e.company))].sort((a,b)=>a===OWN?-1:b===OWN?1:a.localeCompare(b));
+  if(CMP.vend&&!vends.includes(CMP.vend))CMP.vend='';
+  el.innerHTML=`
+    <div class="card-head"><div><div class="card-title">🆚 Compare TL &amp; Agent</div>
+      <div class="card-sub">Bandingkan pergerakan TL atau agent (semua vendor) dari laporan klien ${CMP.per==='monthly'?'Bulanan (akumulasi per tanggal laporan)':'Harian'} · centang di daftar kiri (maks ${CMP_MAX})</div></div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <div class="seg"><button class="${CMP.mode==='tl'?'on':''}" onclick="cmpSet('mode','tl')">TL</button><button class="${CMP.mode==='agent'?'on':''}" onclick="cmpSet('mode','agent')">Agent</button></div>
+        <div class="seg"><button class="${CMP.per==='daily'?'on':''}" ${hasD?'':'disabled'} onclick="cmpSet('per','daily')">Harian</button><button class="${CMP.per==='monthly'?'on':''}" ${hasM?'':'disabled'} onclick="cmpSet('per','monthly')">Bulanan</button></div>
+        <select onchange="cmpSet('metric',this.value)" title="Data yang dibandingkan">${CMP_M.filter(m=>!(m.agentOnly&&CMP.mode==='tl')).map(m=>`<option value="${m.k}" ${m.k===M.k?'selected':''}>${escH(m.l)}</option>`).join('')}</select>
+        <button class="btn btn-primary noprint" onclick="openBsmEmbed()" title="Buka Summary Bucket ${escH(bk)} (panel Tim) — data baru dimuat saat tombol ditekan">📊 Summary Bucket ${escH(bk)}</button>
+      </div></div>
+    ${ents.length?`<div class="cmpgrid">
+      <div class="cmppick noprint">
+        <input type="search" placeholder="Cari ${CMP.mode==='tl'?'TL':'nama / KUFI agent'}…" value="${escH(CMP.q)}" oninput="CMP.q=this.value;cmpPicker()">
+        <div style="display:flex;gap:6px;flex-wrap:wrap">
+          <select style="flex:1;min-width:0" onchange="CMP.vend=this.value;cmpPicker()"><option value="">Semua vendor</option>${vends.map(v=>`<option value="${escH(v)}" ${v===CMP.vend?'selected':''}>${v===OWN?'EDN':'Vendor '+escH(v)}</option>`).join('')}</select>
+          ${CMP.mode==='agent'?`<select id="cmpTlF" style="flex:1;min-width:0" onchange="CMP.tlF=this.value;cmpPicker()"></select>`:''}
+        </div>
+        <div style="display:flex;gap:10px;font-size:11.5px"><a href="javascript:void 0" onclick="cmpBulk(true)">✔ Centang yang tampil</a><a href="javascript:void 0" onclick="cmpBulk(false)">✕ Kosongkan</a></div>
+        <div id="cmpMsg" class="muted" style="font-size:11px"></div>
+        <div class="cmplist" id="cmpList"></div>
+      </div>
+      <div style="min-width:0">
+        <div class="chart-wrap"><canvas id="cCmp"></canvas></div>
+        <div id="cmpLegend"></div>
+        <div class="muted" id="cmpNote" style="font-size:11px;margin-top:6px;text-align:center"></div>
+        <div class="tbl-wrap" style="margin-top:12px" id="cmpTbl"></div>
+      </div></div>`:'<div class="empty">Belum ada data '+(CMP.mode==='tl'?'TL':'agent')+' untuk dibandingkan.</div>'}`;
+  if(!ents.length)return;
+  window._CMP={S,ents};
+  cmpPicker(); cmpDraw();
+}
+function cmpSet(k,v){CMP[k]=v;if(k==='mode'){CMP.q='';CMP.tlF='';}renderCmp();}
+function cmpVisible(){
+  const {ents}=window._CMP,q=normKey(CMP.q);
+  return ents.filter(e=>(!CMP.vend||e.company===CMP.vend)&&(CMP.mode!=='agent'||!CMP.tlF||e.tl===CMP.tlF)&&(!q||normKey(e.name).includes(q)||normKey(e.kufi).includes(q)||normKey(e.tl).includes(q)));
+}
+function cmpPicker(){
+  const box=document.getElementById('cmpList');if(!box||!window._CMP)return;
+  const {ents}=window._CMP, sel=CMP.sel[CMP.mode];
+  const tf=document.getElementById('cmpTlF');
+  if(tf){const tls=[...new Set(ents.filter(e=>!CMP.vend||e.company===CMP.vend).map(e=>e.tl))].sort();if(CMP.tlF&&!tls.includes(CMP.tlF))CMP.tlF='';
+    tf.innerHTML='<option value="">Semua TL</option>'+tls.map(t=>`<option value="${escH(t)}" ${t===CMP.tlF?'selected':''}>${escH(t)}</option>`).join('');}
+  const vis=cmpVisible();
+  box.innerHTML=vis.map(e=>{const i=sel.indexOf(e.key);return `<label title="${escH(e.name)}${e.kufi?' · '+escH(e.kufi):''} · ${e.company===OWN?'EDN':'Vendor '+escH(e.company)}${CMP.mode==='agent'?' · TL '+escH(e.tl):''}"><input type="checkbox" ${i>=0?'checked':''} onchange="cmpToggle('${escH(e.key).replace(/'/g,"\\'")}',this.checked)">${i>=0?`<i style="background:${CMP_COLORS[i%CMP_COLORS.length]}"></i>`:''}<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escH(e.name)}</span><span class="sub">${e.company===OWN?'EDN':escH(e.company)}${CMP.mode==='agent'?' · '+escH(String(e.tl).split(' ')[0]):''}</span></label>`;}).join('')||'<div class="muted" style="font-size:12px;padding:6px">Tidak ada yang cocok.</div>';
+  const m=document.getElementById('cmpMsg');if(m){m.textContent=CMP.msg||`${sel.length} dipilih · ${vis.length} tampil`;CMP.msg='';}
+}
+function cmpToggle(k,on){
+  let sel=CMP.sel[CMP.mode].filter(x=>x!==k);
+  if(on){if(sel.length>=CMP_MAX){CMP.msg=`Maksimal ${CMP_MAX} garis — hapus centang yang lain dulu.`;cmpPicker();return;}sel.push(k);}
+  CMP.sel[CMP.mode]=sel;cmpPicker();cmpDraw();
+}
+function cmpBulk(on){
+  const vis=cmpVisible().map(e=>e.key);let sel=CMP.sel[CMP.mode];
+  if(on){vis.forEach(k=>{if(!sel.includes(k)&&sel.length<CMP_MAX)sel.push(k);});if(vis.some(k=>!sel.includes(k)))CMP.msg=`Hanya ${CMP_MAX} pertama yang dicentang (batas ${CMP_MAX} garis).`;}
+  else sel=sel.filter(k=>!vis.includes(k));
+  CMP.sel[CMP.mode]=sel;cmpPicker();cmpDraw();
+}
+function cmpDraw(){
+  if(!window._CMP)return;
+  const {S,ents}=window._CMP, M=cmpMetric(), sel=CMP.sel[CMP.mode], E=Object.fromEntries(ents.map(e=>[e.key,e]));
+  const cv=document.getElementById('cCmp');if(!cv)return;
+  if(charts.cmp){charts.cmp.destroy();charts.cmp=null;}
+  const rec=(k,d)=>(S.by[d]||[]).find(r=>cmpKey(r)===k);
+  const gc=isDark()?'rgba(255,255,255,.06)':'rgba(0,0,0,.06)', tc=isDark()?'#9aa5be':'#6b7280';
+  const nMax=Math.max(1,...S.dates.map(d=>S.by[d].length));
+  const y={grid:{color:gc},ticks:{color:tc,callback:v=>M.fmt==='pct'?fmtPct(v,2):M.fmt==='rank'?'#'+v:M.fmt==='rp'?fmtRpFull(v):fmtNum(v)}};
+  if(M.fmt==='rank'){const vals=sel.flatMap(k=>S.dates.map(d=>cmpVal(rec(k,d),S.by[d],M))).filter(v=>v!=null);const lo=vals.length?Math.max(1,Math.min(...vals)):1,hi=vals.length?Math.max(lo,Math.min(nMax,Math.max(...vals))):nMax;
+    Object.assign(y,{reverse:true,min:lo-.5,max:hi+.5,afterBuildTicks:ax=>{const step=Math.max(1,Math.ceil((hi-lo+1)/12));const t=[];for(let v=lo;v<=hi;v+=step)t.push({value:v});ax.ticks=t;}});}
+  if(M.k==='kurang')y.beginAtZero=true;
+  charts.cmp=new Chart(cv,{type:'line',
+    data:{labels:S.dates.map(dShort),datasets:sel.map((k,i)=>{const e=E[k];return {tzId:k,label:(e?e.name:k)+(e&&e.company!==OWN?' ('+e.company+')':''),
+      data:S.dates.map(d=>{const v=cmpVal(rec(k,d),S.by[d],M);return v===null||v===undefined||isNaN(v)?null:v;}),
+      borderColor:CMP_COLORS[i%CMP_COLORS.length],backgroundColor:CMP_COLORS[i%CMP_COLORS.length],borderWidth:e&&e.company===OWN?2.6:1.8,borderDash:e&&e.company===OWN?[]:[5,3],
+      pointRadius:2.5,tension:.25,spanGaps:true};})},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:false},tooltip:{itemSort:(a,b)=>M.hi?(b.parsed.y||0)-(a.parsed.y||0):(a.parsed.y||0)-(b.parsed.y||0),callbacks:{label:x=>`${x.dataset.label}: ${cmpFmt(M,x.parsed.y,true)}`}}},
+      scales:{x:{grid:{color:gc},ticks:{color:tc}},y}}});
+  tzLegend(charts.cmp,document.getElementById('cmpLegend'),{only:CMP.mode==='tl'?[{label:'Hanya EDN',ids:sel.filter(k=>E[k]&&E[k].company===OWN)}]:[]});
+  const note=document.getElementById('cmpNote');
+  if(note)note.textContent=(M.tip?M.tip+'. ':'')+(M.fmt==='rank'?'Atas = peringkat 1. ':'')+'Garis putus-putus = vendor lain. Titik kosong = tidak ada di laporan tanggal itu.';
+  // tabel ringkas
+  const lastD=S.dates[S.dates.length-1], mon=CMP.per==='monthly';
+  const rows=sel.map((k,i)=>{const e=E[k]||{name:k,company:''};const recs=S.dates.map(d=>rec(k,d)).filter(Boolean);const r=rec(k,lastD);
+    const os=recs.reduce((a,x)=>a+(x.outstanding||0),0),rp=recs.reduce((a,x)=>a+(x.repay||0),0);
+    return {k,i,e,r,days:recs.length,merah:recs.filter(x=>x.merah).length,avg:mon?(r?r.rate:null):(os?rp/os*100:null),rp:mon?(r?r.repay:null):rp,
+      cur:r?cmpVal(r,S.by[lastD],M):null,rank:r?cmpVal(r,S.by[lastD],{k:'rank'}):null};});
+  const best=rows.filter(x=>x.r).sort((a,b)=>b.r.rate-a.r.rate)[0];
+  rows.sort((a,b)=>(b.r?b.r.rate:-1)-(a.r?a.r.rate:-1));
+  document.getElementById('cmpTbl').innerHTML=sel.length?`<table class="t"><thead><tr><th></th><th>${CMP.mode==='tl'?'TL':'Agent'}</th><th>Vendor</th>${CMP.mode==='agent'?'<th>TL</th>':''}<th class="n">Hari data</th>
+    <th class="n" title="${mon?'Rate akumulasi di laporan terakhir':'Σ repay ÷ Σ outstanding semua hari'}">${mon?'Rate akumulasi':'Rate rata-rata'}</th><th class="n">${mon?'Repay akumulasi':'Total repay'}</th>
+    ${M.k!=='rate'&&M.k!=='repay'&&M.k!=='rank'?`<th class="n">${escH(M.l)} ${dShort(lastD)}</th>`:''}<th class="n">Rate ${dShort(lastD)}</th><th class="n">Peringkat ${dShort(lastD)}</th>
+    <th class="n" title="Repay tambahan supaya rate ${dShort(lastD)} sama dengan yang terbaik di antara yang dipilih">Kurang ke terbaik pilihan</th>${CMP.mode==='agent'&&!mon?'<th class="n">Hari merah</th>':''}</tr></thead><tbody>
+    ${rows.map(x=>`<tr class="${x.e.company===OWN?'edn':''}"><td><i style="display:inline-block;width:10px;height:10px;border-radius:3px;background:${CMP_COLORS[x.i%CMP_COLORS.length]}"></i></td>
+      <td style="font-weight:600">${escH(x.e.name)}${x.e.kufi?` <span class="muted" style="font-size:10.5px">${escH(x.e.kufi)}</span>`:''}</td><td>${x.e.company===OWN?'<span class="pill pill-edn">EDN</span>':escH(x.e.company)}</td>${CMP.mode==='agent'?`<td>${escH(x.e.tl||'')}</td>`:''}
+      <td class="n">${x.days}/${S.dates.length}</td><td class="n" style="font-weight:700">${fmtPct(x.avg)}</td><td class="n">${x.rp===null?'—':fmtRpFull(x.rp)}</td>
+      ${M.k!=='rate'&&M.k!=='repay'&&M.k!=='rank'?`<td class="n">${cmpFmt(M,x.cur,true)}</td>`:''}<td class="n">${x.r?fmtPct(x.r.rate):'—'}</td><td class="n">${x.rank?'#'+x.rank+' <span class="muted">/ '+S.by[lastD].length+'</span>':'—'}</td>
+      <td class="n" style="color:var(--danger)">${!x.r?'—':x===best?'<span style="color:var(--success);font-weight:700">🏆 terbaik</span>':'-'+fmtRpFull(Math.max(0,(best.r.rate-x.r.rate)/100*(x.r.outstanding||0)))}</td>
+      ${CMP.mode==='agent'&&!mon?`<td class="n">${x.merah}/${x.days}</td>`:''}</tr>`).join('')}</tbody></table>`:'<div class="empty">Centang minimal satu '+(CMP.mode==='tl'?'TL':'agent')+' di daftar kiri.</div>';
+}
+
+// Summary Bucket (panel Tim) di jendela sendiri — halaman Tim dibuka di dalam jendela ini
+// (mode embed) hanya saat tombol ditekan, lengkap dengan semua fitur Summary Bucket.
+function openBsmEmbed(){
+  const bulan=document.getElementById('selBulan').value, tahun=document.getElementById('selTahun').value;
+  const src=`team.html?embed=bsm&aplikasi=${encodeURIComponent('RUPIAH CEPAT')}&bucket=${encodeURIComponent(BUCKET)}&bulan=${encodeURIComponent(bulan)}&tahun=${encodeURIComponent(tahun)}`;
+  let m=document.getElementById('modalBsm');
+  if(!m){
+    m=document.createElement('div');m.className='modal';m.id='modalBsm';
+    m.innerHTML=`<div class="modal-box" style="max-width:1400px;height:calc(100vh - 60px)"><div class="modal-h"><div><div class="ttl" id="bsmTtl"></div><div class="card-sub">Summary Bucket dari panel Tim · data internal (All Data) · semua fitur Summary tersedia di sini</div></div>
+      <div style="display:flex;gap:6px"><button class="btn btn-ghost" id="bsmFs" onclick="bsmFull()" title="Layar penuh">⛶ Layar penuh</button><button class="btn btn-ghost" onclick="closeBsmEmbed()">✕</button></div></div>
+      <div style="flex:1;min-height:0;position:relative"><iframe id="bsmFrame" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0 0 var(--radius) var(--radius)"></iframe></div></div>`;
+    document.body.appendChild(m);
+    window.addEventListener('message',e=>{if(e.origin===location.origin&&e.data&&e.data.tzBsm==='close')closeBsmEmbed();});
+  }
+  document.getElementById('bsmTtl').textContent=`📊 Summary Bucket ${BUCKET==='C03'?'CO3':BUCKET} · Rupiah Cepat · ${bulan} ${tahun}`;
+  const f=document.getElementById('bsmFrame');
+  if(f.dataset.src!==src){f.dataset.src=src;f.src=src;}
+  m.classList.add('open');document.body.style.overflow='hidden';
+}
+function bsmFull(){const m=document.getElementById('modalBsm');const on=m.classList.toggle('mfull');document.getElementById('bsmFs').textContent=on?'⊠ Keluar layar penuh':'⛶ Layar penuh';}
+function closeBsmEmbed(){const m=document.getElementById('modalBsm');if(m)m.classList.remove('open');document.body.style.overflow='';}
 
 // ── Detail 1 agent: versi klien per hari + versi internal per hari + perbandingan rata-rata tim ──
 // Detail TL (klik baris Ranking TL): tangga gap ke tiap peringkat di atasnya + agent TL itu
