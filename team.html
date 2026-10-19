@@ -10204,7 +10204,7 @@ document.addEventListener("DOMContentLoaded",()=>tzInit());
   document.head.appendChild(st);
   const msg=document.createElement('div');msg.id='tzEmbedMsg';msg.innerHTML='<div class="spinner"></div><div>Memuat '+(MODE==='bsm'?'Summary Bucket ':'Compare TL & Agent ')+BK+' …</div>';
   document.body.appendChild(msg);
-  const say=t=>{msg.style.display='flex';msg.innerHTML='<div>'+t+'</div>';};
+  const say=t=>{msg.style.display='flex';msg.innerHTML='<div>'+t+'</div>';if(MODE==='cmp')post({tzEmbed:'cmp',h:120});};
   window.alert=t=>say('⚠️ '+String(t));
   // tema ikut halaman induk (localStorage sama)
   window.addEventListener('storage',e=>{if(e.key==='dca_theme'&&e.newValue)document.documentElement.setAttribute('data-theme',e.newValue);});
