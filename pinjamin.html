@@ -499,6 +499,14 @@ function render(){
       <td class="n" title="${up?`vs ${escH(up.ag)} (#${up.rank}) rate ${fmtPct(up.rate)} · selisih rate ${fmtPct(rDiff)}`:''}">${up?(rMoney<0?`<span class="bad">-${fmtRp(-rMoney)}</span>`:`<span class="good">+${fmtRp(rMoney)}</span>`)+`<div class="muted" style="font-size:10.5px">${rDiff<0?'':'+'}${fmtPct(rDiff)}</div>`:'<span class="good">—</span>'}</td><td class="n">${top&&top.gross>r.gross?`<span class="bad">${fmtRp(top.gross-r.gross)}</span>`:'<span class="good">#1 🏆</span>'}</td>
       <td>${bandPill(r.band)}</td></tr>`;}).join('')}
     </tbody></table></div><div class="vnote">Klik nama agent untuk melihat selisih uang ke tiap peringkat di atasnya (+ aktivitas internal untuk agent EDN). <b>Selisih rate vs 1 di atas</b> = terbayar tambahan supaya rate (terbayar ÷ pokok) sama dengan agent tepat 1 peringkat di atasnya — minus merah = kurang, plus hijau = rate sudah lebih tinggi (kalah di gross). <b>Kejar #1 (gross)</b> = selisih total uang masuk ke peringkat 1. Hari merah = hari kerja lebih sedikit dari bucket (agent baru/pindahan).</div>`});
+  // 5b. Compare TL & Agent + Summary Bucket (versi panel Tim, data internal) — ikut bucket yang dipilih di Peringkat Agent
+  S.push({id:'cmp',t:'Compare TL & Agent · Summary Bucket',h:`
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:10px">
+      <div class="muted" style="font-size:12.5px">Sama seperti Compare di panel Tim — penyentuhan tim bucket <b>${escH(VIEW.grp)}</b> dari data internal (All Data) ${escH(document.getElementById('selBulan').value)} ${escH(document.getElementById('selTahun').value)}: absensi, payment, rate, sentuh/respon WA, PTP, call, dll. Bucket mengikuti tab di Peringkat Agent.</div>
+      <div style="display:flex;gap:8px" class="noprint"><button class="btn btn-ghost" onclick="pjCmpReload()" title="Muat ulang data compare">↻</button>
+        <button class="btn btn-primary" onclick="pjSummary()" title="Buka Summary Bucket ${escH(VIEW.grp)} (panel Tim) — data baru dimuat saat tombol ditekan">📊 Summary Bucket ${escH(VIEW.grp)}</button></div>
+    </div>
+    <div id="pjCmpHost"></div>`,after:()=>{window._pjCmpFrame=tzCompare(document.getElementById('pjCmpHost'),pjEmbedOpt());}});
   // 6. Tim TL EDN
   const tls={};own.forEach(r=>{const k=r.group+'|'+r.tl;const t=tls[k]=tls[k]||{tl:r.tl,group:r.group,n:0,os:0,paid:0,gross:0,rank:0,top:0,low:0,baru:0};t.n++;t.os+=r.os;t.paid+=r.paid;t.gross+=r.gross;t.rank+=r.rank/G[r.group].n*100;if(r.band<=1&&r.band>=0)t.top++;if(r.band>=4)t.low++;if(r.baru)t.baru++;});
   S.push({id:'tl',t:'Tim TL EDN',h:`<div class="tbl-wrap"><table class="t"><thead><tr><th>TL (versi klien)</th><th>Bucket</th><th class="n">Agent</th><th class="n">Rate</th><th class="n">Gross/agent</th><th class="n">vs median bucket</th><th class="n" title="0% = paling atas bucket">Posisi rata²</th><th class="n">Top 25%</th><th class="n">Zona bawah</th></tr></thead><tbody>
@@ -517,6 +525,9 @@ function render(){
   PRES.n=S.length;if(document.body.classList.contains('present'))pShow();
   S.forEach(s=>s.after&&s.after());
 }
+function pjEmbedOpt(){return {aplikasi:'PINJAMIN',bucket:VIEW.grp,bulan:document.getElementById('selBulan').value,tahun:document.getElementById('selTahun').value};}
+function pjSummary(){tzSummary(pjEmbedOpt());}
+function pjCmpReload(){if(window._pjCmpFrame)window._pjCmpFrame.reload();}
 function fsToggle(id){const el=document.getElementById(id);if(!el)return;const on=!el.classList.contains('fsmode');document.querySelectorAll('.fsmode').forEach(x=>x.classList.remove('fsmode'));
   VIEW.fs=on?id:'';if(on)el.classList.add('fsmode');document.body.classList.toggle('fs-on',on);document.querySelectorAll('.fsbtn').forEach(x=>x.textContent=x.classList.contains('ico')?'⛶':'⛶ Layar penuh');const b=el.querySelector('.fsbtn');if(b)b.textContent=b.classList.contains('ico')?(on?'✕':'⛶'):(on?'✕ Tutup layar penuh':'⛶ Layar penuh');}
 document.addEventListener('keydown',e=>{if(e.key==='Escape'&&document.querySelector('.fsmode')){const x=document.querySelector('.fsmode');fsToggle(x.id);}});
@@ -718,5 +729,6 @@ function doUnlockPage(){
 loadData();
 </script>
 <script src="copyimg.js"></script>
+<script src="tzembed.js"></script>
 </body>
 </html>
