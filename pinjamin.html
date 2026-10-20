@@ -470,7 +470,7 @@ function render(){
     <div class="noprint" style="margin-bottom:10px"><label class="chip2"><input type="checkbox" ${VIEW.allGroups?'checked':''} onchange="VIEW.allGroups=this.checked;render()"> tampilkan juga bucket yang tidak dipegang EDN</label></div>
     ${basisBar(showG.map(g=>g.group))}
     <div class="vcards">${showG.map(g=>scoreCard(g,PG[g.group],FG&&FG[g.group],FD)).join('')}</div>
-    <div class="vnote"><b>Kurang rate</b> = terbayar tambahan (total vendor) supaya rate vendor itu sama dengan vendor rate terbaik. <b>Kurang gross/ag</b> = selisih uang masuk per agent dengan vendor gross/agent tertinggi. <b>Rate</b> = pokok terbayar ÷ pokok dibagikan. <b>Gross/agent</b> = rata-rata total uang masuk per agent (dasar ranking klien). <b>Rank</b> = rata-rata peringkat agent vendor itu (makin kecil makin baik). Δ dibanding laporan ${VIEW.cmp?dLabel(VIEW.cmp):'—'}.</div>`});
+    <div class="vnote">Kolom kartu mengikuti <b>dasar ranking</b> tiap bucket (tombol Principal / Gross di atas). <b>Principal</b>: Rate = pokok terbayar ÷ pokok dibagikan, Terbayar = pokok terbayar, Kurang terbayar = pokok terbayar tambahan supaya rate sama dengan vendor rate terbaik (total &amp; per agent). <b>Gross</b>: Gross/ag = rata-rata total uang masuk per agent (dasar ranking klien), Gross = total uang masuk, Kurang gross = selisih ke vendor gross/agent tertinggi (total &amp; per agent). <b>Rank</b> = rata-rata peringkat agent vendor itu (makin kecil makin baik). Δ dibanding laporan ${VIEW.cmp?dLabel(VIEW.cmp):'—'}.</div>`});
   // 2b. Rank harian vendor (Rank Board)
   S.push({id:'rankd',t:'Rank Harian Vendor',h:rankSection(),after:rankCharts});
   // 3. Sebaran persentil
@@ -541,23 +541,42 @@ function vGap(v,g){
   return `<span class="n gp" title="${v===bR?'Rate terbaik di bucket':`vs ${escH(bR.comp)} ${fmtPct(bR.rate)} · selisih ${fmtPct(bR.rate-v.rate)}`}">${v===bR?'<span class="good">🏆 terbaik</span>':`<span class="bad">-${fmtRp(rm)}</span>`}</span>`+
     `<span class="n gp" title="${v===bG?'Gross/agent tertinggi':`vs ${escH(bG.comp)} ${fmtJt(bG.grossPer)}/agent`}">${v===bG?'<span class="good">🏆 terbaik</span>':`<span class="bad">-${fmtRp(gm)}</span>`}</span>`;
 }
+// Kolom kartu bucket mengikuti dasar ranking:
+//  Principal → RATE · TERBAYAR (pokok) · RANK · KURANG TERBAYAR (total) · KURANG/AGENT  (acuan: vendor rate terbaik)
+//  Gross     → GROSS/AGENT · GROSS (total) · RANK · KURANG GROSS (total) · KURANG/AGENT (acuan: vendor gross/agent terbaik)
+function vHead(gr){return gr
+  ?`<div class="vrow hd"><span>VENDOR</span><span></span><span class="n">GROSS/AG</span><span class="n" title="Total uang masuk (gross) vendor">GROSS</span><span class="n" title="Rata-rata peringkat agent">RANK</span><span class="n" title="Gross tambahan (total vendor) supaya gross/agent sama dengan vendor gross/agent tertinggi">KURANG GROSS</span><span class="n" title="Selisih gross per agent dengan vendor gross/agent tertinggi">KURANG/AGENT</span></div>`
+  :`<div class="vrow hd"><span>VENDOR</span><span></span><span class="n">RATE</span><span class="n" title="Pokok terbayar (principal) vendor">TERBAYAR</span><span class="n" title="Rata-rata peringkat agent">RANK</span><span class="n" title="Terbayar pokok tambahan (total vendor) supaya rate-nya sama dengan vendor rate terbaik: selisih rate × pokok vendor ini">KURANG TERBAYAR</span><span class="n" title="Kurang terbayar dibagi jumlah agent vendor ini">KURANG/AGENT</span></div>`;}
+function vRow(v,g,gr,dim){
+  const multi=g.vend.length>1, best=gr?g.byGross[0]:g.byRate[0];
+  const max=Math.max(...g.vend.map(x=>gr?x.grossPer:x.rate),1e-9), val=gr?v.grossPer:v.rate;
+  const tot=!multi?null:gr?(best.grossPer-v.grossPer)*v.n:(best.rate-v.rate)/100*v.os;
+  const gapCells=!multi?'<span class="n muted">—</span><span class="n muted">—</span>':v===best?'<span class="n gp"><span class="good">🏆 terbaik</span></span><span class="n gp"><span class="good">—</span></span>'
+    :`<span class="n gp" title="vs ${escH(best.comp)} ${gr?fmtJt(best.grossPer)+'/agent':fmtPct(best.rate)}"><span class="bad">-${fmtRp(Math.max(0,tot))}</span></span><span class="n gp"><span class="bad">-${fmtRp(Math.max(0,tot)/Math.max(1,v.n))}</span></span>`;
+  return `<div class="vrow ${v.comp===OWN?'own':''}" ${dim?'style="opacity:.6"':''}><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk" title="${gr?'Gross/agent':'Rate'}"><span style="width:${val/max*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===best&&multi?'color:var(--success)':''}">${gr?fmtJt(v.grossPer):fmtPct(v.rate)}</span><span class="n">${fmtJt(gr?v.gross:v.paid)}</span><span class="n">${v.avgRank.toFixed(1)}</span>${gapCells}</div>`;
+}
 function scoreCard(g,pg,fg,fd){
   const maxG=Math.max(...g.vend.map(v=>v.rate),1e-9), lead=g.byGross[0], rl=g.byRate[0];
   const posR=g.own?g.byRate.indexOf(g.own)+1:null, posG=g.own?g.byGross.indexOf(g.own)+1:null;
   const pOwn=pg&&pg.own;
   const badge=!g.own?'<span class="ib" style="background:var(--surface);color:var(--text3)">tanpa EDN</span>':g.vend.length<2?'<span class="ib" style="background:var(--surface);color:var(--text3)">EDN saja</span>':(isGross(g.group)?`<span class="ib" style="background:${posG===1?'var(--success-bg)':'var(--danger-bg)'};color:${posG===1?'var(--success)':'var(--danger)'}">Gross #${posG}/${g.vend.length}</span> <span class="ib" style="background:var(--surface);color:var(--text3)">Rate #${posR}</span>`:`<span class="ib" style="background:${posR===1?'var(--success-bg)':'var(--danger-bg)'};color:${posR===1?'var(--success)':'var(--danger)'}">Rate #${posR}/${g.vend.length}</span> <span class="ib" style="background:${posG===1?'var(--success-bg)':'var(--warning-bg)'};color:${posG===1?'var(--success)':'var(--warning)'}">Gross #${posG}/${g.vend.length}</span>`);
-  let note='';
+  let note='';const GR=isGross(g.group);
   if(g.own&&g.vend.length>1){
-    if(lead!==g.own)note+=`Untuk menyamai ${escH(lead.comp)}, tiap agent EDN butuh tambahan uang masuk ±<b>${fmtRp(lead.grossPer-g.own.grossPer)}</b> (total ±${fmtJt((lead.grossPer-g.own.grossPer)*g.own.n)}). `;
-    if(rl===g.own&&lead!==g.own&&Math.abs(g.own.os/g.own.n-lead.os/lead.n)>0.1*lead.os/lead.n)note+=`EDN unggul rate tapi kalah gross — pokok per agent EDN ${fmtJt(g.own.os/g.own.n)} vs ${escH(lead.comp)} ${fmtJt(lead.os/lead.n)}. `;
+    if(GR){
+      if(lead!==g.own)note+=`Untuk menyamai gross/agent ${escH(lead.comp)}, tiap agent EDN butuh tambahan uang masuk (gross) ±<b>${fmtRp(lead.grossPer-g.own.grossPer)}</b> (total ±${fmtJt((lead.grossPer-g.own.grossPer)*g.own.n)}). `;
+      if(rl===g.own&&lead!==g.own&&Math.abs(g.own.os/g.own.n-lead.os/lead.n)>0.1*lead.os/lead.n)note+=`EDN unggul rate tapi kalah gross — pokok per agent EDN ${fmtJt(g.own.os/g.own.n)} vs ${escH(lead.comp)} ${fmtJt(lead.os/lead.n)}. `;
+    }else{
+      if(rl!==g.own){const t=(rl.rate-g.own.rate)/100*g.own.os;note+=`Untuk menyamai rate ${escH(rl.comp)} (${fmtPct(rl.rate)}), EDN butuh tambahan terbayar pokok ±<b>${fmtRp(t)}</b> (±${fmtRp(t/Math.max(1,g.own.n))}/agent). `;}
+      if(lead===g.own&&rl!==g.own)note+=`EDN unggul gross/agent tapi kalah rate — pokok per agent EDN ${fmtJt(g.own.os/g.own.n)} vs ${escH(rl.comp)} ${fmtJt(rl.os/rl.n)}. `;
+    }
     if(pOwn)note+=`Sejak ${dShort(VIEW.cmp)}: rate ${pOwn.rate<=g.own.rate?'naik':'turun'} ${fmtPct(Math.abs(g.own.rate-pOwn.rate))}, rata² rank ${g.own.avgRank<=pOwn.avgRank?'membaik':'memburuk'} ${Math.abs(pOwn.avgRank-g.own.avgRank).toFixed(1)}.`;
   }
   return `<div class="vcard" id="vc-${escH(g.group)}"><div class="vcard-h"><div><div class="g">${escH(g.group)}</div><div class="sub">DPD ${escH(g.dpd)} · ${g.days} hari kerja · ${g.n} agent · <b>urut ${isGross(g.group)?'gross/agent':'rate'}</b></div></div><div class="rt">${badge}<button class="fsbtn ico noprint" title="Layar penuh" onclick="fsToggle('vc-${escH(g.group)}')">⛶</button></div></div><div class="vcard-b">
-    <div class="vrow hd"><span>VENDOR</span><span></span><span class="n">RATE</span><span class="n">GROSS/AGENT</span><span class="n" title="Rata-rata peringkat agent">RANK</span><span class="n" title="Terbayar tambahan (total vendor) supaya rate-nya sama dengan vendor rate terbaik: selisih rate × pokok vendor ini">KURANG RATE</span><span class="n" title="Selisih gross per agent dengan vendor gross/agent tertinggi">KURANG GROSS/AG</span></div>
-    ${(isGross(g.group)?g.byGross:g.byRate).map(v=>`<div class="vrow ${v.comp===OWN?'own':''}"><span class="nm"><i style="width:8px;height:8px;border-radius:2px;background:${vColor(v.comp)};display:inline-block"></i>${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk" title="Rate"><span style="width:${v.rate/maxG*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n" style="${v===rl&&g.vend.length>1?'color:var(--success)':''}">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span>${vGap(v,g)}</div>`).join('')}
+    ${vHead(GR)}
+    ${(GR?g.byGross:g.byRate).map(v=>vRow(v,g,GR)).join('')}
     ${g.own&&g.vend.length<2?`<div class="vnote">Posisi rata² agent EDN: peringkat <b>${g.own.avgRank.toFixed(1)}</b> dari ${g.n}${g.nEst&&!fg?' (perkiraan)':''} agent di bucket → <b>${fmtPct(g.own.pctl,0)}</b> dari atas · ${g.own.top} agent Top 25%, ${g.own.low} di zona bawah.</div>`:''}
     ${g.vend.length<2&&fg&&fg.vend.length>1?`<div class="vnote" style="margin-top:10px;font-weight:700">Vendor lain — laporan lengkap ${dShort(fd)}</div>
-      ${fg.byRate.map(v=>`<div class="vrow ${v.comp===OWN?'own':''}" style="opacity:.6"><span class="nm">${escH(v.comp)} <span class="muted" style="font-weight:500">${v.n}</span></span><div class="trk"><span style="width:${v.rate/Math.max(...fg.vend.map(x=>x.rate),1e-9)*100}%;${v.comp===OWN?'':'background:'+vColor(v.comp)+'99'}"></span></div><span class="n">${fmtPct(v.rate)}</span><span class="n">${fmtJt(v.grossPer)}</span><span class="n">${v.avgRank.toFixed(1)}</span>${vGap(v,fg)}</div>`).join('')}
+      ${(GR?fg.byGross:fg.byRate).map(v=>vRow(v,fg,GR,true)).join('')}
       <div class="vnote muted">Angka di atas dari tanggal ${dShort(fd)} (hari kerja berbeda), dipakai sebagai acuan posisi vendor.</div>`:''}
     ${note?`<div class="vnote">${note}</div>`:''}
     ${g.vend.some(v=>v.outl.length)?`<div class="vnote muted">Tidak dihitung (pokok tidak wajar, >5× median bucket): ${g.vend.flatMap(v=>v.outl.map(r=>`${escH(r.ag)} (${escH(v.comp)}, ${fmtJt(r.os)})`)).join(', ')}.</div>`:''}</div></div>`;
