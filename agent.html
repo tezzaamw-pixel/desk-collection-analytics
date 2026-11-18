@@ -349,19 +349,34 @@ function setTheme(t){
 
 /* CACHE & FETCH */
 /* ── CACHE & FETCH (localStorage, TTL 30 menit, SWR) ── */
-const LC_PREFIX='tz_c_', LC_TTL=30*60*1000;
+// ── Cache browser (IndexedDB, muat puluhan MB; localStorage cuma ~5 MB) ──
+// Data bulan arsip (respon server arsip:true) disimpan permanen; bulan berjalan/lalu 30 menit.
+const LC_PREFIX='tz_c_', LC_TTL=30*60*1000; let TZ_FORCE=false;
+const TZC=(()=>{const mem=new Map();let dbp=null;
+  try{Object.keys(localStorage).filter(k=>k.startsWith(LC_PREFIX)).forEach(k=>localStorage.removeItem(k));}catch(e){} // bersihkan cache lama
+  const db=()=>dbp||(dbp=new Promise(res=>{try{const r=indexedDB.open('tz_cache',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>res(null);r.onblocked=()=>res(null);}catch(e){res(null);}}));
+  const run=async(mode,fn)=>{const d=await db();if(!d)return null;return new Promise(res=>{let q=null;try{const t=d.transaction('kv',mode);q=fn(t.objectStore('kv'));t.oncomplete=()=>res(q&&q.result!==undefined?q.result:null);t.onerror=()=>res(null);t.onabort=()=>res(null);}catch(e){res(null);}});};
+  return {
+    async get(k){if(mem.has(k))return mem.get(k);const v=await run('readonly',s=>s.get(k));if(v)mem.set(k,v);return v||null;},
+    set(k,v){mem.set(k,v);run('readwrite',s=>{s.put(v,k);});},
+    clear(all){for(const [k,v] of [...mem])if(all||!(v&&v.arsip))mem.delete(k);
+      return run('readwrite',s=>{const c=s.openCursor();c.onsuccess=()=>{const cur=c.result;if(!cur)return;if(all||!(cur.value&&cur.value.arsip))cur.delete();cur.continue();};});}
+  };})();
 function _lcKey(url){let h=0;const s=url.split('?')[1]||url;for(let i=0;i<s.length;i++)h=Math.imul(31,h)+s.charCodeAt(i)|0;return LC_PREFIX+(h>>>0).toString(36);}
-function _lcGet(url){try{const v=localStorage.getItem(_lcKey(url));if(!v)return null;const p=JSON.parse(v);return p;}catch(e){return null;}}
-function _lcSet(url,data){try{localStorage.setItem(_lcKey(url),JSON.stringify({data,ts:Date.now()}));}catch(e){}}
-function clearCache(){try{Object.keys(localStorage).filter(k=>k.startsWith(LC_PREFIX)).forEach(k=>localStorage.removeItem(k));}catch(e){}}
-async function _doFetch(url){const res=await fetch(url);const text=await res.text();if(text.trim().charCodeAt(0)===60){const r2=await fetch(url);return r2.json();}return JSON.parse(text);}
+function _lcSet(k,data){TZC.set(k,{data,ts:Date.now(),arsip:!!(data&&data.arsip)});}
+// clearCache() = hapus cache bulan berjalan (arsip tetap); clearCache(true) = hapus semua
+function clearCache(all){TZC.clear(!!all);}
+async function _doFetch(url,force){if(force)url+=(url.includes('?')?'&':'?')+'nocache=1';const res=await fetch(url);const text=await res.text();if(text.trim().charCodeAt(0)===60){const r2=await fetch(url);return r2.json();}return JSON.parse(text);}
 async function fetchJSON(url,useCache=true){
-  const cached=useCache?_lcGet(url):null;
+  const force=TZ_FORCE&&/action=agentdata/.test(url);if(force)TZ_FORCE=false; // tombol Refresh: paksa data terbaru dari sheet
+  const k=_lcKey(url);
+  const cached=useCache&&!force?await TZC.get(k):null;
+  if(cached&&cached.arsip)return cached.data;
   const fresh=Date.now()-(cached?.ts||0)<LC_TTL;
   if(cached&&fresh)return cached.data;
-  if(cached&&!fresh){_doFetch(url).then(d=>{if(d&&d.success)_lcSet(url,d);}).catch(()=>{});return cached.data;}
-  const data=await _doFetch(url);
-  if(useCache&&data&&data.success)_lcSet(url,data);
+  if(cached&&!fresh){_doFetch(url).then(d=>{if(d&&d.success)_lcSet(k,d);}).catch(()=>{});return cached.data;}
+  const data=await _doFetch(url,force);
+  if(useCache&&data&&data.success)_lcSet(k,data);
   return data;
 }
 

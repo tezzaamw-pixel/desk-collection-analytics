@@ -404,6 +404,10 @@ function _cacheRemove(key) {
 /** Panggil dari trigger / manual setelah update sheet agar cache segar */
 function clearAllServerCache() {
   const keys = ['svc_referensi', 'svc_violation', 'svc_agentdata_raw', 'svc_rankdata', 'svc_paytrend'];
+  // cache agentdata bulan berjalan & bulan lalu (arsip bulan lama tidak dihapus)
+  const tz = Session.getScriptTimeZone(), now = new Date();
+  const y = parseInt(Utilities.formatDate(now, tz, 'yyyy'), 10), m = parseInt(Utilities.formatDate(now, tz, 'M'), 10) - 1;
+  [[y, m], [m ? y : y - 1, m ? m - 1 : 11]].forEach(([yy, mm]) => keys.push(_adKey_(BULAN_LIST[mm], String(yy))));
   keys.forEach(k => _cacheRemove(k));
   Logger.log('Server cache cleared: ' + keys.join(', '));
 }
@@ -453,31 +457,203 @@ function endpointHome_(e) {
 
 function endpointAgentData_(e) {
   const p = e.parameter;
-  // Cache raw rows (tanpa filter) — key tidak include parameter filter
-  const CACHE_KEY = 'svc_agentdata_raw';
-  let allRows = _cacheGet(CACHE_KEY);
-  if (!allRows) {
-    const { rows } = readInputData();
-    allRows = rows;
-    _cachePut(CACHE_KEY, allRows);
+  const bulanN = p.bulan ? normBulan_(p.bulan) : '';
+  const tahunN = p.tahun ? normTahun_(p.tahun) : '';
+  let monthRows = null, sumber = 'live', arsip = false;
+
+  if (bulanN && tahunN) {
+    // ── Jalur cepat: hanya baris 1 bulan ──
+    const key = _adKey_(bulanN, tahunN);
+    if (_bulanTutup_(bulanN, tahunN)) {
+      // Bulan yang sudah lewat (lebih tua dari bulan lalu) → arsip permanen
+      monthRows = _arsipGet_(key);
+      if (monthRows) { sumber = 'arsip'; arsip = true; }
+      else {
+        monthRows = _cleanRows_(readInputMonth_(bulanN, tahunN));
+        if (monthRows.length) { _arsipSave_(key, bulanN, tahunN, monthRows); arsip = true; sumber = 'arsip-baru'; }
+      }
+    } else {
+      // Bulan berjalan & bulan lalu → selalu dari sheet, cache 5 menit (nocache=1 = paksa terbaru)
+      if (!p.nocache) monthRows = _bigCacheGet_(key);
+      if (monthRows) sumber = 'cache';
+      else {
+        monthRows = _cleanRows_(readInputMonth_(bulanN, tahunN));
+        _bigCachePut_(key, monthRows, SVC_CACHE_TTL);
+      }
+    }
+  } else {
+    // Tanpa bulan/tahun → cara lama (baca semua)
+    monthRows = _cleanRows_(readInputData().rows);
+    if (p.bulan) monthRows = monthRows.filter(r => r.bulan === bulanN);
+    if (p.tahun) monthRows = monthRows.filter(r => r.tahun === tahunN);
   }
-  let filtered = allRows;
+
+  let filtered = monthRows;
   if (p.agent)    filtered = filtered.filter(r => r.agent.toLowerCase() === p.agent.trim().toLowerCase());
-  if (p.bulan)    filtered = filtered.filter(r => r.bulan === normBulan_(p.bulan));
-  if (p.tahun)    filtered = filtered.filter(r => r.tahun === normTahun_(p.tahun));
   if (p.aplikasi) filtered = filtered.filter(r => r.aplikasi.toLowerCase() === p.aplikasi.trim().toLowerCase());
   if (p.bucket)   filtered = filtered.filter(r => r.bucket.toLowerCase() === p.bucket.trim().toLowerCase());
-  // Strip internal fields untuk kurangi response size
-  const cleanRows = filtered.map(r => {
-    const {_errors, _row, ...rest} = r;
-    return rest;
-  });
   return {
     success: true, action: 'agentdata', filters: p,
-    totalRows: cleanRows.length,
-    summary: summarizeRows_(cleanRows),
-    rows: cleanRows
+    totalRows: filtered.length,
+    summary: summarizeRows_(filtered),
+    rows: filtered,
+    sumber: sumber, arsip: arsip
   };
+}
+
+/* ============================================================
+ * AGENTDATA CEPAT: baca hanya baris bulan yg diminta + arsip bulan lama
+ * ============================================================ */
+function _cleanRows_(rows) {
+  return rows.map(r => { const {_errors, _row, ...rest} = r; return rest; });
+}
+function _adKey_(bulanN, tahunN) { return 'ad_' + tahunN + '_' + (BULAN_LIST.indexOf(bulanN) + 1); }
+
+/** true kalau bulan/tahun lebih tua dari bulan lalu (data dianggap final). */
+function _bulanTutup_(bulanN, tahunN) {
+  const m = BULAN_LIST.indexOf(bulanN), y = parseInt(tahunN, 10);
+  if (m < 0 || !(y > 2000)) return false;
+  const now = new Date(), tz = Session.getScriptTimeZone();
+  const ny = parseInt(Utilities.formatDate(now, tz, 'yyyy'), 10), nm = parseInt(Utilities.formatDate(now, tz, 'M'), 10) - 1;
+  return (y * 12 + m) < (ny * 12 + nm - 1);
+}
+
+/** Sama persis dengan readInputData(), tapi hanya memproses baris bulan/tahun tsb.
+ *  Kolom TAHUN & BULAN dibaca dulu, lalu hanya rentang baris yang memuat bulan itu. */
+function readInputMonth_(bulanN, tahunN) {
+  const ss = SpreadsheetApp.openById(CFG.SPREADSHEET_ID);
+  const sheetAllData = ss.getSheetByName(CFG.SHEET_ALL_DATA);
+  const sheetRef     = ss.getSheetByName(CFG.SHEET_REFERENSI);
+  if (!sheetAllData) throw new Error('Sheet "' + CFG.SHEET_ALL_DATA + '" tidak ditemukan.');
+  if (!sheetRef)     throw new Error('Sheet "' + CFG.SHEET_REFERENSI + '" tidak ditemukan.');
+  const lastRowData = sheetAllData.getLastRow();
+  if (lastRowData < CFG.DATA_START_ROW) return [];
+  const n = lastRowData - CFG.DATA_START_ROW + 1;
+
+  // 1) kolom TAHUN..BULAN saja → cari baris yang cocok
+  const c0 = Math.min(COL.TAHUN, COL.BULAN);
+  const ym = sheetAllData.getRange(CFG.DATA_START_ROW, c0 + 1, n, Math.abs(COL.TAHUN - COL.BULAN) + 1).getValues();
+  const hit = [];
+  for (let i = 0; i < n; i++) {
+    if (normBulan_(ym[i][COL.BULAN - c0]) === bulanN && normTahun_(ym[i][COL.TAHUN - c0]) === tahunN) hit.push(i);
+  }
+  if (!hit.length) return [];
+
+  // 2) baca rentang baris pertama..terakhir yg cocok (baris bulan lain di tengah dilewati)
+  const i0 = hit[0], i1 = hit[hit.length - 1], start = CFG.DATA_START_ROW + i0, len = i1 - i0 + 1;
+  const rawRows = sheetAllData.getRange(start, 1, len, TOTAL_COLS).getValues();
+  const tglDisp = sheetAllData.getRange(start, COL.TANGGAL + 1, len, 1).getDisplayValues();
+
+  const lastRowRef = sheetRef.getLastRow();
+  const refRows = lastRowRef >= 2 ? sheetRef.getRange(2, 1, lastRowRef - 1, REF_TOTAL_COLS).getValues() : [];
+  const supMap = buildSupervisorMap_(refRows);
+
+  const rows = [];
+  hit.forEach(i => {
+    const k = i - i0, raw = rawRows[k];
+    const isEmpty = raw.every(c => c === '' || c === null || c === undefined);
+    if (isEmpty) return;
+    raw[COL.TANGGAL] = tglDisp[k][0];
+    const norm = normalizeRow(raw, CFG.DATA_START_ROW + i);
+    norm.supervisor = lookupSupervisor_(supMap, norm.aplikasi, norm.bucket, norm.tahun);
+    rows.push(norm);
+  });
+  return rows;
+}
+
+/* ── Cache besar: JSON di-gzip lalu dipecah per 90 KB (batas CacheService 100 KB/kunci) ── */
+const BIG_CHUNK = 90000;
+function _gz64_(s) { return Utilities.base64Encode(Utilities.gzip(Utilities.newBlob(s, 'application/json')).getBytes()); }
+function _ungz64_(b) { return Utilities.ungzip(Utilities.newBlob(Utilities.base64Decode(b), 'application/x-gzip')).getDataAsString(); }
+function _bigCachePut_(key, obj, ttl) {
+  try {
+    const b = _gz64_(JSON.stringify(obj)), n = Math.ceil(b.length / BIG_CHUNK);
+    if (n > 90) return;
+    const tag = String(Date.now()), m = {};
+    for (let i = 0; i < n; i++) m[key + '#' + tag + '#' + i] = b.substr(i * BIG_CHUNK, BIG_CHUNK);
+    const c = CacheService.getScriptCache();
+    c.putAll(m, ttl);
+    c.put(key, JSON.stringify({ n: n, tag: tag, len: b.length }), ttl); // meta ditulis terakhir
+  } catch (e) {}
+}
+function _bigCacheGet_(key) {
+  try {
+    const c = CacheService.getScriptCache(), meta = c.get(key);
+    if (!meta) return null;
+    const m = JSON.parse(meta), ks = [];
+    for (let i = 0; i < m.n; i++) ks.push(key + '#' + m.tag + '#' + i);
+    const got = c.getAll(ks);
+    let b = '';
+    for (let i = 0; i < ks.length; i++) { if (got[ks[i]] == null) return null; b += got[ks[i]]; }
+    if (b.length !== m.len) return null;
+    return JSON.parse(_ungz64_(b));
+  } catch (e) { return null; }
+}
+
+/* ── Arsip permanen bulan lama: 1 file JSON per bulan di folder Drive ── */
+const ARSIP_FOLDER_NAME = 'TZ Analytics - Arsip agentdata';
+function _arsipFolder_() {
+  const props = PropertiesService.getScriptProperties();
+  const id = props.getProperty('ARSIP_FOLDER_ID');
+  if (id) { try { const f = DriveApp.getFolderById(id); if (!f.isTrashed()) return f; } catch (e) {} }
+  const it = DriveApp.getFoldersByName(ARSIP_FOLDER_NAME);
+  const f = it.hasNext() ? it.next() : DriveApp.createFolder(ARSIP_FOLDER_NAME);
+  props.setProperty('ARSIP_FOLDER_ID', f.getId());
+  return f;
+}
+function _arsipGet_(key) {
+  const hot = _bigCacheGet_('arsip_' + key);
+  if (hot) return hot;
+  try {
+    const id = PropertiesService.getScriptProperties().getProperty('ARSIP_' + key);
+    if (!id) return null;
+    const file = DriveApp.getFileById(id);
+    if (file.isTrashed()) return null;
+    const obj = JSON.parse(file.getBlob().getDataAsString());
+    if (!obj || obj.key !== key || !Array.isArray(obj.rows) || obj.rows.length !== obj.totalRows) return null;
+    _bigCachePut_('arsip_' + key, obj.rows, 21600);
+    return obj.rows;
+  } catch (e) { return null; }
+}
+function _arsipSave_(key, bulanN, tahunN, rows) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return false;
+  try {
+    const props = PropertiesService.getScriptProperties();
+    const body = JSON.stringify({ key: key, bulan: bulanN, tahun: tahunN,
+      dibuat: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm'),
+      totalRows: rows.length, rows: rows });
+    const name = 'agentdata_' + tahunN + '_' + String(BULAN_LIST.indexOf(bulanN) + 1).padStart(2, '0') + '_' + bulanN + '.json';
+    let file = null;
+    const id = props.getProperty('ARSIP_' + key);
+    if (id) { try { file = DriveApp.getFileById(id); if (file.isTrashed()) file = null; } catch (e) { file = null; } }
+    if (file) file.setContent(body);
+    else { file = _arsipFolder_().createFile(name, body, 'application/json'); props.setProperty('ARSIP_' + key, file.getId()); }
+    _bigCachePut_('arsip_' + key, rows, 21600);
+    return true;
+  } finally { lock.releaseLock(); }
+}
+
+/**
+ * JALANKAN SEKALI dari editor Apps Script setelah deploy (juga untuk memberi izin Drive).
+ * Membuat / memperbarui arsip semua bulan yang sudah lewat (lebih tua dari bulan lalu).
+ * Aman dijalankan ulang kapan saja — misalnya kalau ada koreksi data bulan lama.
+ */
+function SETUP_ARSIP() {
+  const rows = _cleanRows_(readInputData().rows), groups = {};
+  rows.forEach(r => {
+    if (!_bulanTutup_(r.bulan, r.tahun)) return;
+    const k = _adKey_(r.bulan, r.tahun);
+    (groups[k] = groups[k] || { bulan: r.bulan, tahun: r.tahun, rows: [] }).rows.push(r);
+  });
+  const done = [];
+  Object.keys(groups).sort().forEach(k => {
+    const g = groups[k];
+    _arsipSave_(k, g.bulan, g.tahun, g.rows);
+    done.push(g.bulan + ' ' + g.tahun + ' (' + g.rows.length + ' baris)');
+  });
+  Logger.log('Arsip dibuat/diperbarui: ' + (done.join(', ') || '-'));
+  return done;
 }
 
 function endpointWeekly_(e) {
